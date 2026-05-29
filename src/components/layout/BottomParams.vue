@@ -68,10 +68,19 @@ const drawing = useDrawingStore()
 const box = useBoxStore()
 
 const activeBox = computed(() => box.getActiveBox?.() || null)
-const activeWidth = computed(() => activeBox.value?.width ?? cabinet.state.width)
-const activeDepth = computed(() => activeBox.value?.depth ?? cabinet.state.depth)
-const activeHeight = computed(() => activeBox.value?.height ?? cabinet.state.height)
-const activePanelThickness = computed(() => activeBox.value?.panelThickness ?? cabinet.state.panelThickness)
+
+const displayNumber = (value) => {
+  const number = Number(value)
+
+  if (!Number.isFinite(number)) return 0
+
+  return Math.round(number)
+}
+
+const activeWidth = computed(() => displayNumber(activeBox.value?.width ?? cabinet.state.width))
+const activeDepth = computed(() => displayNumber(activeBox.value?.depth ?? cabinet.state.depth))
+const activeHeight = computed(() => displayNumber(activeBox.value?.height ?? cabinet.state.height))
+const activePanelThickness = computed(() => displayNumber(activeBox.value?.panelThickness ?? cabinet.state.panelThickness))
 const activeUnit = computed(() => activeBox.value?.unit ?? cabinet.state.unit)
 
 //=================
@@ -80,7 +89,7 @@ function normalizeInputValue(event) {
 
   if (!Number.isFinite(rawValue) || rawValue <= 0) return null
 
-  return rawValue
+  return Math.round(rawValue)
 } // End normalizeInputValue
 
 //=================

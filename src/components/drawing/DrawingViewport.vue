@@ -632,15 +632,34 @@ function getPanelSelectRect(panel) {
   })
 } // End getPanelSelectRect
 //=================
-function getBoxSelectRect(targetBox) {
-  if (!targetBox) return null
+function getPanelOwnerBoxId(panel) {
+  if (!panel) return null
 
-  const rect = projectBoxToCameraRect(targetBox, app.state.currentView)
+  return panel.linkedFrameId
+    || panel.frameId
+    || panel.sourceBoxId
+    || panel.baseObjectId
+    || null
+} // End getPanelOwnerBoxId
 
-  if (!rect) return null
+//=================
+function hitTestBoxFill(local) {
+  if (!local) return null
 
-  return localRectToScreenRect(rect)
-} // End getBoxSelectRect
+  for (let index = getVisibleBoxes().length - 1; index >= 0; index -= 1) {
+    const targetBox = getVisibleBoxes()[index]
+    const rect = projectBoxToCameraRect(targetBox, app.state.currentView)
+
+    if (!rect) continue
+
+    const insideX = local.x >= rect.x && local.x <= rect.x + rect.width
+    const insideY = local.y >= rect.y && local.y <= rect.y + rect.height
+
+    if (insideX && insideY) return targetBox
+  }
+
+  return null
+} // End hitTestBoxFill
 
 //=================
 function getPanelLocalRect(panel) {
@@ -1401,6 +1420,31 @@ function onPointerDown(event) {
       drawing.addPanelFromHover()
       draw()
       return
+    }
+
+    draw()
+    return
+  }
+
+  const boxFillHit = app.state.currentTool === 'select' ? hitTestBoxFill(rawLocal) : null
+
+  if (app.state.currentTool === 'select' && boxFillHit) {
+    const panelIdsInBox = getVisiblePanels()
+      .filter((panel) => getPanelOwnerBoxId(panel) === boxFillHit.id)
+      .map((panel) => panel.id)
+
+    if (event.shiftKey) {
+      box.selectBoxes(mergeIds(box.state.selectedBoxIds, boxFillHit.id))
+      drawing.selectPanels([
+        ...new Set([
+          ...(Array.isArray(drawing.state.selectedPanelIds) ? drawing.state.selectedPanelIds : []),
+          ...panelIdsInBox
+        ])
+      ])
+    } else {
+      box.selectBox(boxFillHit.id)
+      drawing.selectPanels(panelIdsInBox)
+      drawing.selectDimensions([])
     }
 
     draw()
