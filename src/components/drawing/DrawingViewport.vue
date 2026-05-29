@@ -38,9 +38,6 @@
     />
 
   <Mini3DPreview v-if="app.state.mini3DVisible" />
-  <div class="mn-quick-view-bar">
-    <button v-for="view in views" :key="view.id" class="mn-quick-view-btn" :class="{ active: app.state.currentView === view.id }" @click="app.setView(view.id)">{{ view.label }}</button>
-  </div>
   <button class="mn-preview-toggle" @click="app.toggleMini3D">{{ app.state.mini3DVisible ? 'Ẩn 3D' : 'Hiện 3D' }}</button>
   </main>
 </template>
