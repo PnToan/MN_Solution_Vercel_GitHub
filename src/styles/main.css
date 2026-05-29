@@ -219,7 +219,7 @@ img { display: block; max-width: 100%; }
 
 .mn-quick-view-btn {
   min-width: 42px;
-  height: 22px;
+  height: 35px;
   padding: 0 8px;
   border: 1px solid transparent;
   border-radius: 4px;
@@ -347,7 +347,7 @@ img { display: block; max-width: 100%; }
   width: 40%;
   min-width: 320px;
   max-width: 40%;
-  height: 28px;
+  height: 32px;
   display: flex;
   align-items: center;
   padding: 0 10px;
@@ -355,7 +355,7 @@ img { display: block; max-width: 100%; }
   border-radius: 4px;
   background: #1c1c1c;
   color: var(--mn-text-sub);
-  font-size: 11px;
+  font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
