@@ -333,10 +333,10 @@ img { display: block; max-width: 100%; }
 .mn-preview-toggle {
   position: fixed;
   right: 0;
-  top: 126px;
-  z-index: 40;
+  top: 128px;
+  z-index: 999;
   width: 28px;
-  height: 72px;
+  height: 76px;
   padding: 0;
   border: 1px solid #3a3a3a;
   border-right: none;
@@ -423,7 +423,7 @@ img { display: block; max-width: 100%; }
   width: 6px;
   margin-left: -3px;
   cursor: ew-resize;
-  z-index: 35;
+  z-index: 50;
   background: transparent;
 }
 
@@ -453,10 +453,10 @@ body.mn-right-panel-is-resizing {
 .mn-right-panel-tab {
   position: fixed;
   right: 0;
-  top: 50px;
-  z-index: 40;
+  top: 48px;
+  z-index: 999;
   width: 28px;
-  height: 72px;
+  height: 76px;
   border: 1px solid #3a3a3a;
   border-right: none;
   border-radius: 8px 0 0 8px;

@@ -276,8 +276,8 @@ function toggleSection(key) {
 
 <style scoped>
 .mn-right-panel {
-  width: 224px;
-  min-width: 224px;
+  width: var(--mn-right-panel-width);
+  min-width: var(--mn-right-panel-width);
   height: 100%;
   background: #202020;
   border-left: 1px solid #3a3a3a;
@@ -308,6 +308,7 @@ function toggleSection(key) {
 }
 
 .mn-box-info-body {
+  width: 100%;
   background: #f2f2f2;
   color: #000000;
   border: 2px solid #000000;
