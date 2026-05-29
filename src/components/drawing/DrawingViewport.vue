@@ -919,16 +919,6 @@ function getSelectedIdsByDragRect(selectRect) {
     })
     .map((panel) => panel.id)
 
-  const boxIds = getVisibleBoxes()
-    .filter((targetBox) => {
-      const rect = getBoxSelectRect(targetBox)
-
-      if (!rect || rect.width <= 0 || rect.height <= 0) return false
-
-      return checkRect(selectRect, rect)
-    })
-    .map((targetBox) => targetBox.id)
-
   const dimensionIds = drawing.getRenderableDimensions(app.state.currentView)
     .filter((dimension) => {
       const rect = getDimensionSelectRect(dimension)
@@ -941,7 +931,7 @@ function getSelectedIdsByDragRect(selectRect) {
 
   return {
     panelIds,
-    boxIds,
+    boxIds: [],
     dimensionIds
   }
 } // End getSelectedIdsByDragRect
