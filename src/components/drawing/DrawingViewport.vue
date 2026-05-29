@@ -1595,20 +1595,50 @@ function onPointerUp(event) {
     const selectRect = getSelectDragRect()
     const selectedIds = getSelectedIdsByDragRect(selectRect)
 
-    drawing.selectPanels(selectedIds.panelIds)
-    drawing.selectDimensions(selectedIds.dimensionIds)
-    box.selectBoxes(selectedIds.boxIds)
+    if (event?.shiftKey) {
+      drawing.selectPanels([
+        ...new Set([
+          ...(Array.isArray(drawing.state.selectedPanelIds) ? drawing.state.selectedPanelIds : []),
+          ...selectedIds.panelIds
+        ])
+      ])
+
+      drawing.selectDimensions([
+        ...new Set([
+          ...(Array.isArray(drawing.state.selectedDimensionIds) ? drawing.state.selectedDimensionIds : []),
+          ...selectedIds.dimensionIds
+        ])
+      ])
+    } else {
+      drawing.selectPanels(selectedIds.panelIds)
+      drawing.selectDimensions(selectedIds.dimensionIds)
+      box.clearSelection()
+    }
 
     resetSelectDrag()
 
-    event.preventDefault()
-    event.stopPropagation()
+    if (
+      event?.currentTarget &&
+      typeof event.currentTarget.releasePointerCapture === 'function' &&
+      event.pointerId !== undefined &&
+      event.currentTarget.hasPointerCapture?.(event.pointerId)
+    ) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+
+    event?.preventDefault?.()
+    event?.stopPropagation?.()
+
+    draw()
     return
   }
 
   if (selectDrag.value.start) {
     resetSelectDrag()
+    draw()
+    return
   }
+
   panning = false
   panStart = null
   panOriginal = null
