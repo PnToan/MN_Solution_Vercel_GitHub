@@ -673,28 +673,19 @@ function selectBoxWithPanels(boxId, append = false) {
 } // End selectBoxWithPanels
 
 //=================
-function selectPanelWithOwnerBox(panelId, ownerBoxId, append = false) {
+function selectPanelOnly(panelId, append = false) {
   if (!panelId) return
 
   if (append) {
     drawing.selectPanels(mergeIds(drawing.state.selectedPanelIds, panelId))
-
-    if (ownerBoxId) {
-      box.selectBoxes(mergeIds(box.state.selectedBoxIds, ownerBoxId))
-    }
-
+    box.clearSelection()
     return
   }
 
   drawing.selectPanel(panelId)
   drawing.selectDimensions([])
-
-  if (ownerBoxId) {
-    box.selectBox(ownerBoxId)
-  } else {
-    box.clearSelection()
-  }
-} // End selectPanelWithOwnerBox
+  box.clearSelection()
+} // End selectPanelOnly
 //=================
 function hitTestBoxFill(local) {
   if (!local) return null
@@ -1481,9 +1472,7 @@ function onPointerDown(event) {
   const panelHit = hitTestPanel(getVisiblePanels(), rawLocal)
 
   if (app.state.currentTool === 'select' && panelHit) {
-    const ownerBoxId = getPanelOwnerBoxId(panelHit.panel)
-
-    selectPanelWithOwnerBox(panelHit.panel.id, ownerBoxId, event.shiftKey)
+    selectPanelOnly(panelHit.panel.id, event.shiftKey)
 
     draw()
     return
