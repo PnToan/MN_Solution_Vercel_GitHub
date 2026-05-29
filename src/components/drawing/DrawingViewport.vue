@@ -641,7 +641,60 @@ function getPanelOwnerBoxId(panel) {
     || panel.baseObjectId
     || null
 } // End getPanelOwnerBoxId
+//=================
+function getPanelIdsInBox(boxId) {
+  if (!boxId) return []
 
+  return getVisiblePanels()
+    .filter((panel) => getPanelOwnerBoxId(panel) === boxId)
+    .map((panel) => panel.id)
+} // End getPanelIdsInBox
+
+//=================
+function selectBoxWithPanels(boxId, append = false) {
+  if (!boxId) return
+
+  const panelIdsInBox = getPanelIdsInBox(boxId)
+
+  if (append) {
+    box.selectBoxes(mergeIds(box.state.selectedBoxIds, boxId))
+    drawing.selectPanels([
+      ...new Set([
+        ...(Array.isArray(drawing.state.selectedPanelIds) ? drawing.state.selectedPanelIds : []),
+        ...panelIdsInBox
+      ])
+    ])
+    return
+  }
+
+  box.selectBox(boxId)
+  drawing.selectPanels(panelIdsInBox)
+  drawing.selectDimensions([])
+} // End selectBoxWithPanels
+
+//=================
+function selectPanelWithOwnerBox(panelId, ownerBoxId, append = false) {
+  if (!panelId) return
+
+  if (append) {
+    drawing.selectPanels(mergeIds(drawing.state.selectedPanelIds, panelId))
+
+    if (ownerBoxId) {
+      box.selectBoxes(mergeIds(box.state.selectedBoxIds, ownerBoxId))
+    }
+
+    return
+  }
+
+  drawing.selectPanel(panelId)
+  drawing.selectDimensions([])
+
+  if (ownerBoxId) {
+    box.selectBox(ownerBoxId)
+  } else {
+    box.clearSelection()
+  }
+} // End selectPanelWithOwnerBox
 //=================
 function hitTestBoxFill(local) {
   if (!local) return null
@@ -1425,42 +1478,21 @@ function onPointerDown(event) {
     draw()
     return
   }
+  const panelHit = hitTestPanel(getVisiblePanels(), rawLocal)
 
-  const boxFillHit = app.state.currentTool === 'select' ? hitTestBoxFill(rawLocal) : null
+  if (app.state.currentTool === 'select' && panelHit) {
+    const ownerBoxId = getPanelOwnerBoxId(panelHit.panel)
 
-  if (app.state.currentTool === 'select' && boxFillHit) {
-    const panelIdsInBox = getVisiblePanels()
-      .filter((panel) => getPanelOwnerBoxId(panel) === boxFillHit.id)
-      .map((panel) => panel.id)
-
-    if (event.shiftKey) {
-      box.selectBoxes(mergeIds(box.state.selectedBoxIds, boxFillHit.id))
-      drawing.selectPanels([
-        ...new Set([
-          ...(Array.isArray(drawing.state.selectedPanelIds) ? drawing.state.selectedPanelIds : []),
-          ...panelIdsInBox
-        ])
-      ])
-    } else {
-      box.selectBox(boxFillHit.id)
-      drawing.selectPanels(panelIdsInBox)
-      drawing.selectDimensions([])
-    }
+    selectPanelWithOwnerBox(panelHit.panel.id, ownerBoxId, event.shiftKey)
 
     draw()
     return
   }
 
-  const panelHit = hitTestPanel(getVisiblePanels(), rawLocal)
+  const boxFillHit = app.state.currentTool === 'select' ? hitTestBoxFill(rawLocal) : null
 
-  if (app.state.currentTool === 'select' && panelHit) {
-    if (event.shiftKey) {
-      drawing.selectPanels(mergeIds(drawing.state.selectedPanelIds, panelHit.panel.id))
-    } else {
-      drawing.selectPanel(panelHit.panel.id)
-      drawing.selectDimensions([])
-      box.clearSelection()
-    }
+  if (app.state.currentTool === 'select' && boxFillHit) {
+    selectBoxWithPanels(boxFillHit.id, event.shiftKey)
 
     draw()
     return
