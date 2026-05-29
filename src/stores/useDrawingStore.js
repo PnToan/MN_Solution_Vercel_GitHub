@@ -932,6 +932,160 @@ const store = createSimpleStore({
 
     this.rebuildZones()
   }, // End updatePanelsAfterBoxResize
+
+  //=================
+  updatePanelsAfterBoxThicknessChange(boxId, thickness) {
+    const boxStore = useBoxStore()
+    const sourceBox = boxStore.state.boxes.find((item) => item.id === boxId)
+
+    if (!sourceBox) return
+
+    const safeThickness = Number(thickness)
+
+    if (!Number.isFinite(safeThickness) || safeThickness <= 0) return
+
+    const panelsInBox = state.panels.filter((panel) => {
+      return panel.linkedFrameId === boxId
+        || panel.frameId === boxId
+        || panel.sourceBoxId === boxId
+        || panel.baseObjectId === boxId
+    })
+
+    if (!panelsInBox.length) {
+      this.rebuildZones()
+      return
+    }
+
+    const panelsOutsideBox = state.panels.filter((panel) => {
+      return !(panel.linkedFrameId === boxId
+        || panel.frameId === boxId
+        || panel.sourceBoxId === boxId
+        || panel.baseObjectId === boxId)
+    })
+
+    const baseRect = {
+      x: Number(sourceBox.x || 0),
+      y: Number(sourceBox.z || 0),
+      width: Number(sourceBox.width || 0),
+      height: Number(sourceBox.height || 0),
+      minX: Number(sourceBox.x || 0),
+      maxX: Number(sourceBox.x || 0) + Number(sourceBox.width || 0),
+      minY: Number(sourceBox.z || 0),
+      maxY: Number(sourceBox.z || 0) + Number(sourceBox.height || 0),
+      minZ: Number(sourceBox.z || 0),
+      maxZ: Number(sourceBox.z || 0) + Number(sourceBox.height || 0),
+      id: sourceBox.id,
+      name: sourceBox.name,
+      frameId: sourceBox.id,
+      linkedFrameId: sourceBox.id,
+      sourceBoxId: sourceBox.id,
+      baseObjectId: sourceBox.id,
+      depth: sourceBox.depth,
+      source: sourceBox,
+      sourceBox,
+      baseObject: sourceBox
+    }
+
+    const getPanelEdge = (panel) => {
+      if (panel.panelOffsetFrom === 'left' || panel.panelOffsetFrom === 'right' || panel.panelOffsetFrom === 'top' || panel.panelOffsetFrom === 'bottom') {
+        return panel.panelOffsetFrom
+      }
+
+      if (panel.edge === 'left' || panel.edge === 'right' || panel.edge === 'top' || panel.edge === 'bottom') {
+        return panel.edge
+      }
+
+      if (panel.panelSide === 'left' || panel.panelSide === 'right' || panel.panelSide === 'top' || panel.panelSide === 'bottom') {
+        return panel.panelSide
+      }
+
+      if (panel.panelSide === 'split_vertical') return 'left'
+      if (panel.panelSide === 'split_horizontal') return 'bottom'
+
+      if (panel.orientation === 'vertical') return 'left'
+      if (panel.orientation === 'horizontal') return 'bottom'
+
+      return null
+    }
+
+    const findZoneByOldPanelCenter = (zones, oldPanel) => {
+      if (!zones.length) return null
+
+      const oldPanelX = Number(oldPanel.x3d ?? oldPanel.x ?? Number(sourceBox.x || 0))
+      const oldPanelZ = Number(oldPanel.z3d ?? oldPanel.z ?? oldPanel.y ?? Number(sourceBox.z || 0))
+      const oldPanelWidth = Number(oldPanel.xSize ?? oldPanel.width ?? 0)
+      const oldPanelHeight = Number(oldPanel.zSize ?? oldPanel.height ?? 0)
+      const targetX = oldPanelX + (oldPanelWidth / 2)
+      const targetY = oldPanelZ + (oldPanelHeight / 2)
+
+      return zones.find((zone) => {
+        const minX = Number(zone.minX ?? zone.x ?? 0)
+        const maxX = Number(zone.maxX ?? (minX + Number(zone.width || 0)))
+        const minY = Number(zone.minY ?? zone.minZ ?? zone.y ?? 0)
+        const maxY = Number(zone.maxY ?? zone.maxZ ?? (minY + Number(zone.height || 0)))
+
+        return targetX >= minX - 0.001
+          && targetX <= maxX + 0.001
+          && targetY >= minY - 0.001
+          && targetY <= maxY + 0.001
+      }) || zones[0]
+    }
+
+    const nextPanelsInBox = []
+
+    panelsInBox.forEach((oldPanel) => {
+      const edge = getPanelEdge(oldPanel)
+
+      if (!edge) return
+
+      const currentZones = buildZones(baseRect, nextPanelsInBox).map((zone) => ({
+        ...zone,
+        frameId: boxId,
+        linkedFrameId: boxId,
+        sourceBoxId: boxId,
+        baseObjectId: boxId,
+        depth: sourceBox.depth,
+        sourceBox,
+        baseObject: sourceBox
+      }))
+
+      if (!currentZones.length) return
+
+      const targetZone = findZoneByOldPanelCenter(currentZones, oldPanel)
+      const offset = Number(oldPanel.panelOffset ?? 0)
+      const nextPanel = createPanelOnZoneEdge(targetZone, edge, safeThickness, offset)
+
+      if (!nextPanel) return
+
+      nextPanelsInBox.push({
+        ...oldPanel,
+        ...nextPanel,
+        id: oldPanel.id,
+        name: oldPanel.name,
+        zoneId: nextPanel.zoneId,
+        panelBaseZone: nextPanel.panelBaseZone,
+        linkedFrameId: boxId,
+        frameId: boxId,
+        sourceBoxId: boxId,
+        baseObjectId: boxId,
+        panelSide: oldPanel.panelSide || nextPanel.panelSide,
+        panelDivideCount: oldPanel.panelDivideCount,
+        panelOffsetFrom: oldPanel.panelOffsetFrom || nextPanel.panelOffsetFrom,
+        panelOffset: offset,
+        panelThickness: safeThickness,
+        thickness: safeThickness,
+        dimEnabled: oldPanel.dimEnabled ?? false
+      })
+    })
+
+    state.panels = [
+      ...panelsOutsideBox,
+      ...nextPanelsInBox
+    ]
+
+    this.rebuildZones()
+  }, // End updatePanelsAfterBoxThicknessChange
+
   //=================
   setHover(hit) {
     if (hit?.type === 'zone-edge' && !this.isPanelToolAllowed()) {
@@ -965,6 +1119,26 @@ const store = createSimpleStore({
     state.selectedPanelIds = ids
     state.selectedPanelId = ids[0] || null
   }, // End selectPanels
+  //=================
+  selectPanels(panelIds) {
+    const ids = Array.isArray(panelIds) ? panelIds.filter(Boolean) : []
+
+    state.selectedPanelIds = ids
+    state.selectedPanelId = ids[0] || null
+  }, // End selectPanels
+
+  //=================
+  getSelectedPanelBoxId() {
+    const selectedId = state.selectedPanelId || state.selectedPanelIds[0] || null
+
+    if (!selectedId) return null
+
+    const panel = state.panels.find((item) => item.id === selectedId)
+
+    if (!panel) return null
+
+    return getPanelFrameId(panel)
+  }, // End getSelectedPanelBoxId
 
   //=================
   selectDimensions(dimensionIds) {

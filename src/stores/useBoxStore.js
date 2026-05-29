@@ -1,6 +1,7 @@
 import { createSimpleStore } from './createStore'
 import { normalizePositiveNumber } from '../core/geometry/number-utils'
 import { useDrawingStore } from './useDrawingStore'
+import { useCabinetStore } from './useCabinetStore'
 let boxIdSeed = 1
 
 //=================
@@ -25,7 +26,10 @@ function createBoxFromRect(rect, height) {
   if (!rect) return null
   if (rect.width <= 1 || rect.depth <= 1) return null
 
+  const cabinet = useCabinetStore()
   const id = `box_${boxIdSeed++}`
+  const panelThickness = Number(cabinet.state.panelThickness || 18)
+  const unit = cabinet.state.unit || 'mm'
 
   return {
     id,
@@ -36,6 +40,8 @@ function createBoxFromRect(rect, height) {
     width: rect.width,
     depth: rect.depth,
     height,
+    panelThickness,
+    unit,
     color: 'rgba(0, 119, 204, 0.12)'
   }
 } // End createBoxFromRect
@@ -137,7 +143,7 @@ const store = createSimpleStore({
 
   //=================
   setBoxSize(boxId, key, value, wallBox = null) {
-    if (!['width', 'depth', 'height'].includes(key)) return
+    if (!['width', 'depth', 'height', 'panelThickness'].includes(key)) return
 
     const item = state.boxes.find((box) => box.id === boxId)
     if (!item) return
@@ -146,8 +152,16 @@ const store = createSimpleStore({
     if (!Number.isFinite(rawValue) || rawValue <= 0) return
 
     const oldBox = { ...item }
+    const drawing = useDrawingStore()
 
-    useDrawingStore().pushHistorySnapshot('Sửa kích thước Box')
+    drawing.pushHistorySnapshot(key === 'panelThickness' ? 'Sửa độ dày tấm Box' : 'Sửa kích thước Box')
+
+    if (key === 'panelThickness') {
+      item.panelThickness = rawValue
+      drawing.updatePanelsAfterBoxThicknessChange?.(item.id, rawValue)
+      drawing.rebuildZones?.()
+      return
+    }
 
     if (key === 'depth') {
       const anchorY = item.y + item.depth
@@ -157,7 +171,6 @@ const store = createSimpleStore({
       item[key] = rawValue
     }
 
-    const drawing = useDrawingStore()
     drawing.updatePanelsAfterBoxResize(oldBox, item)
   }, // End setBoxSize
 
@@ -180,7 +193,21 @@ const store = createSimpleStore({
   //=================
   getSelectedBox() {
     return state.boxes.find((item) => item.id === state.selectedBoxId) || null
-  } // End getSelectedBox
+  }, // End getSelectedBox
+
+  //=================
+  getActiveBox() {
+    const selectedBox = this.getSelectedBox()
+
+    if (selectedBox) return selectedBox
+
+    const drawing = useDrawingStore()
+    const panelBoxId = drawing.getSelectedPanelBoxId?.()
+
+    if (!panelBoxId) return null
+
+    return state.boxes.find((item) => item.id === panelBoxId) || null
+  } // End getActiveBox
 }))
 
 //=================
