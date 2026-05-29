@@ -15,7 +15,7 @@
   --mn-topbar-height: 40px;
   --mn-library-height: 45px;
   --mn-left-toolbar-width: 40px;
-  --mn-right-panel-width: 180px;
+  --mn-right-panel-width: 224px;
   --mn-bottom-params-height: 48px;
   --mn-font-main: Arial, Helvetica, sans-serif;
 }
@@ -333,8 +333,8 @@ img { display: block; max-width: 100%; }
 .mn-preview-toggle {
   position: fixed;
   right: 0;
-  top: 168px;
-  z-index: 31;
+  top: 126px;
+  z-index: 40;
   width: 28px;
   height: 72px;
   padding: 0;
@@ -416,6 +416,28 @@ img { display: block; max-width: 100%; }
   transition: transform 0.2s ease;
   z-index: 20;
 }
+.mn-right-panel-resizer {
+  grid-area: right;
+  align-self: stretch;
+  justify-self: start;
+  width: 6px;
+  margin-left: -3px;
+  cursor: ew-resize;
+  z-index: 35;
+  background: transparent;
+}
+
+.mn-right-panel-resizer:hover {
+  background: rgba(63, 169, 245, 0.28);
+}
+
+body.mn-right-panel-is-resizing {
+  cursor: ew-resize;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
 .mn-app.mn-right-panel-hidden {
   grid-template-columns: var(--mn-left-toolbar-width) 1fr 0px;
 }
@@ -431,8 +453,8 @@ img { display: block; max-width: 100%; }
 .mn-right-panel-tab {
   position: fixed;
   right: 0;
-  top: 88px;
-  z-index: 30;
+  top: 50px;
+  z-index: 40;
   width: 28px;
   height: 72px;
   border: 1px solid #3a3a3a;

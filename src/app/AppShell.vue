@@ -6,6 +6,12 @@
     <DrawingViewport />
     <BottomParams />
 
+    <div
+      v-if="!isRightPanelHidden"
+      class="mn-right-panel-resizer"
+      @pointerdown="startRightPanelResize"
+    ></div>
+
     <RightPanel />
 
     <button
@@ -13,7 +19,7 @@
       type="button"
       @click="toggleRightPanel"
     >
-      {{ isRightPanelHidden ? 'Mở' : 'Ẩn' }}
+      {{ isRightPanelHidden ? 'Info' : 'Ẩn Info' }}
     </button>
   </div>
 </template>
@@ -32,7 +38,52 @@ import { useAppStore } from '../stores/useAppStore'
 const drawingStore = useDrawingStore()
 const app = useAppStore()
 const isRightPanelHidden = ref(true)
+const rightPanelWidth = ref(224)
+let rightPanelResizing = false
+//=================
+function applyRightPanelWidth(width) {
+  const safeWidth = Math.max(180, Math.min(520, Math.round(width)))
 
+  rightPanelWidth.value = safeWidth
+  document.documentElement.style.setProperty('--mn-right-panel-width', `${safeWidth}px`)
+
+  requestAnimationFrame(() => {
+    window.dispatchEvent(new Event('resize'))
+  })
+} // End applyRightPanelWidth
+
+//=================
+function onRightPanelResizeMove(event) {
+  if (!rightPanelResizing) return
+
+  const nextWidth = window.innerWidth - event.clientX
+
+  applyRightPanelWidth(nextWidth)
+} // End onRightPanelResizeMove
+
+//=================
+function stopRightPanelResize() {
+  if (!rightPanelResizing) return
+
+  rightPanelResizing = false
+  document.body.classList.remove('mn-right-panel-is-resizing')
+  window.removeEventListener('pointermove', onRightPanelResizeMove)
+  window.removeEventListener('pointerup', stopRightPanelResize)
+} // End stopRightPanelResize
+
+//=================
+function startRightPanelResize(event) {
+  rightPanelResizing = true
+  document.body.classList.add('mn-right-panel-is-resizing')
+
+  event?.preventDefault?.()
+  event?.stopPropagation?.()
+
+  window.addEventListener('pointermove', onRightPanelResizeMove)
+  window.addEventListener('pointerup', stopRightPanelResize)
+} // End startRightPanelResize
+
+//=================
 //=================
 function toggleRightPanel() {
   isRightPanelHidden.value = !isRightPanelHidden.value
@@ -59,10 +110,12 @@ function onGlobalKeyDown(event) {
 
 onMounted(() => {
   drawingStore.rebuildZones()
+  applyRightPanelWidth(rightPanelWidth.value)
   window.addEventListener('keydown', onGlobalKeyDown, true)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onGlobalKeyDown, true)
+  stopRightPanelResize()
 })
 </script>
