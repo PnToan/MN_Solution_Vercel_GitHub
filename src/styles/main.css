@@ -430,7 +430,7 @@ img { display: block; max-width: 100%; }
 
 .mn-right-panel-tab { position: fixed; 
   right: 0; 
-  top: 680px; 
+  top: 720px; 
   z-index: 30; 
   width: 28px; 
   height: 72px; 
