@@ -234,23 +234,23 @@ function buildFramePanels(sourceBox, info, body, panels) {
 function buildBackPanels(sourceBox, info, body, panels) {
   if (!normalizeBoolean(info?.back?.enabled)) return
 
+  const t = body.thickness
   const grooveDepth = toNonNegativeNumber(info.back.grooveDepth, 0)
-  const backThickness = toPositiveNumber(info.back.thickness, Math.max(1, body.thickness / 3))
+  const backThickness = toPositiveNumber(info.back.thickness, Math.max(1, t / 3))
   const inset = toNumber(info.back.inset, 0)
 
-  const backOuterY = body.y
-  const y = backOuterY + inset
+  const innerX = body.x + t
+  const innerWidth = Math.max(1, body.width - (2 * t))
+  const x = innerX - grooveDepth
+  const width = Math.max(1, innerWidth + (2 * grooveDepth))
 
-  const x = body.x + grooveDepth
-  const width = Math.max(1, body.width - (2 * grooveDepth))
+  const innerZ = body.z + t
+  const innerHeight = Math.max(1, body.height - (2 * t))
+  const z = innerZ - grooveDepth
+  const height = Math.max(1, innerHeight + (2 * grooveDepth))
 
-  const z = body.z + (normalizeBoolean(info.back.bottomCoverBack) ? 0 : grooveDepth)
-  const height = Math.max(
-    1,
-    body.height
-      - (normalizeBoolean(info.back.topCoverBack) ? 0 : grooveDepth)
-      - (normalizeBoolean(info.back.bottomCoverBack) ? 0 : grooveDepth)
-  )
+  const backFaceY = body.y + body.depth
+  const y = backFaceY - inset - backThickness
 
   const splitOffsets = parseDivisionFormula(info.back.splitFormula, width, backThickness)
   let startX = x
