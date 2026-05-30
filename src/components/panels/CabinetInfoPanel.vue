@@ -102,11 +102,19 @@ const cabinetInfo = useCabinetInfoStore()
 const boxStore = useBoxStore()
 const info = cabinetInfo.state.info
 
-const selectedBox = computed(() => boxStore.getSelectedBox ? boxStore.getSelectedBox() : null)
+const selectedBox = computed(() => {
+  if (typeof boxStore.getActiveBox === 'function') {
+    return boxStore.getActiveBox()
+  }
+
+  return boxStore.getSelectedBox ? boxStore.getSelectedBox() : null
+})
 
 const selectedBoxName = computed(() => selectedBox.value?.name || selectedBox.value?.id || 'Chưa chọn')
 
 watch(() => selectedBox.value?.id, () => {
+  if (!selectedBox.value) return
+
   cabinetInfo.syncSelectedBoxToInfo()
 }, { immediate: true })
 
