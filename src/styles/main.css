@@ -333,7 +333,7 @@ img { display: block; max-width: 100%; }
 .mn-preview-toggle {
   position: fixed;
   right: 0;
-  top: 168px;
+  top: 300px;
   z-index: 31;
   width: 28px;
   height: 72px;
@@ -428,23 +428,21 @@ img { display: block; max-width: 100%; }
   pointer-events: none;
 }
 
-.mn-right-panel-tab {
-  position: fixed;
-  right: 0;
-  top: 88px;
-  z-index: 30;
-  width: 28px;
-  height: 72px;
-  border: 1px solid #3a3a3a;
-  border-right: none;
-  border-radius: 8px 0 0 8px;
-  background: #2b2b2b;
-  color: #ffffff;
-  cursor: pointer;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-size: 12px;
-}
+.mn-right-panel-tab { position: fixed; 
+  right: 0; 
+  top: 220px; 
+  z-index: 30; 
+  width: 28px; 
+  height: 72px; 
+  border: 1px solid #3a3a3a; 
+  border-right: none; 
+  border-radius: 8px 0 0 8px; 
+  background: #2b2b2b; 
+  color: #ffffff; 
+  cursor: pointer; 
+  writing-mode: vertical-rl; 
+  text-orientation: mixed; 
+  font-size: 12px; }
 
 .mn-right-panel-tab:hover {
   background: #3a3a3a;
