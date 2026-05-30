@@ -4,7 +4,10 @@
     <LibraryBar />
     <LeftToolbar />
     <DrawingViewport />
-    <BottomParams />
+    <BottomParams
+      :commit-sha="props.commitSha"
+      :commit-name="props.commitName"
+    />
 
     <div
       v-if="!isRightPanelHidden"
@@ -117,5 +120,15 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onGlobalKeyDown, true)
   stopRightPanelResize()
+})
+const props = defineProps({
+  commitSha: {
+    type: String,
+    default: 'local'
+  },
+  commitName: {
+    type: String,
+    default: 'local dev'
+  }
 })
 </script>

@@ -17,11 +17,26 @@
         {{ view.label }}
       </button>
     </div>
+
+    <div class="mn-bottom-commit-info">
+      Commit: {{ commitSha }} — {{ commitName }}
+    </div>
   </section>
 </template>
 
 <script setup>
 import { useAppStore } from '../../stores/useAppStore'
+
+defineProps({
+  commitSha: {
+    type: String,
+    default: 'local'
+  },
+  commitName: {
+    type: String,
+    default: 'local dev'
+  }
+})
 
 const app = useAppStore()
 

@@ -711,13 +711,16 @@ img { display: block; max-width: 100%; }
 
 /*=================*/
 .mn-bottom-commit-info {
+  margin-left: auto;
   min-width: 320px;
   max-width: 520px;
-  height: 22px;
+  height: 24px;
+  display: flex;
+  align-items: center;
   padding: 0 10px;
   border: 1px solid #3a3a3a;
-  border-radius: 3px;
-  background: #1f1f1f;
+  border-radius: 4px;
+  background: #1c1c1c;
   color: #dcdcdc;
   font-size: 11px;
   line-height: 20px;
