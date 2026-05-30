@@ -2,165 +2,150 @@ import { createSimpleStore } from './createStore'
 import { useAppStore } from './useAppStore'
 import { useBoxStore } from './useBoxStore'
 import { useDrawingStore } from './useDrawingStore'
-import { CABINET_INFO_DEFAULTS } from '../core/cabinet-info/cabinetInfoDefaults'
-import { buildCabinetInfoLayout, normalizeSelectedCabinetFrame } from '../core/cabinet-info/cabinetInfoLayout'
+import { createDefaultCabinetInfoState } from '../core/cabinet-info/cabinetInfoDefaults'
+import { buildCabinetInfoPanels } from '../core/cabinet-info/cabinetInfoBuilder'
 
 //=================
-function readSelectedIdFromStore(store) {
-  const state = store?.state || {}
-  const directKeys = ['selectedBoxId', 'activeBoxId', 'currentBoxId', 'selectedId']
-
-  for (const key of directKeys) {
-    if (state[key]) return state[key]
-  }
-
-  const arrayKeys = ['selectedBoxIds', 'selectedIds']
-  for (const key of arrayKeys) {
-    if (Array.isArray(state[key]) && state[key].length) return state[key][0]
-  }
-
-  return null
-} // End readSelectedIdFromStore
+function cloneValue(value) {
+  return JSON.parse(JSON.stringify(value))
+} // End cloneValue
 
 //=================
-function readBoxList(boxStore, drawing) {
-  if (Array.isArray(boxStore?.state?.boxes)) return boxStore.state.boxes
-  if (Array.isArray(boxStore?.boxes)) return boxStore.boxes
-  if (Array.isArray(drawing?.state?.boxes)) return drawing.state.boxes
-  return []
-} // End readBoxList
+function setNestedValue(target, path, value) {
+  const keys = String(path || '').split('.').filter(Boolean)
+
+  if (!keys.length) return
+
+  let cursor = target
+
+  keys.slice(0, -1).forEach((key) => {
+    if (!cursor[key] || typeof cursor[key] !== 'object') {
+      cursor[key] = {}
+    }
+
+    cursor = cursor[key]
+  })
+
+  cursor[keys[keys.length - 1]] = value
+} // End setNestedValue
 
 //=================
-function findSelectedBox(boxStore, drawing) {
-  const boxes = readBoxList(boxStore, drawing)
-  const selectedId = readSelectedIdFromStore(boxStore) || readSelectedIdFromStore(drawing)
+function removeCabinetInfoPanelsForBox(panels, boxId) {
+  return panels.filter((panel) => {
+    const sameBox = panel.linkedFrameId === boxId
+      || panel.frameId === boxId
+      || panel.sourceBoxId === boxId
+      || panel.baseObjectId === boxId
 
-  if (selectedId) {
-    const box = boxes.find((item) => item.id === selectedId || item.boxId === selectedId)
-    if (box) return box
-  }
-
-  const flaggedBox = boxes.find((item) => item.selected || item.isSelected || item.active)
-  if (flaggedBox) return flaggedBox
-
-  return null
-} // End findSelectedBox
-
-//=================
-function isCabinetInfoPanelOfFrame(panel, frameId) {
-  if (panel?.sourceType !== 'cabinet-info') return false
-  return panel.frameId === frameId || panel.linkedFrameId === frameId || panel.sourceBoxId === frameId || panel.baseObjectId === frameId
-} // End isCabinetInfoPanelOfFrame
+    return !(sameBox && panel.sourceType === 'cabinet-info')
+  })
+} // End removeCabinetInfoPanelsForBox
 
 const store = createSimpleStore({
-  form: { ...CABINET_INFO_DEFAULTS },
-  lastLayout: null,
-  lastError: '',
-  selectedFrame: null
+  info: createDefaultCabinetInfoState(),
+  openSections: {
+    general: false,
+    back: false,
+    topStrip: false,
+    handleRail: false,
+    doorStop: false,
+    toeKick: false,
+    filler: false,
+    shelfInset: false
+  },
+  autoApply: true
 }, (state) => ({
   //=================
-  setValue(key, value) {
-    if (!(key in state.form)) return
-    state.form[key] = value
+  resetInfo() {
+    state.info = createDefaultCabinetInfoState()
+  }, // End resetInfo
+
+  //=================
+  toggleSection(key) {
+    state.openSections[key] = !state.openSections[key]
+  }, // End toggleSection
+
+  //=================
+  setAutoApply(value) {
+    state.autoApply = value === true
+  }, // End setAutoApply
+
+  //=================
+  setValue(path, value) {
+    setNestedValue(state.info, path, value)
+
+    if (state.autoApply) {
+      this.applyToSelectedBox(false)
+    }
   }, // End setValue
 
   //=================
-  reset() {
-    state.form = { ...CABINET_INFO_DEFAULTS }
-    state.lastLayout = null
-    state.lastError = ''
-    state.selectedFrame = null
-  }, // End reset
-
-  //=================
   getSelectedBox() {
-    const drawing = useDrawingStore()
     const boxStore = useBoxStore()
-    return findSelectedBox(boxStore, drawing)
+
+    return boxStore.getSelectedBox ? boxStore.getSelectedBox() : null
   }, // End getSelectedBox
 
   //=================
-  syncFromSelectedBox() {
+  syncGroupNameFromSelectedBox() {
     const selectedBox = this.getSelectedBox()
-    if (!selectedBox) {
-      state.lastError = 'MN Info: chọn box trước khi tạo thông tin tủ'
-      state.selectedFrame = null
-      return null
-    }
 
-    const frame = normalizeSelectedCabinetFrame(selectedBox, state.form)
-    state.selectedFrame = frame
-    state.form.width = frame.width
-    state.form.height = frame.height
-    state.form.depth = frame.depth
-    if (!state.form.thickness) state.form.thickness = frame.panelThickness
-    state.lastError = ''
-    return selectedBox
-  }, // End syncFromSelectedBox
+    if (!selectedBox) return
+
+    state.info.groupName = selectedBox.name || state.info.groupName || 'Box 1'
+  }, // End syncGroupNameFromSelectedBox
 
   //=================
-  getSelectedFrameLabel() {
+  applyToSelectedBox(pushHistory = true) {
     const selectedBox = this.getSelectedBox()
-    if (!selectedBox) return 'Chưa chọn box'
-    const frame = normalizeSelectedCabinetFrame(selectedBox, state.form)
-    return `${frame.width} x ${frame.depth} x ${frame.height}`
-  }, // End getSelectedFrameLabel
-
-  //=================
-  buildPreview() {
-    try {
-      const selectedBox = this.syncFromSelectedBox()
-      if (!selectedBox) return null
-      const layout = buildCabinetInfoLayout(state.form, selectedBox)
-      state.lastLayout = layout
-      state.lastError = ''
-      return layout
-    } catch (error) {
-      state.lastError = error?.message || 'Không tạo được thông tin tủ'
-      return null
-    }
-  }, // End buildPreview
-
-  //=================
-  applyToDrawing() {
-    const layout = this.buildPreview()
-    if (!layout) return false
-
     const drawing = useDrawingStore()
     const app = useAppStore()
-    const oldPanels = Array.isArray(drawing.state.panels) ? drawing.state.panels : []
-    const frameId = layout.meta.frameId
-    const nextPanels = oldPanels.filter((panel) => !isCabinetInfoPanelOfFrame(panel, frameId))
 
-    drawing.pushHistorySnapshot?.('MN Solution Info - Apply Selected Box')
-    drawing.state.panels = [...nextPanels, ...layout.panels]
+    if (!selectedBox) {
+      app.setStatus('Info: chưa chọn Box')
+      return false
+    }
+
+    const nextPanels = buildCabinetInfoPanels(selectedBox, cloneValue(state.info))
+    const oldPanels = removeCabinetInfoPanelsForBox(drawing.state.panels, selectedBox.id)
+
+    if (pushHistory) {
+      drawing.pushHistorySnapshot('MN Solution Info')
+    }
+
+    drawing.state.panels = [
+      ...oldPanels,
+      ...nextPanels
+    ]
+
+    drawing.state.selectedPanelId = nextPanels[0]?.id || null
+    drawing.state.selectedPanelIds = nextPanels[0] ? [nextPanels[0].id] : []
+    drawing.rebuildZones()
+    app.setStatus(`Info: đã tạo ${nextPanels.length} chi tiết cho ${selectedBox.name || selectedBox.id}`)
+
+    return true
+  }, // End applyToSelectedBox
+
+  //=================
+  clearSelectedBoxInfoPanels() {
+    const selectedBox = this.getSelectedBox()
+    const drawing = useDrawingStore()
+    const app = useAppStore()
+
+    if (!selectedBox) {
+      app.setStatus('Info: chưa chọn Box')
+      return false
+    }
+
+    drawing.pushHistorySnapshot('Xóa MN Solution Info')
+    drawing.state.panels = removeCabinetInfoPanelsForBox(drawing.state.panels, selectedBox.id)
     drawing.state.selectedPanelId = null
     drawing.state.selectedPanelIds = []
-    drawing.rebuildZones?.()
-    app.setStatus?.(`MN Info: đã tạo ${layout.panels.length} chi tiết cho box đang chọn`)
+    drawing.rebuildZones()
+    app.setStatus(`Info: đã xóa chi tiết Info của ${selectedBox.name || selectedBox.id}`)
+
     return true
-  }, // End applyToDrawing
-
-  //=================
-  clearCabinetInfo() {
-    const drawing = useDrawingStore()
-    const app = useAppStore()
-    const selectedBox = this.getSelectedBox()
-
-    drawing.pushHistorySnapshot?.('Xóa MN Solution Info')
-
-    if (selectedBox) {
-      const frame = normalizeSelectedCabinetFrame(selectedBox, state.form)
-      drawing.state.panels = (drawing.state.panels || []).filter((panel) => !isCabinetInfoPanelOfFrame(panel, frame.id))
-      app.setStatus?.('MN Info: đã xóa chi tiết Info của box đang chọn')
-    } else {
-      drawing.state.panels = (drawing.state.panels || []).filter((panel) => panel.sourceType !== 'cabinet-info')
-      app.setStatus?.('MN Info: đã xóa toàn bộ chi tiết Info')
-    }
-
-    state.lastLayout = null
-    drawing.rebuildZones?.()
-  } // End clearCabinetInfo
+  } // End clearSelectedBoxInfoPanels
 }))
 
 //=================

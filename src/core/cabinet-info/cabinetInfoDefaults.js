@@ -1,46 +1,65 @@
-export const CABINET_INFO_DEFAULTS = {
-  width: 800,
-  height: 1000,
-  depth: 500,
-  thickness: 17.4,
-  leftSide: true,
-  rightSide: true,
-  top: true,
-  bottom: true,
-  topOverlay: true,
-  bottomOverlay: true,
-  back: true,
-  backGrooveDepth: 10,
-  backThickness: 5,
-  backRetreat: 10,
-  backSplitFormula: '',
-  topBackOverlay: true,
-  bottomBackOverlay: true,
-  topRail: true,
-  topRailInset: false,
-  topRailHeight: 50,
-  topRailFaceOffset: 0,
-  handleRail: false,
-  handleRailCount: 1,
-  handleRailSize: 50,
-  handleRailFaceOffset: 0,
-  handleRailBackCount: 0,
-  handleRailSupportCount: 0,
-  doorStop: false,
-  doorStopFormula: '/2',
-  doorStopSize: 50,
-  doorStopHorizontal: true,
-  doorStopFaceOffset: 0,
-  toeKick: false,
-  toeKickHeight: 100,
-  toeKickRetreat: 17.4,
-  toeKickDetached: false,
-  toeKickBack: false,
-  toeKickSupportCount: 0,
-  leftScribe: 0,
-  leftScribeRotate: false,
-  rightScribe: 0,
-  rightScribeRotate: false,
-  verticalShelfRetreat: 0,
-  horizontalShelfRetreat: 0
-}
+//=================
+export function createDefaultCabinetInfoState() {
+  return {
+    groupName: 'Box 1',
+    general: {
+      panelThickness: 17.4,
+      leftSide: false,
+      rightSide: false,
+      top: false,
+      bottom: false,
+      topOverlap: true,
+      bottomOverlap: true
+    },
+    back: {
+      enabled: false,
+      grooveDepth: 10,
+      thickness: 5,
+      inset: 10,
+      splitFormula: '',
+      topCoverBack: false,
+      bottomCoverBack: false
+    },
+    topStrip: {
+      enabled: false,
+      inset: false,
+      size: 50,
+      faceOffset: 0
+    },
+    handleRail: {
+      enabled: false,
+      frontCount: 1,
+      size: 50,
+      faceOffset: 0,
+      rearCount: 0,
+      middleCount: 0
+    },
+    doorStop: {
+      enabled: false,
+      formula: '/2',
+      size: 50,
+      horizontal: false,
+      faceOffset: 0
+    },
+    toeKick: {
+      enabled: false,
+      height: 100,
+      inset: 17.4,
+      detached: false,
+      rear: false,
+      middleCount: 0
+    },
+    filler: {
+      enabled: false,
+      left: 0,
+      leftRotate: false,
+      right: 0,
+      rightRotate: false
+    },
+    shelfInset: {
+      enabled: false,
+      vertical: 0,
+      horizontal: 0
+    }
+  }
+} // End createDefaultCabinetInfoState

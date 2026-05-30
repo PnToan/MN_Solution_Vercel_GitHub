@@ -1,230 +1,193 @@
 <template>
-  <section class="mn-panel-section compact mn-info-panel">
-    <div class="mn-panel-title">MN Solution Info</div>
+  <section class="mn-info-panel">
+    <div class="mn-info-title">Thông Tin Tủ</div>
 
-    <div class="mn-status-box mn-info-selected">
-      Box đang chọn: {{ selectedFrameLabel }}<br />
-      Tick phần nào sẽ tạo lại phần Info cho box đó.
-    </div>
+    <label class="mn-info-row">
+      <span>Tên Nhóm</span>
+      <input :value="info.groupName" @input="setValue('groupName', $event.target.value)" />
+    </label>
 
-    <details open>
-      <summary>Khung chính</summary>
-      <div class="mn-info-grid">
-        <label>Rộng<input v-model="info.state.form.width" type="number" step="0.1" disabled /></label>
-        <label>Cao<input v-model="info.state.form.height" type="number" step="0.1" disabled /></label>
-        <label>Sâu<input v-model="info.state.form.depth" type="number" step="0.1" disabled /></label>
-        <label>Dày tấm<input v-model="info.state.form.thickness" type="number" step="0.1" @change="applyInfo" /></label>
-      </div>
-      <div class="mn-info-checks">
-        <label><input v-model="info.state.form.leftSide" type="checkbox" @change="applyInfo" /> Hông trái</label>
-        <label><input v-model="info.state.form.rightSide" type="checkbox" @change="applyInfo" /> Hông phải</label>
-        <label><input v-model="info.state.form.top" type="checkbox" @change="applyInfo" /> Nóc</label>
-        <label><input v-model="info.state.form.bottom" type="checkbox" @change="applyInfo" /> Đáy</label>
-        <label><input v-model="info.state.form.topOverlay" type="checkbox" @change="applyInfo" /> Nóc trùm</label>
-        <label><input v-model="info.state.form.bottomOverlay" type="checkbox" @change="applyInfo" /> Đáy trùm</label>
-      </div>
-    </details>
-
-    <details>
-      <summary>Hậu</summary>
-      <div class="mn-info-checks">
-        <label><input v-model="info.state.form.back" type="checkbox" @change="applyInfo" /> Hậu</label>
-        <label><input v-model="info.state.form.topBackOverlay" type="checkbox" @change="applyInfo" /> Nóc trùm hậu</label>
-        <label><input v-model="info.state.form.bottomBackOverlay" type="checkbox" @change="applyInfo" /> Đáy trùm hậu</label>
-      </div>
-      <div class="mn-info-grid">
-        <label>Rãnh hậu<input v-model="info.state.form.backGrooveDepth" type="number" step="0.1" @change="applyInfo" /></label>
-        <label>Dày hậu<input v-model="info.state.form.backThickness" type="number" step="0.1" @change="applyInfo" /></label>
-        <label>Lùi hậu<input v-model="info.state.form.backRetreat" type="number" step="0.1" @change="applyInfo" /></label>
-        <label>Công thức<input v-model="info.state.form.backSplitFormula" type="text" placeholder="/2 hoặc 400,300" @change="applyInfo" /></label>
-      </div>
-    </details>
-
-    <details>
-      <summary>Chỉ nóc</summary>
-      <div class="mn-info-checks">
-        <label><input v-model="info.state.form.topRail" type="checkbox" @change="applyInfo" /> Thanh chỉ nóc</label>
-        <label><input v-model="info.state.form.topRailInset" type="checkbox" @change="applyInfo" /> Nóc lọt</label>
-      </div>
-      <div class="mn-info-grid">
-        <label>Kích thước<input v-model="info.state.form.topRailHeight" type="number" step="0.1" @change="applyInfo" /></label>
-        <label>Âm mặt<input v-model="info.state.form.topRailFaceOffset" type="number" step="0.1" @change="applyInfo" /></label>
-      </div>
-    </details>
-
-    <details>
-      <summary>Diềm tay nắm</summary>
-      <div class="mn-info-checks">
-        <label><input v-model="info.state.form.handleRail" type="checkbox" @change="applyInfo" /> Diềm tay nắm</label>
-      </div>
-      <div class="mn-info-grid">
-        <label>Số lượng<input v-model="info.state.form.handleRailCount" type="number" step="1" @change="applyInfo" /></label>
-        <label>Kích thước<input v-model="info.state.form.handleRailSize" type="number" step="0.1" @change="applyInfo" /></label>
-        <label>Âm mặt<input v-model="info.state.form.handleRailFaceOffset" type="number" step="0.1" @change="applyInfo" /></label>
-        <label>Thanh sau<input v-model="info.state.form.handleRailBackCount" type="number" step="1" @change="applyInfo" /></label>
-        <label>Bổ sung<input v-model="info.state.form.handleRailSupportCount" type="number" step="1" @change="applyInfo" /></label>
-      </div>
-    </details>
-
-    <details>
-      <summary>Thanh chặn cánh</summary>
-      <div class="mn-info-checks">
-        <label><input v-model="info.state.form.doorStop" type="checkbox" @change="applyInfo" /> Thanh chặn cánh</label>
-        <label><input v-model="info.state.form.doorStopHorizontal" type="checkbox" @change="applyInfo" /> Ngang</label>
-      </div>
-      <div class="mn-info-grid">
-        <label>Công thức<input v-model="info.state.form.doorStopFormula" type="text" placeholder="/2 hoặc 300,200" @change="applyInfo" /></label>
-        <label>Kích thước<input v-model="info.state.form.doorStopSize" type="number" step="0.1" @change="applyInfo" /></label>
-        <label>Âm mặt<input v-model="info.state.form.doorStopFaceOffset" type="number" step="0.1" @change="applyInfo" /></label>
-      </div>
-    </details>
-
-    <details>
-      <summary>Len chân</summary>
-      <div class="mn-info-checks">
-        <label><input v-model="info.state.form.toeKick" type="checkbox" @change="applyInfo" /> Len chân</label>
-        <label><input v-model="info.state.form.toeKickDetached" type="checkbox" @change="applyInfo" /> Len chân rời</label>
-        <label><input v-model="info.state.form.toeKickBack" type="checkbox" @change="applyInfo" /> Thanh chân sau</label>
-      </div>
-      <div class="mn-info-grid">
-        <label>Cao len<input v-model="info.state.form.toeKickHeight" type="number" step="0.1" @change="applyInfo" /></label>
-        <label>Lùi len<input v-model="info.state.form.toeKickRetreat" type="number" step="0.1" @change="applyInfo" /></label>
-        <label>Bổ sung<input v-model="info.state.form.toeKickSupportCount" type="number" step="1" @change="applyInfo" /></label>
-      </div>
-    </details>
-
-    <details>
-      <summary>Nẹp gia giảm / lùi đợt</summary>
-      <div class="mn-info-checks">
-        <label><input v-model="info.state.form.leftScribeRotate" type="checkbox" @change="applyInfo" /> Xoay nẹp trái</label>
-        <label><input v-model="info.state.form.rightScribeRotate" type="checkbox" @change="applyInfo" /> Xoay nẹp phải</label>
-      </div>
-      <div class="mn-info-grid">
-        <label>Nẹp trái<input v-model="info.state.form.leftScribe" type="number" step="0.1" @change="applyInfo" /></label>
-        <label>Nẹp phải<input v-model="info.state.form.rightScribe" type="number" step="0.1" @change="applyInfo" /></label>
-        <label>Lùi đợt đứng<input v-model="info.state.form.verticalShelfRetreat" type="number" step="0.1" @change="applyInfo" /></label>
-        <label>Lùi đợt nằm<input v-model="info.state.form.horizontalShelfRetreat" type="number" step="0.1" @change="applyInfo" /></label>
-      </div>
-    </details>
+    <div class="mn-info-selected">Box đang chọn: {{ selectedBoxName }}</div>
 
     <div class="mn-info-actions">
-      <button type="button" @click="applyInfo">Áp vào box</button>
-      <button type="button" @click="previewInfo">Check</button>
-      <button type="button" @click="clearInfo">Xóa Info</button>
+      <button type="button" @click="cabinetInfo.applyToSelectedBox(true)">Cập nhật</button>
+      <button type="button" @click="cabinetInfo.clearSelectedBoxInfoPanels()">Xóa Info</button>
     </div>
 
-    <div class="mn-status-box" v-if="info.state.lastLayout">
-      Box: {{ info.state.lastLayout.box.width }} x {{ info.state.lastLayout.box.depth }} x {{ info.state.lastLayout.box.height }}<br />
-      Chi tiết: {{ info.state.lastLayout.panels.length }}
-    </div>
-    <div class="mn-status-box mn-info-error" v-if="info.state.lastError">{{ info.state.lastError }}</div>
+    <label class="mn-info-check auto">
+      <input type="checkbox" :checked="cabinetInfo.state.autoApply" @change="cabinetInfo.setAutoApply($event.target.checked)" />
+      <span>Tick là tạo/cập nhật</span>
+    </label>
+
+    <InfoSection title="Thông tin chung" section-key="general">
+      <InfoNumber label="Dày tấm" path="general.panelThickness" />
+      <InfoCheck label="Hông trái" path="general.leftSide" />
+      <InfoCheck label="Hông phải" path="general.rightSide" />
+      <InfoCheck label="Nóc" path="general.top" />
+      <InfoCheck label="Đáy" path="general.bottom" />
+      <InfoCheck label="Nóc trùm" path="general.topOverlap" />
+      <InfoCheck label="Đáy trùm" path="general.bottomOverlap" />
+    </InfoSection>
+
+    <InfoSection title="Hậu" section-key="back">
+      <InfoCheck label="Tạo hậu" path="back.enabled" />
+      <InfoNumber label="Độ sâu rãnh hậu" path="back.grooveDepth" />
+      <InfoNumber label="Dày hậu" path="back.thickness" />
+      <InfoNumber label="Lùi hậu" path="back.inset" />
+      <InfoText label="Công thức chia" path="back.splitFormula" placeholder="/2 hoặc 400,300" />
+      <InfoCheck label="Nóc trùm hậu" path="back.topCoverBack" />
+      <InfoCheck label="Đáy trùm hậu" path="back.bottomCoverBack" />
+    </InfoSection>
+
+    <InfoSection title="Thanh Chỉ Nóc" section-key="topStrip">
+      <InfoCheck label="Tạo chỉ nóc" path="topStrip.enabled" />
+      <InfoCheck label="Nóc lọt" path="topStrip.inset" />
+      <InfoNumber label="Kích thước" path="topStrip.size" />
+      <InfoNumber label="Âm mặt" path="topStrip.faceOffset" />
+    </InfoSection>
+
+    <InfoSection title="Diềm Tay Nắm" section-key="handleRail">
+      <InfoCheck label="Tạo diềm" path="handleRail.enabled" />
+      <InfoNumber label="Số lượng trước" path="handleRail.frontCount" />
+      <InfoNumber label="Kích thước" path="handleRail.size" />
+      <InfoNumber label="Âm mặt" path="handleRail.faceOffset" />
+      <InfoNumber label="Số lượng thanh sau" path="handleRail.rearCount" />
+      <InfoNumber label="Số lượng bổ sung" path="handleRail.middleCount" />
+    </InfoSection>
+
+    <InfoSection title="Thanh Chặn Cánh" section-key="doorStop">
+      <InfoCheck label="Tạo thanh" path="doorStop.enabled" />
+      <InfoText label="Công thức chia" path="doorStop.formula" placeholder="/2 hoặc 300,200" />
+      <InfoNumber label="Kích thước" path="doorStop.size" />
+      <InfoCheck label="Ngang" path="doorStop.horizontal" />
+      <InfoNumber label="Âm mặt" path="doorStop.faceOffset" />
+    </InfoSection>
+
+    <InfoSection title="Len Chân" section-key="toeKick">
+      <InfoCheck label="Tạo len chân" path="toeKick.enabled" />
+      <InfoNumber label="Cao len chân" path="toeKick.height" />
+      <InfoNumber label="Lùi len chân" path="toeKick.inset" />
+      <InfoCheck label="Len chân rời" path="toeKick.detached" />
+      <InfoCheck label="Thanh chân sau" path="toeKick.rear" />
+      <InfoNumber label="Thanh chân bổ sung" path="toeKick.middleCount" />
+    </InfoSection>
+
+    <InfoSection title="Nẹp Gia Giảm" section-key="filler">
+      <InfoCheck label="Tạo nẹp" path="filler.enabled" />
+      <InfoNumber label="Nẹp trái" path="filler.left" />
+      <InfoCheck label="Xoay trái" path="filler.leftRotate" />
+      <InfoNumber label="Nẹp phải" path="filler.right" />
+      <InfoCheck label="Xoay phải" path="filler.rightRotate" />
+    </InfoSection>
+
+    <InfoSection title="Lùi Đợt" section-key="shelfInset">
+      <InfoCheck label="Bật lùi đợt" path="shelfInset.enabled" />
+      <InfoNumber label="Lùi đợt đứng" path="shelfInset.vertical" />
+      <InfoNumber label="Lùi đợt nằm" path="shelfInset.horizontal" />
+    </InfoSection>
   </section>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, defineComponent, h } from 'vue'
+import { useBoxStore } from '../../stores/useBoxStore'
 import { useCabinetInfoStore } from '../../stores/useCabinetInfoStore'
 
-const info = useCabinetInfoStore()
-const selectedFrameLabel = computed(() => info.getSelectedFrameLabel())
+const cabinetInfo = useCabinetInfoStore()
+const boxStore = useBoxStore()
+const info = cabinetInfo.state.info
+
+const selectedBoxName = computed(() => {
+  const box = boxStore.getSelectedBox ? boxStore.getSelectedBox() : null
+
+  return box?.name || box?.id || 'Chưa chọn'
+})
 
 //=================
-function previewInfo() {
-  info.buildPreview()
-} // End previewInfo
+function getPathValue(path) {
+  return String(path || '').split('.').filter(Boolean).reduce((value, key) => {
+    return value?.[key]
+  }, cabinetInfo.state.info)
+} // End getPathValue
 
 //=================
-function applyInfo() {
-  info.applyToDrawing()
-} // End applyInfo
+function setValue(path, value) {
+  cabinetInfo.setValue(path, value)
+} // End setValue
 
-//=================
-function clearInfo() {
-  info.clearCabinetInfo()
-} // End clearInfo
+const InfoSection = defineComponent({
+  props: {
+    title: { type: String, required: true },
+    sectionKey: { type: String, required: true }
+  },
+  setup(props, { slots }) {
+    return () => h('div', { class: 'mn-info-section' }, [
+      h('button', {
+        class: 'mn-info-section-title',
+        type: 'button',
+        onClick: () => cabinetInfo.toggleSection(props.sectionKey)
+      }, [
+        h('span', { class: ['mn-info-triangle', cabinetInfo.state.openSections[props.sectionKey] ? 'open' : ''] }, '▶'),
+        h('span', props.title)
+      ]),
+      cabinetInfo.state.openSections[props.sectionKey]
+        ? h('div', { class: 'mn-info-section-body' }, slots.default ? slots.default() : [])
+        : null
+    ])
+  }
+})
+
+const InfoNumber = defineComponent({
+  props: {
+    label: { type: String, required: true },
+    path: { type: String, required: true }
+  },
+  setup(props) {
+    return () => h('label', { class: 'mn-info-row' }, [
+      h('span', props.label),
+      h('input', {
+        type: 'number',
+        step: '0.1',
+        value: getPathValue(props.path),
+        onInput: (event) => setValue(props.path, event.target.value)
+      })
+    ])
+  }
+})
+
+const InfoText = defineComponent({
+  props: {
+    label: { type: String, required: true },
+    path: { type: String, required: true },
+    placeholder: { type: String, default: '' }
+  },
+  setup(props) {
+    return () => h('label', { class: 'mn-info-row' }, [
+      h('span', props.label),
+      h('input', {
+        type: 'text',
+        value: getPathValue(props.path),
+        placeholder: props.placeholder,
+        onInput: (event) => setValue(props.path, event.target.value)
+      })
+    ])
+  }
+})
+
+const InfoCheck = defineComponent({
+  props: {
+    label: { type: String, required: true },
+    path: { type: String, required: true }
+  },
+  setup(props) {
+    return () => h('label', { class: 'mn-info-check' }, [
+      h('input', {
+        type: 'checkbox',
+        checked: getPathValue(props.path) === true,
+        onChange: (event) => setValue(props.path, event.target.checked)
+      }),
+      h('span', props.label)
+    ])
+  }
+})
 </script>
-
-<style scoped>
-.mn-info-panel {
-  max-height: 58vh;
-  overflow: auto;
-}
-
-.mn-info-panel details {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  margin-bottom: 6px;
-  padding: 6px;
-}
-
-.mn-info-panel summary {
-  cursor: pointer;
-  font-weight: 600;
-  margin-bottom: 6px;
-}
-
-.mn-info-selected {
-  margin-bottom: 6px;
-}
-
-.mn-info-error {
-  color: #ff6666;
-}
-
-.mn-info-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-
-.mn-info-grid label,
-.mn-info-checks label {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  font-size: 11px;
-}
-
-.mn-info-checks {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px 8px;
-  margin-bottom: 6px;
-}
-
-.mn-info-checks label {
-  flex-direction: row;
-  align-items: center;
-}
-
-.mn-info-grid input {
-  min-width: 0;
-  height: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 4px;
-  padding: 2px 5px;
-  background: rgba(255, 255, 255, 0.08);
-  color: inherit;
-}
-
-.mn-info-grid input:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-}
-
-.mn-info-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px;
-  margin: 8px 0;
-}
-
-.mn-info-actions button {
-  height: 26px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 5px;
-  background: rgba(255, 255, 255, 0.1);
-  color: inherit;
-  cursor: pointer;
-}
-</style>
