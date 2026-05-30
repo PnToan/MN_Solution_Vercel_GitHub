@@ -1120,25 +1120,15 @@ const store = createSimpleStore({
     state.selectedPanelId = ids[0] || null
   }, // End selectPanels
   //=================
-  selectPanels(panelIds) {
-    const ids = Array.isArray(panelIds) ? panelIds.filter(Boolean) : []
+  getSelectedPanel() {
+    const selectedPanelId = state.selectedPanelId
+      || state.selectedPanelIds?.[0]
+      || null
 
-    state.selectedPanelIds = ids
-    state.selectedPanelId = ids[0] || null
-  }, // End selectPanels
+    if (!selectedPanelId) return null
 
-  //=================
-  getSelectedPanelBoxId() {
-    const selectedId = state.selectedPanelId || state.selectedPanelIds[0] || null
-
-    if (!selectedId) return null
-
-    const panel = state.panels.find((item) => item.id === selectedId)
-
-    if (!panel) return null
-
-    return getPanelFrameId(panel)
-  }, // End getSelectedPanelBoxId
+    return state.panels.find((panel) => panel.id === selectedPanelId) || null
+  }, // End getSelectedPanel
   //=================
   getSelectedPanelBoxId() {
     const selectedPanel = this.getSelectedPanel()
@@ -1149,9 +1139,12 @@ const store = createSimpleStore({
       || selectedPanel.frameId
       || selectedPanel.sourceBoxId
       || selectedPanel.baseObjectId
+      || selectedPanel.parentBoxId
+      || selectedPanel.boxId
+      || selectedPanel.targetBoxId
+      || selectedPanel.cabinetBoxId
       || null
   }, // End getSelectedPanelBoxId
-  //=================
   selectDimensions(dimensionIds) {
     state.selectedDimensionIds = Array.isArray(dimensionIds) ? dimensionIds.filter(Boolean) : []
   }, // End selectDimensions
