@@ -239,15 +239,35 @@ function buildBackPanels(sourceBox, info, body, panels) {
   const backThickness = toPositiveNumber(info.back.thickness, Math.max(1, t / 3))
   const inset = toNumber(info.back.inset, 0)
 
-  const innerX = body.x + t
-  const innerWidth = Math.max(1, body.width - (2 * t))
-  const x = innerX - grooveDepth
-  const width = Math.max(1, innerWidth + (2 * grooveDepth))
+  const hasLeftSide = normalizeBoolean(info?.general?.leftSide)
+  const hasRightSide = normalizeBoolean(info?.general?.rightSide)
+  const hasTop = normalizeBoolean(info?.general?.top)
+  const hasBottom = normalizeBoolean(info?.general?.bottom)
 
-  const innerZ = body.z + t
-  const innerHeight = Math.max(1, body.height - (2 * t))
-  const z = innerZ - grooveDepth
-  const height = Math.max(1, innerHeight + (2 * grooveDepth))
+  const leftInset = hasLeftSide ? t : 0
+  const rightInset = hasRightSide ? t : 0
+  const bottomInset = hasBottom ? t : 0
+  const topInset = hasTop ? t : 0
+
+  const x = body.x + leftInset - (hasLeftSide ? grooveDepth : 0)
+  const width = Math.max(
+    1,
+    body.width
+      - leftInset
+      - rightInset
+      + (hasLeftSide ? grooveDepth : 0)
+      + (hasRightSide ? grooveDepth : 0)
+  )
+
+  const z = body.z + bottomInset - (hasBottom ? grooveDepth : 0)
+  const height = Math.max(
+    1,
+    body.height
+      - bottomInset
+      - topInset
+      + (hasBottom ? grooveDepth : 0)
+      + (hasTop ? grooveDepth : 0)
+  )
 
   const backFaceY = body.y + body.depth
   const y = backFaceY - inset - backThickness
