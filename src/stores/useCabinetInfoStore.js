@@ -118,6 +118,8 @@ const store = createSimpleStore({
 
   //=================
   setValue(path, value) {
+    const selectedBox = this.getSelectedBox()
+    const targetBoxId = selectedBox ? selectedBox.id : null
     const nextValue = normalizeInfoInputValue(path, value)
 
     setNestedValue(state.info, path, nextValue)
@@ -128,6 +130,7 @@ const store = createSimpleStore({
 
     if (state.autoApply) {
       this.applyToSelectedBox(false)
+      this.restoreSelectedBox(targetBoxId)
     }
   }, // End setValue
 
@@ -173,7 +176,37 @@ const store = createSimpleStore({
 
     return true
   }, // End applyDepthToSelectedBox
+  //=================
+  restoreSelectedBox(boxId) {
+    if (!boxId) return
 
+    const boxStore = useBoxStore()
+    const drawing = useDrawingStore()
+
+    if (typeof boxStore.selectBox === 'function') {
+      boxStore.selectBox(boxId)
+    }
+
+    if ('selectedBoxId' in boxStore) {
+      boxStore.selectedBoxId = boxId
+    }
+
+    if ('activeBoxId' in boxStore) {
+      boxStore.activeBoxId = boxId
+    }
+
+    if ('currentBoxId' in boxStore) {
+      boxStore.currentBoxId = boxId
+    }
+
+    if ('selectedId' in boxStore) {
+      boxStore.selectedId = boxId
+    }
+
+    drawing.state.selectedPanelId = null
+    drawing.state.selectedPanelIds = []
+  }, // End restoreSelectedBox
+  
   //=================
   applyToSelectedBox(pushHistory = true) {
     const selectedBox = this.getSelectedBox()
@@ -184,6 +217,8 @@ const store = createSimpleStore({
       app.setStatus('Info: chưa chọn Box')
       return false
     }
+
+    const targetBoxId = selectedBox.id
 
     if (pushHistory) {
       drawing.pushHistorySnapshot('MN Solution Info')
@@ -200,8 +235,8 @@ const store = createSimpleStore({
       ...nextPanels
     ]
 
-    drawing.state.selectedPanelId = nextPanels[0]?.id || null
-    drawing.state.selectedPanelIds = nextPanels[0] ? [nextPanels[0].id] : []
+    this.restoreSelectedBox(targetBoxId)
+
     drawing.rebuildZones()
     app.setStatus(`Info: đã tạo ${nextPanels.length} chi tiết cho ${targetBox.name || targetBox.id}`)
 
