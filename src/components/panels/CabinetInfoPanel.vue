@@ -150,11 +150,14 @@ const InfoNumber = defineComponent({
     path: { type: String, required: true }
   },
   setup(props) {
+    const isDecimalNumber = props.path === 'general.panelThickness'
+
     return () => h('label', { class: 'mn-info-row' }, [
       h('span', props.label),
       h('input', {
         type: 'number',
-        step: '0.1',
+        step: isDecimalNumber ? '0.1' : '1',
+        inputmode: isDecimalNumber ? 'decimal' : 'numeric',
         value: getPathValue(props.path),
         onInput: (event) => setValue(props.path, event.target.value)
       })

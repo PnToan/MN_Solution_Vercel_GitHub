@@ -39,7 +39,42 @@ function setNestedValue(target, path, value) {
 
   cursor[keys[keys.length - 1]] = value
 } // End setNestedValue
+//=================
+function normalizeInfoInputValue(path, value) {
+  if (typeof value === 'boolean') return value
+  if (path === 'general.panelThickness') return value
 
+  const numberPaths = [
+    'general.cabinetDepth',
+    'back.grooveDepth',
+    'back.thickness',
+    'back.inset',
+    'topStrip.size',
+    'topStrip.faceOffset',
+    'handleRail.frontCount',
+    'handleRail.size',
+    'handleRail.faceOffset',
+    'handleRail.rearCount',
+    'handleRail.middleCount',
+    'doorStop.size',
+    'doorStop.faceOffset',
+    'toeKick.height',
+    'toeKick.inset',
+    'toeKick.middleCount',
+    'filler.left',
+    'filler.right',
+    'shelfInset.vertical',
+    'shelfInset.horizontal'
+  ]
+
+  if (!numberPaths.includes(path)) return value
+
+  const numberValue = toNumber(value, 0)
+
+  if (!Number.isFinite(numberValue)) return 0
+
+  return Math.round(numberValue)
+} // End normalizeInfoInputValue
 //=================
 function removeCabinetInfoPanelsForBox(panels, boxId) {
   return panels.filter((panel) => {
@@ -83,7 +118,9 @@ const store = createSimpleStore({
 
   //=================
   setValue(path, value) {
-    setNestedValue(state.info, path, value)
+    const nextValue = normalizeInfoInputValue(path, value)
+
+    setNestedValue(state.info, path, nextValue)
 
     if (path === 'general.cabinetDepth') {
       this.applyDepthToSelectedBox()
@@ -124,7 +161,7 @@ const store = createSimpleStore({
 
     if (!selectedBox) return false
 
-    const nextDepth = toNumber(state.info.general.cabinetDepth, selectedBox.depth)
+    const nextDepth = Math.round(toNumber(state.info.general.cabinetDepth, selectedBox.depth))
 
     if (!Number.isFinite(nextDepth) || nextDepth <= 0) return false
     if (Math.abs(toNumber(selectedBox.depth, 0) - nextDepth) < 0.001) return true
