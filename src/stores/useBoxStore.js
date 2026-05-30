@@ -190,24 +190,29 @@ const store = createSimpleStore({
 
     state.boxes.splice(index, 1, nextBox)
   }, // End replaceBox
+
   //=================
   getSelectedBox() {
-    return state.boxes.find((item) => item.id === state.selectedBoxId) || null
-  }, // End getSelectedBox
+    const selectedBoxId = state.selectedBoxId
+      || state.selectedBoxIds?.[0]
+      || null
 
+    if (!selectedBoxId) return null
+
+    return state.boxes.find((box) => box.id === selectedBoxId) || null
+  }, // End getSelectedBox
   //=================
   getActiveBox() {
-    const drawing = useDrawingStore()
-
     const selectedBox = this.getSelectedBox ? this.getSelectedBox() : null
 
     if (selectedBox) return selectedBox
 
+    const drawing = useDrawingStore()
     const panelBoxId = drawing.getSelectedPanelBoxId?.()
 
     if (!panelBoxId) return null
 
-    return this.state.boxes.find((box) => box.id === panelBoxId) || null
+    return state.boxes.find((box) => box.id === panelBoxId) || null
   }, // End getActiveBox
 }))
 
