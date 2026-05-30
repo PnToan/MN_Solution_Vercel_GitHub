@@ -138,6 +138,10 @@ const store = createSimpleStore({
   getSelectedBox() {
     const boxStore = useBoxStore()
 
+    if (typeof boxStore.getActiveBox === 'function') {
+      return boxStore.getActiveBox()
+    }
+
     return boxStore.getSelectedBox ? boxStore.getSelectedBox() : null
   }, // End getSelectedBox
 
@@ -146,6 +150,8 @@ const store = createSimpleStore({
     const selectedBox = this.getSelectedBox()
 
     if (!selectedBox) return false
+
+    this.restoreSelectedBox(selectedBox.id)
 
     state.info.groupName = selectedBox.name || state.info.groupName || 'Box 1'
     state.info.general.cabinetDepth = toNumber(selectedBox.depth, state.info.general.cabinetDepth || 500)
@@ -206,7 +212,7 @@ const store = createSimpleStore({
     drawing.state.selectedPanelId = null
     drawing.state.selectedPanelIds = []
   }, // End restoreSelectedBox
-  
+
   //=================
   applyToSelectedBox(pushHistory = true) {
     const selectedBox = this.getSelectedBox()
