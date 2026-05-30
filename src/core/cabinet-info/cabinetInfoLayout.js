@@ -49,14 +49,30 @@ function createId(prefix) {
 } // End createId
 
 //=================
-export function normalizeCabinetInfo(rawInfo = {}) {
+function readFrameNumber(frame, keys, fallback = 0) {
+  for (const key of keys) {
+    if (frame && frame[key] !== undefined && frame[key] !== null) {
+      const value = toNumber(frame[key], NaN)
+      if (Number.isFinite(value)) return value
+    }
+  }
+
+  return fallback
+} // End readFrameNumber
+
+//=================
+export function normalizeCabinetInfo(rawInfo = {}, selectedFrame = null) {
   const info = { ...CABINET_INFO_DEFAULTS, ...rawInfo }
+  const frameWidth = selectedFrame ? readFrameNumber(selectedFrame, ['width', 'xSize', 'w'], info.width) : info.width
+  const frameHeight = selectedFrame ? readFrameNumber(selectedFrame, ['height', 'zSize', 'h'], info.height) : info.height
+  const frameDepth = selectedFrame ? readFrameNumber(selectedFrame, ['depth', 'ySize', 'd'], info.depth) : info.depth
+  const frameThickness = selectedFrame ? readFrameNumber(selectedFrame, ['panelThickness', 'thickness'], info.thickness) : info.thickness
 
   return {
-    width: toPositiveNumber(info.width, CABINET_INFO_DEFAULTS.width),
-    height: toPositiveNumber(info.height, CABINET_INFO_DEFAULTS.height),
-    depth: toPositiveNumber(info.depth, CABINET_INFO_DEFAULTS.depth),
-    thickness: toPositiveNumber(info.thickness, CABINET_INFO_DEFAULTS.thickness),
+    width: toPositiveNumber(frameWidth, CABINET_INFO_DEFAULTS.width),
+    height: toPositiveNumber(frameHeight, CABINET_INFO_DEFAULTS.height),
+    depth: toPositiveNumber(frameDepth, CABINET_INFO_DEFAULTS.depth),
+    thickness: toPositiveNumber(info.thickness || frameThickness, CABINET_INFO_DEFAULTS.thickness),
     leftSide: toBoolean(info.leftSide),
     rightSide: toBoolean(info.rightSide),
     top: toBoolean(info.top),
@@ -132,22 +148,28 @@ export function parseDivisionFormula(formula, totalSize, cutterSize = 0) {
 } // End parseDivisionFormula
 
 //=================
-function createBoxPayload(id, info) {
+export function normalizeSelectedCabinetFrame(selectedFrame = null, rawInfo = {}) {
+  const id = selectedFrame?.id || selectedFrame?.boxId || createId('cabinet_info_box')
+  const x = readFrameNumber(selectedFrame, ['x', 'x3d'], 0)
+  const y = readFrameNumber(selectedFrame, ['y', 'y3d', 'worldY', 'depthY'], 0)
+  const z = readFrameNumber(selectedFrame, ['z', 'z3d'], 0)
+  const width = readFrameNumber(selectedFrame, ['width', 'xSize', 'w'], rawInfo.width || CABINET_INFO_DEFAULTS.width)
+  const depth = readFrameNumber(selectedFrame, ['depth', 'ySize', 'd'], rawInfo.depth || CABINET_INFO_DEFAULTS.depth)
+  const height = readFrameNumber(selectedFrame, ['height', 'zSize', 'h'], rawInfo.height || CABINET_INFO_DEFAULTS.height)
+
   return {
     id,
-    name: info.name || 'MN Info Cabinet',
-    x: roundValue(info.x || 0),
-    y: roundValue(info.y || 0),
-    z: roundValue(info.z || 0),
-    width: roundValue(info.width),
-    depth: roundValue(info.depth),
-    height: roundValue(info.height),
-    panelThickness: roundValue(info.panelThickness),
-    unit: 'mm',
-    color: 'rgba(0, 119, 204, 0.08)',
-    sourceType: 'cabinet-info'
+    name: selectedFrame?.name || 'Box đang chọn',
+    x: roundValue(x),
+    y: roundValue(y),
+    z: roundValue(z),
+    width: roundValue(width),
+    depth: roundValue(depth),
+    height: roundValue(height),
+    panelThickness: roundValue(rawInfo.thickness || selectedFrame?.panelThickness || selectedFrame?.thickness || CABINET_INFO_DEFAULTS.thickness),
+    sourceType: selectedFrame?.sourceType || 'selected-box'
   }
-} // End createBoxPayload
+} // End normalizeSelectedCabinetFrame
 
 //=================
 function createPanelPayload(frameId, data) {
@@ -199,37 +221,34 @@ function addPanel(list, frameId, data) {
 
 //=================
 function addScribePanels(list, frameId, info, body) {
-  const height = info.height
   const depthY = info.thickness
-  const leftValue = info.leftScribe
-  const rightValue = info.rightScribe
 
-  if (leftValue > 0) {
+  if (info.leftScribe > 0) {
     addPanel(list, frameId, {
       type: 'left_scribe',
       name: 'Nẹp gia giảm trái',
       orientation: 'vertical',
-      x: 0,
-      y: body.frontY - (info.leftScribeRotate ? leftValue : depthY),
-      z: 0,
-      xSize: info.leftScribeRotate ? info.thickness : leftValue,
-      ySize: info.leftScribeRotate ? leftValue : depthY,
-      zSize: height,
+      x: body.frameX,
+      y: body.frontY - (info.leftScribeRotate ? info.leftScribe : depthY),
+      z: body.z,
+      xSize: info.leftScribeRotate ? info.thickness : info.leftScribe,
+      ySize: info.leftScribeRotate ? info.leftScribe : depthY,
+      zSize: info.height,
       panelThickness: info.thickness
     })
   }
 
-  if (rightValue > 0) {
+  if (info.rightScribe > 0) {
     addPanel(list, frameId, {
       type: 'right_scribe',
       name: 'Nẹp gia giảm phải',
       orientation: 'vertical',
       x: body.x + body.width,
-      y: body.frontY - (info.rightScribeRotate ? rightValue : depthY),
-      z: 0,
-      xSize: info.rightScribeRotate ? info.thickness : rightValue,
-      ySize: info.rightScribeRotate ? rightValue : depthY,
-      zSize: height,
+      y: body.frontY - (info.rightScribeRotate ? info.rightScribe : depthY),
+      z: body.z,
+      xSize: info.rightScribeRotate ? info.thickness : info.rightScribe,
+      ySize: info.rightScribeRotate ? info.rightScribe : depthY,
+      zSize: info.height,
       panelThickness: info.thickness
     })
   }
@@ -239,13 +258,12 @@ function addScribePanels(list, frameId, info, body) {
 function addMainFramePanels(list, frameId, info, body) {
   const t = info.thickness
   const topRailDrop = info.topRail ? info.topRailHeight : 0
-  const topLimit = info.height - topRailDrop
+  const topLimitZ = body.z + info.height - topRailDrop
   const toeHeight = info.toeKick ? info.toeKickHeight : 0
-  const sideZ = info.toeKick && info.toeKickDetached ? toeHeight : 0
-  const bottomZ = info.toeKick ? toeHeight : 0
-  const topZ = clampMin(topLimit - t, bottomZ + t)
-  const sideHeight = clampMin(topLimit - sideZ, t)
-  const sideDepth = body.depth
+  const sideZ = info.toeKick && info.toeKickDetached ? body.z + toeHeight : body.z
+  const bottomZ = info.toeKick ? body.z + toeHeight : body.z
+  const topZ = clampMin(topLimitZ - t, bottomZ + t)
+  const sideHeight = clampMin(topLimitZ - sideZ, t)
   const innerX = body.x + (info.leftSide ? t : 0)
   const innerWidth = body.width - (info.leftSide ? t : 0) - (info.rightSide ? t : 0)
 
@@ -258,7 +276,7 @@ function addMainFramePanels(list, frameId, info, body) {
       y: body.y,
       z: sideZ,
       xSize: t,
-      ySize: sideDepth,
+      ySize: body.depth,
       zSize: sideHeight,
       panelThickness: t
     })
@@ -273,7 +291,7 @@ function addMainFramePanels(list, frameId, info, body) {
       y: body.y,
       z: sideZ,
       xSize: t,
-      ySize: sideDepth,
+      ySize: body.depth,
       zSize: sideHeight,
       panelThickness: t
     })
@@ -288,7 +306,7 @@ function addMainFramePanels(list, frameId, info, body) {
       y: body.y,
       z: bottomZ,
       xSize: info.bottomOverlay ? body.width : innerWidth,
-      ySize: sideDepth,
+      ySize: body.depth,
       zSize: t,
       panelThickness: t
     })
@@ -303,7 +321,7 @@ function addMainFramePanels(list, frameId, info, body) {
       y: body.y,
       z: topZ,
       xSize: info.topOverlay ? body.width : innerWidth,
-      ySize: sideDepth,
+      ySize: body.depth,
       zSize: t,
       panelThickness: t
     })
@@ -318,7 +336,7 @@ function addMainFramePanels(list, frameId, info, body) {
     sideHeight,
     topZ,
     bottomZ,
-    topLimit
+    topLimitZ
   }
 } // End addMainFramePanels
 
@@ -387,7 +405,7 @@ function addTopRail(list, frameId, info, body) {
     orientation: 'rail',
     x,
     y,
-    z: info.height - info.topRailHeight,
+    z: body.z + info.height - info.topRailHeight,
     xSize,
     ySize: t,
     zSize: info.topRailHeight,
@@ -500,7 +518,7 @@ function addToeKick(list, frameId, info, body, backInfo) {
     orientation: 'toe_kick',
     x,
     y: frontY,
-    z: 0,
+    z: body.z,
     xSize,
     ySize: t,
     zSize: info.toeKickHeight,
@@ -515,7 +533,7 @@ function addToeKick(list, frameId, info, body, backInfo) {
       orientation: 'toe_kick',
       x,
       y: backY,
-      z: 0,
+      z: body.z,
       xSize,
       ySize: t,
       zSize: info.toeKickHeight,
@@ -532,7 +550,7 @@ function addToeKick(list, frameId, info, body, backInfo) {
           orientation: 'toe_kick_support',
           x: x + gap * (index + 1) - (t / 2),
           y: backY + t,
-          z: 0,
+          z: body.z,
           xSize: t,
           ySize: usableY,
           zSize: info.toeKickHeight,
@@ -544,27 +562,20 @@ function addToeKick(list, frameId, info, body, backInfo) {
 } // End addToeKick
 
 //=================
-export function buildCabinetInfoLayout(rawInfo = {}) {
-  const info = normalizeCabinetInfo(rawInfo)
-  const frameId = createId('cabinet_info_box')
+export function buildCabinetInfoLayout(rawInfo = {}, selectedFrame = null) {
+  const baseFrame = normalizeSelectedCabinetFrame(selectedFrame, rawInfo)
+  const info = normalizeCabinetInfo(rawInfo, baseFrame)
+  const frameId = baseFrame.id
   const body = {
-    x: info.leftScribe,
-    y: 0,
-    width: clampMin(info.width - info.leftScribe - info.rightScribe, info.thickness * 2),
-    depth: info.depth,
-    frontY: info.depth
+    frameX: baseFrame.x,
+    x: baseFrame.x + info.leftScribe,
+    y: baseFrame.y,
+    z: baseFrame.z,
+    width: clampMin(baseFrame.width - info.leftScribe - info.rightScribe, info.thickness * 2),
+    depth: baseFrame.depth,
+    frontY: baseFrame.y + baseFrame.depth
   }
   const panels = []
-  const box = createBoxPayload(frameId, {
-    name: 'MN Info Cabinet',
-    x: body.x,
-    y: body.y,
-    z: 0,
-    width: body.width,
-    depth: body.depth,
-    height: info.height,
-    panelThickness: info.thickness
-  })
 
   addScribePanels(panels, frameId, info, body)
   const frame = addMainFramePanels(panels, frameId, info, body)
@@ -575,13 +586,14 @@ export function buildCabinetInfoLayout(rawInfo = {}) {
   addToeKick(panels, frameId, info, body, backInfo)
 
   return {
-    box,
+    box: baseFrame,
     panels,
     info,
     meta: {
       frameId,
       panelCount: panels.length,
-      body
+      body,
+      mode: selectedFrame ? 'apply-to-selected-box' : 'standalone-preview'
     }
   }
 } // End buildCabinetInfoLayout

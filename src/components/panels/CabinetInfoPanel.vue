@@ -2,108 +2,113 @@
   <section class="mn-panel-section compact mn-info-panel">
     <div class="mn-panel-title">MN Solution Info</div>
 
+    <div class="mn-status-box mn-info-selected">
+      Box đang chọn: {{ selectedFrameLabel }}<br />
+      Tick phần nào sẽ tạo lại phần Info cho box đó.
+    </div>
+
     <details open>
       <summary>Khung chính</summary>
       <div class="mn-info-grid">
-        <label>Rộng<input v-model="info.state.form.width" type="number" step="0.1" /></label>
-        <label>Cao<input v-model="info.state.form.height" type="number" step="0.1" /></label>
-        <label>Sâu<input v-model="info.state.form.depth" type="number" step="0.1" /></label>
-        <label>Dày tấm<input v-model="info.state.form.thickness" type="number" step="0.1" /></label>
+        <label>Rộng<input v-model="info.state.form.width" type="number" step="0.1" disabled /></label>
+        <label>Cao<input v-model="info.state.form.height" type="number" step="0.1" disabled /></label>
+        <label>Sâu<input v-model="info.state.form.depth" type="number" step="0.1" disabled /></label>
+        <label>Dày tấm<input v-model="info.state.form.thickness" type="number" step="0.1" @change="applyInfo" /></label>
       </div>
       <div class="mn-info-checks">
-        <label><input v-model="info.state.form.leftSide" type="checkbox" /> Hông trái</label>
-        <label><input v-model="info.state.form.rightSide" type="checkbox" /> Hông phải</label>
-        <label><input v-model="info.state.form.top" type="checkbox" /> Nóc</label>
-        <label><input v-model="info.state.form.bottom" type="checkbox" /> Đáy</label>
-        <label><input v-model="info.state.form.topOverlay" type="checkbox" /> Nóc trùm</label>
-        <label><input v-model="info.state.form.bottomOverlay" type="checkbox" /> Đáy trùm</label>
+        <label><input v-model="info.state.form.leftSide" type="checkbox" @change="applyInfo" /> Hông trái</label>
+        <label><input v-model="info.state.form.rightSide" type="checkbox" @change="applyInfo" /> Hông phải</label>
+        <label><input v-model="info.state.form.top" type="checkbox" @change="applyInfo" /> Nóc</label>
+        <label><input v-model="info.state.form.bottom" type="checkbox" @change="applyInfo" /> Đáy</label>
+        <label><input v-model="info.state.form.topOverlay" type="checkbox" @change="applyInfo" /> Nóc trùm</label>
+        <label><input v-model="info.state.form.bottomOverlay" type="checkbox" @change="applyInfo" /> Đáy trùm</label>
       </div>
     </details>
 
     <details>
       <summary>Hậu</summary>
       <div class="mn-info-checks">
-        <label><input v-model="info.state.form.back" type="checkbox" /> Hậu</label>
-        <label><input v-model="info.state.form.topBackOverlay" type="checkbox" /> Nóc trùm hậu</label>
-        <label><input v-model="info.state.form.bottomBackOverlay" type="checkbox" /> Đáy trùm hậu</label>
+        <label><input v-model="info.state.form.back" type="checkbox" @change="applyInfo" /> Hậu</label>
+        <label><input v-model="info.state.form.topBackOverlay" type="checkbox" @change="applyInfo" /> Nóc trùm hậu</label>
+        <label><input v-model="info.state.form.bottomBackOverlay" type="checkbox" @change="applyInfo" /> Đáy trùm hậu</label>
       </div>
       <div class="mn-info-grid">
-        <label>Rãnh hậu<input v-model="info.state.form.backGrooveDepth" type="number" step="0.1" /></label>
-        <label>Dày hậu<input v-model="info.state.form.backThickness" type="number" step="0.1" /></label>
-        <label>Lùi hậu<input v-model="info.state.form.backRetreat" type="number" step="0.1" /></label>
-        <label>Công thức<input v-model="info.state.form.backSplitFormula" type="text" placeholder="/2 hoặc 400,300" /></label>
+        <label>Rãnh hậu<input v-model="info.state.form.backGrooveDepth" type="number" step="0.1" @change="applyInfo" /></label>
+        <label>Dày hậu<input v-model="info.state.form.backThickness" type="number" step="0.1" @change="applyInfo" /></label>
+        <label>Lùi hậu<input v-model="info.state.form.backRetreat" type="number" step="0.1" @change="applyInfo" /></label>
+        <label>Công thức<input v-model="info.state.form.backSplitFormula" type="text" placeholder="/2 hoặc 400,300" @change="applyInfo" /></label>
       </div>
     </details>
 
     <details>
       <summary>Chỉ nóc</summary>
       <div class="mn-info-checks">
-        <label><input v-model="info.state.form.topRail" type="checkbox" /> Thanh chỉ nóc</label>
-        <label><input v-model="info.state.form.topRailInset" type="checkbox" /> Nóc lọt</label>
+        <label><input v-model="info.state.form.topRail" type="checkbox" @change="applyInfo" /> Thanh chỉ nóc</label>
+        <label><input v-model="info.state.form.topRailInset" type="checkbox" @change="applyInfo" /> Nóc lọt</label>
       </div>
       <div class="mn-info-grid">
-        <label>Kích thước<input v-model="info.state.form.topRailHeight" type="number" step="0.1" /></label>
-        <label>Âm mặt<input v-model="info.state.form.topRailFaceOffset" type="number" step="0.1" /></label>
+        <label>Kích thước<input v-model="info.state.form.topRailHeight" type="number" step="0.1" @change="applyInfo" /></label>
+        <label>Âm mặt<input v-model="info.state.form.topRailFaceOffset" type="number" step="0.1" @change="applyInfo" /></label>
       </div>
     </details>
 
     <details>
       <summary>Diềm tay nắm</summary>
       <div class="mn-info-checks">
-        <label><input v-model="info.state.form.handleRail" type="checkbox" /> Diềm tay nắm</label>
+        <label><input v-model="info.state.form.handleRail" type="checkbox" @change="applyInfo" /> Diềm tay nắm</label>
       </div>
       <div class="mn-info-grid">
-        <label>Số lượng<input v-model="info.state.form.handleRailCount" type="number" step="1" /></label>
-        <label>Kích thước<input v-model="info.state.form.handleRailSize" type="number" step="0.1" /></label>
-        <label>Âm mặt<input v-model="info.state.form.handleRailFaceOffset" type="number" step="0.1" /></label>
-        <label>Thanh sau<input v-model="info.state.form.handleRailBackCount" type="number" step="1" /></label>
-        <label>Bổ sung<input v-model="info.state.form.handleRailSupportCount" type="number" step="1" /></label>
+        <label>Số lượng<input v-model="info.state.form.handleRailCount" type="number" step="1" @change="applyInfo" /></label>
+        <label>Kích thước<input v-model="info.state.form.handleRailSize" type="number" step="0.1" @change="applyInfo" /></label>
+        <label>Âm mặt<input v-model="info.state.form.handleRailFaceOffset" type="number" step="0.1" @change="applyInfo" /></label>
+        <label>Thanh sau<input v-model="info.state.form.handleRailBackCount" type="number" step="1" @change="applyInfo" /></label>
+        <label>Bổ sung<input v-model="info.state.form.handleRailSupportCount" type="number" step="1" @change="applyInfo" /></label>
       </div>
     </details>
 
     <details>
       <summary>Thanh chặn cánh</summary>
       <div class="mn-info-checks">
-        <label><input v-model="info.state.form.doorStop" type="checkbox" /> Thanh chặn cánh</label>
-        <label><input v-model="info.state.form.doorStopHorizontal" type="checkbox" /> Ngang</label>
+        <label><input v-model="info.state.form.doorStop" type="checkbox" @change="applyInfo" /> Thanh chặn cánh</label>
+        <label><input v-model="info.state.form.doorStopHorizontal" type="checkbox" @change="applyInfo" /> Ngang</label>
       </div>
       <div class="mn-info-grid">
-        <label>Công thức<input v-model="info.state.form.doorStopFormula" type="text" placeholder="/2 hoặc 300,200" /></label>
-        <label>Kích thước<input v-model="info.state.form.doorStopSize" type="number" step="0.1" /></label>
-        <label>Âm mặt<input v-model="info.state.form.doorStopFaceOffset" type="number" step="0.1" /></label>
+        <label>Công thức<input v-model="info.state.form.doorStopFormula" type="text" placeholder="/2 hoặc 300,200" @change="applyInfo" /></label>
+        <label>Kích thước<input v-model="info.state.form.doorStopSize" type="number" step="0.1" @change="applyInfo" /></label>
+        <label>Âm mặt<input v-model="info.state.form.doorStopFaceOffset" type="number" step="0.1" @change="applyInfo" /></label>
       </div>
     </details>
 
     <details>
       <summary>Len chân</summary>
       <div class="mn-info-checks">
-        <label><input v-model="info.state.form.toeKick" type="checkbox" /> Len chân</label>
-        <label><input v-model="info.state.form.toeKickDetached" type="checkbox" /> Len chân rời</label>
-        <label><input v-model="info.state.form.toeKickBack" type="checkbox" /> Thanh chân sau</label>
+        <label><input v-model="info.state.form.toeKick" type="checkbox" @change="applyInfo" /> Len chân</label>
+        <label><input v-model="info.state.form.toeKickDetached" type="checkbox" @change="applyInfo" /> Len chân rời</label>
+        <label><input v-model="info.state.form.toeKickBack" type="checkbox" @change="applyInfo" /> Thanh chân sau</label>
       </div>
       <div class="mn-info-grid">
-        <label>Cao len<input v-model="info.state.form.toeKickHeight" type="number" step="0.1" /></label>
-        <label>Lùi len<input v-model="info.state.form.toeKickRetreat" type="number" step="0.1" /></label>
-        <label>Bổ sung<input v-model="info.state.form.toeKickSupportCount" type="number" step="1" /></label>
+        <label>Cao len<input v-model="info.state.form.toeKickHeight" type="number" step="0.1" @change="applyInfo" /></label>
+        <label>Lùi len<input v-model="info.state.form.toeKickRetreat" type="number" step="0.1" @change="applyInfo" /></label>
+        <label>Bổ sung<input v-model="info.state.form.toeKickSupportCount" type="number" step="1" @change="applyInfo" /></label>
       </div>
     </details>
 
     <details>
       <summary>Nẹp gia giảm / lùi đợt</summary>
       <div class="mn-info-checks">
-        <label><input v-model="info.state.form.leftScribeRotate" type="checkbox" /> Xoay nẹp trái</label>
-        <label><input v-model="info.state.form.rightScribeRotate" type="checkbox" /> Xoay nẹp phải</label>
+        <label><input v-model="info.state.form.leftScribeRotate" type="checkbox" @change="applyInfo" /> Xoay nẹp trái</label>
+        <label><input v-model="info.state.form.rightScribeRotate" type="checkbox" @change="applyInfo" /> Xoay nẹp phải</label>
       </div>
       <div class="mn-info-grid">
-        <label>Nẹp trái<input v-model="info.state.form.leftScribe" type="number" step="0.1" /></label>
-        <label>Nẹp phải<input v-model="info.state.form.rightScribe" type="number" step="0.1" /></label>
-        <label>Lùi đợt đứng<input v-model="info.state.form.verticalShelfRetreat" type="number" step="0.1" /></label>
-        <label>Lùi đợt nằm<input v-model="info.state.form.horizontalShelfRetreat" type="number" step="0.1" /></label>
+        <label>Nẹp trái<input v-model="info.state.form.leftScribe" type="number" step="0.1" @change="applyInfo" /></label>
+        <label>Nẹp phải<input v-model="info.state.form.rightScribe" type="number" step="0.1" @change="applyInfo" /></label>
+        <label>Lùi đợt đứng<input v-model="info.state.form.verticalShelfRetreat" type="number" step="0.1" @change="applyInfo" /></label>
+        <label>Lùi đợt nằm<input v-model="info.state.form.horizontalShelfRetreat" type="number" step="0.1" @change="applyInfo" /></label>
       </div>
     </details>
 
     <div class="mn-info-actions">
-      <button type="button" @click="applyInfo">Tạo tủ</button>
+      <button type="button" @click="applyInfo">Áp vào box</button>
       <button type="button" @click="previewInfo">Check</button>
       <button type="button" @click="clearInfo">Xóa Info</button>
     </div>
@@ -112,14 +117,16 @@
       Box: {{ info.state.lastLayout.box.width }} x {{ info.state.lastLayout.box.depth }} x {{ info.state.lastLayout.box.height }}<br />
       Chi tiết: {{ info.state.lastLayout.panels.length }}
     </div>
-    <div class="mn-status-box" v-if="info.state.lastError">{{ info.state.lastError }}</div>
+    <div class="mn-status-box mn-info-error" v-if="info.state.lastError">{{ info.state.lastError }}</div>
   </section>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useCabinetInfoStore } from '../../stores/useCabinetInfoStore'
 
 const info = useCabinetInfoStore()
+const selectedFrameLabel = computed(() => info.getSelectedFrameLabel())
 
 //=================
 function previewInfo() {
@@ -156,6 +163,14 @@ function clearInfo() {
   margin-bottom: 6px;
 }
 
+.mn-info-selected {
+  margin-bottom: 6px;
+}
+
+.mn-info-error {
+  color: #ff6666;
+}
+
 .mn-info-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -190,6 +205,11 @@ function clearInfo() {
   padding: 2px 5px;
   background: rgba(255, 255, 255, 0.08);
   color: inherit;
+}
+
+.mn-info-grid input:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .mn-info-actions {
