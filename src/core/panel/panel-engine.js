@@ -180,7 +180,7 @@ function createSidePanel(zone, edge, thickness, offset) {
     ySize: zoneDepth,
     zSize: zoneHeight,
 
-    color: '#0040a0'
+    color: 'rgba(135, 206, 255, 0.8)'
   })
 } // End createSidePanel
 
@@ -213,7 +213,7 @@ function createTopBottomPanel(zone, edge, thickness, offset) {
     ySize: zoneDepth,
     zSize: thickness,
 
-    color: '#0040a0'
+    color: 'rgba(135, 206, 255, 0.8)'
   })
 } // End createTopBottomPanel
 

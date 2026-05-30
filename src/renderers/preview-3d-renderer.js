@@ -27,7 +27,7 @@ export function renderPreview3D(ctx, payload) {
   ctx.strokeRect(x, y, frontW, frontH)
 
   panels.forEach((panel) => {
-    ctx.fillStyle = panel.orientation === 'vertical' ? '#e55353' : '#3fa9f5'
+    ctx.fillStyle = panel.color || 'rgba(135, 206, 255, 0.8)'
     const px = x + (panel.x / cabinet.width) * frontW
     const py = y + frontH - ((panel.y + panel.height) / cabinet.depth) * frontH
     const pw = Math.max(2, (panel.width / cabinet.width) * frontW)

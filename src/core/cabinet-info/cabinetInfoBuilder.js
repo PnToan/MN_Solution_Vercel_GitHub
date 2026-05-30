@@ -121,7 +121,7 @@ function createPanel(sourceBox, kind, name, x3d, y3d, z3d, xSize, ySize, zSize, 
     xSize: safeXSize,
     ySize: safeYSize,
     zSize: safeZSize,
-    color: meta.color || '#0040a0'
+    color: meta.color || 'rgba(135, 206, 255, 0.8)'
   })
 } // End createPanel
 

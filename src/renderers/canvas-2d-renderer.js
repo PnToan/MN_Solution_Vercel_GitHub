@@ -341,8 +341,8 @@ function drawPanels(ctx, viewport, panels = [], selectedPanelIds = [], currentVi
     const selected = selectedIds.includes(panel.id)
 
     drawRectLocal(ctx, viewport, rect, {
-      fill: 'rgba(0, 64, 160, 0.90)',
-      stroke: selected ? '#ff9f1a' : '#002f78',
+      fill: panel.color || 'rgba(135, 206, 255, 0.8)',
+      stroke: selected ? '#ff9f1a' : '#3a8fbd',
       lineWidth: selected ? 3 : 2
     })
 
@@ -535,8 +535,8 @@ function drawPanelPreviewItems(ctx, viewport, previewItems = [], hover, currentV
     if (!rect) return
 
     drawRectLocal(ctx, viewport, rect, {
-      fill: 'rgba(0, 64, 160, 0.55)',
-      stroke: '#002f78',
+      fill: panel.color || 'rgba(135, 206, 255, 0.8)',
+      stroke: '#3a8fbd',
       lineWidth: 2
     })
   })
