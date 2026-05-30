@@ -708,3 +708,20 @@ img { display: block; max-width: 100%; }
   font-weight: 700;
   text-align: center;
 }
+
+/*=================*/
+.mn-bottom-commit-info {
+  min-width: 320px;
+  max-width: 520px;
+  height: 22px;
+  padding: 0 10px;
+  border: 1px solid #3a3a3a;
+  border-radius: 3px;
+  background: #1f1f1f;
+  color: #dcdcdc;
+  font-size: 11px;
+  line-height: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
