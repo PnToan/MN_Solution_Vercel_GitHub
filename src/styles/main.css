@@ -699,3 +699,14 @@ img { display: block; max-width: 100%; }
   border-left: 1px solid #111111;
   background: #eeeeee;
 }
+
+.mn-info-target-empty {
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid #111;
+  background: #fff8c8;
+  color: #c00000;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}

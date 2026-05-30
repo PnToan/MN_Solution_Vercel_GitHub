@@ -11,6 +11,17 @@ function cloneValue(value) {
 } // End cloneValue
 
 //=================
+function toNumber(value, fallback = 0) {
+  const numberValue = typeof value === 'string'
+    ? Number(value.replace(',', '.'))
+    : Number(value)
+
+  if (!Number.isFinite(numberValue)) return fallback
+
+  return numberValue
+} // End toNumber
+
+//=================
 function setNestedValue(target, path, value) {
   const keys = String(path || '').split('.').filter(Boolean)
 
@@ -74,6 +85,10 @@ const store = createSimpleStore({
   setValue(path, value) {
     setNestedValue(state.info, path, value)
 
+    if (path === 'general.cabinetDepth') {
+      this.applyDepthToSelectedBox()
+    }
+
     if (state.autoApply) {
       this.applyToSelectedBox(false)
     }
@@ -87,13 +102,40 @@ const store = createSimpleStore({
   }, // End getSelectedBox
 
   //=================
-  syncGroupNameFromSelectedBox() {
+  syncSelectedBoxToInfo() {
     const selectedBox = this.getSelectedBox()
 
-    if (!selectedBox) return
+    if (!selectedBox) return false
 
     state.info.groupName = selectedBox.name || state.info.groupName || 'Box 1'
+    state.info.general.cabinetDepth = toNumber(selectedBox.depth, state.info.general.cabinetDepth || 500)
+
+    return true
+  }, // End syncSelectedBoxToInfo
+
+  //=================
+  syncGroupNameFromSelectedBox() {
+    return this.syncSelectedBoxToInfo()
   }, // End syncGroupNameFromSelectedBox
+
+  //=================
+  applyDepthToSelectedBox() {
+    const selectedBox = this.getSelectedBox()
+
+    if (!selectedBox) return false
+
+    const nextDepth = toNumber(state.info.general.cabinetDepth, selectedBox.depth)
+
+    if (!Number.isFinite(nextDepth) || nextDepth <= 0) return false
+    if (Math.abs(toNumber(selectedBox.depth, 0) - nextDepth) < 0.001) return true
+
+    const anchorY = toNumber(selectedBox.y, 0) + toNumber(selectedBox.depth, 0)
+
+    selectedBox.y = anchorY - nextDepth
+    selectedBox.depth = nextDepth
+
+    return true
+  }, // End applyDepthToSelectedBox
 
   //=================
   applyToSelectedBox(pushHistory = true) {
@@ -106,12 +148,15 @@ const store = createSimpleStore({
       return false
     }
 
-    const nextPanels = buildCabinetInfoPanels(selectedBox, cloneValue(state.info))
-    const oldPanels = removeCabinetInfoPanelsForBox(drawing.state.panels, selectedBox.id)
-
     if (pushHistory) {
       drawing.pushHistorySnapshot('MN Solution Info')
     }
+
+    this.applyDepthToSelectedBox()
+
+    const targetBox = this.getSelectedBox()
+    const nextPanels = buildCabinetInfoPanels(targetBox, cloneValue(state.info))
+    const oldPanels = removeCabinetInfoPanelsForBox(drawing.state.panels, targetBox.id)
 
     drawing.state.panels = [
       ...oldPanels,
@@ -121,7 +166,7 @@ const store = createSimpleStore({
     drawing.state.selectedPanelId = nextPanels[0]?.id || null
     drawing.state.selectedPanelIds = nextPanels[0] ? [nextPanels[0].id] : []
     drawing.rebuildZones()
-    app.setStatus(`Info: đã tạo ${nextPanels.length} chi tiết cho ${selectedBox.name || selectedBox.id}`)
+    app.setStatus(`Info: đã tạo ${nextPanels.length} chi tiết cho ${targetBox.name || targetBox.id}`)
 
     return true
   }, // End applyToSelectedBox

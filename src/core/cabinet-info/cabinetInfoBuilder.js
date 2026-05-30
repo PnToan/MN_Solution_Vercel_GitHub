@@ -65,7 +65,7 @@ function getBodyRect(sourceBox, info) {
     y: toNumber(sourceBox.y, 0),
     z: toNumber(sourceBox.z, 0),
     width,
-    depth: toPositiveNumber(sourceBox.depth, 1),
+    depth: toPositiveNumber(info?.general?.cabinetDepth, toPositiveNumber(sourceBox.depth, 1)),
     height: toPositiveNumber(sourceBox.height, 1),
     thickness
   }

@@ -3,6 +3,7 @@ export function createDefaultCabinetInfoState() {
   return {
     groupName: 'Box 1',
     general: {
+      cabinetDepth: 500,
       panelThickness: 17.4,
       leftSide: false,
       rightSide: false,

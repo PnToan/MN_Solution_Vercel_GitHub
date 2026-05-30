@@ -7,20 +7,24 @@
       <input :value="info.groupName" @input="setValue('groupName', $event.target.value)" />
     </label>
 
-    <div class="mn-info-selected">Box đang chọn: {{ selectedBoxName }}</div>
+    <div v-if="!selectedBox" class="mn-info-target-empty">Chọn Box để điều chỉnh</div>
 
-    <div class="mn-info-actions">
+    <template v-else>
+      <div class="mn-info-selected">Box đang chọn: {{ selectedBoxName }}</div>
+
+      <div class="mn-info-actions">
       <button type="button" @click="cabinetInfo.applyToSelectedBox(true)">Cập nhật</button>
       <button type="button" @click="cabinetInfo.clearSelectedBoxInfoPanels()">Xóa Info</button>
-    </div>
+      </div>
 
-    <label class="mn-info-check auto">
+      <label class="mn-info-check auto">
       <input type="checkbox" :checked="cabinetInfo.state.autoApply" @change="cabinetInfo.setAutoApply($event.target.checked)" />
       <span>Tick là tạo/cập nhật</span>
-    </label>
+      </label>
 
-    <InfoSection title="Thông tin chung" section-key="general">
-      <InfoNumber label="Dày tấm" path="general.panelThickness" />
+      <InfoSection title="Thông tin chung" section-key="general">
+      <InfoNumber label="Sâu Tủ" path="general.cabinetDepth" />
+      <InfoNumber label="Độ dày tấm" path="general.panelThickness" />
       <InfoCheck label="Hông trái" path="general.leftSide" />
       <InfoCheck label="Hông phải" path="general.rightSide" />
       <InfoCheck label="Nóc" path="general.top" />
@@ -80,16 +84,17 @@
       <InfoCheck label="Xoay phải" path="filler.rightRotate" />
     </InfoSection>
 
-    <InfoSection title="Lùi Đợt" section-key="shelfInset">
+      <InfoSection title="Lùi Đợt" section-key="shelfInset">
       <InfoCheck label="Bật lùi đợt" path="shelfInset.enabled" />
       <InfoNumber label="Lùi đợt đứng" path="shelfInset.vertical" />
       <InfoNumber label="Lùi đợt nằm" path="shelfInset.horizontal" />
-    </InfoSection>
+      </InfoSection>
+    </template>
   </section>
 </template>
 
 <script setup>
-import { computed, defineComponent, h } from 'vue'
+import { computed, defineComponent, h, watch } from 'vue'
 import { useBoxStore } from '../../stores/useBoxStore'
 import { useCabinetInfoStore } from '../../stores/useCabinetInfoStore'
 
@@ -97,11 +102,13 @@ const cabinetInfo = useCabinetInfoStore()
 const boxStore = useBoxStore()
 const info = cabinetInfo.state.info
 
-const selectedBoxName = computed(() => {
-  const box = boxStore.getSelectedBox ? boxStore.getSelectedBox() : null
+const selectedBox = computed(() => boxStore.getSelectedBox ? boxStore.getSelectedBox() : null)
 
-  return box?.name || box?.id || 'Chưa chọn'
-})
+const selectedBoxName = computed(() => selectedBox.value?.name || selectedBox.value?.id || 'Chưa chọn')
+
+watch(() => selectedBox.value?.id, () => {
+  cabinetInfo.syncSelectedBoxToInfo()
+}, { immediate: true })
 
 //=================
 function getPathValue(path) {
