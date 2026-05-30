@@ -234,44 +234,62 @@ function buildFramePanels(sourceBox, info, body, panels) {
 function buildBackPanels(sourceBox, info, body, panels) {
   if (!normalizeBoolean(info?.back?.enabled)) return
 
-  const t = body.thickness
   const grooveDepth = toNonNegativeNumber(info.back.grooveDepth, 0)
-  const backThickness = toPositiveNumber(info.back.thickness, Math.max(1, t / 3))
+  const backThickness = toPositiveNumber(info.back.thickness, Math.max(1, body.thickness / 3))
   const inset = toNumber(info.back.inset, 0)
+
+  const backOuterY = body.y
+  const y = backOuterY + inset
+
   const x = body.x + grooveDepth
   const width = Math.max(1, body.width - (2 * grooveDepth))
-  const z = body.z + (normalizeBoolean(info.back.bottomCoverBack) ? grooveDepth : 0)
-  const height = Math.max(1, body.height - (normalizeBoolean(info.back.topCoverBack) ? grooveDepth : 0) - (normalizeBoolean(info.back.bottomCoverBack) ? grooveDepth : 0))
-  const y = body.y + inset
+
+  const z = body.z + (normalizeBoolean(info.back.bottomCoverBack) ? 0 : grooveDepth)
+  const height = Math.max(
+    1,
+    body.height
+      - (normalizeBoolean(info.back.topCoverBack) ? 0 : grooveDepth)
+      - (normalizeBoolean(info.back.bottomCoverBack) ? 0 : grooveDepth)
+  )
+
   const splitOffsets = parseDivisionFormula(info.back.splitFormula, width, backThickness)
   let startX = x
 
   if (!splitOffsets.length) {
-    pushPanel(panels, createPanel(sourceBox, 'back', 'Tấm hậu', x, y, z, width, backThickness, height, {
-      panelThickness: backThickness,
-      orientation: 'vertical',
-      panelSide: 'back'
-    }))
+    pushPanel(
+      panels,
+      createPanel(sourceBox, 'back', 'Tấm hậu', x, y, z, width, backThickness, height, {
+        panelThickness: backThickness,
+        orientation: 'vertical',
+        panelSide: 'back'
+      })
+    )
     return
   }
 
   splitOffsets.forEach((offset, index) => {
     const panelWidth = x + offset - startX
 
-    pushPanel(panels, createPanel(sourceBox, 'back', `Tấm hậu ${index + 1}`, startX, y, z, panelWidth, backThickness, height, {
-      panelThickness: backThickness,
-      orientation: 'vertical',
-      panelSide: 'back'
-    }))
+    pushPanel(
+      panels,
+      createPanel(sourceBox, 'back', `Tấm hậu ${index + 1}`, startX, y, z, panelWidth, backThickness, height, {
+        panelThickness: backThickness,
+        orientation: 'vertical',
+        panelSide: 'back'
+      })
+    )
 
     startX = x + offset
   })
 
-  pushPanel(panels, createPanel(sourceBox, 'back', `Tấm hậu ${splitOffsets.length + 1}`, startX, y, z, x + width - startX, backThickness, height, {
-    panelThickness: backThickness,
-    orientation: 'vertical',
-    panelSide: 'back'
-  }))
+  pushPanel(
+    panels,
+    createPanel(sourceBox, 'back', `Tấm hậu ${splitOffsets.length + 1}`, startX, y, z, x + width - startX, backThickness, height, {
+      panelThickness: backThickness,
+      orientation: 'vertical',
+      panelSide: 'back'
+    })
+  )
 } // End buildBackPanels
 
 //=================
