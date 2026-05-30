@@ -37,6 +37,7 @@ import BottomParams from '../components/layout/BottomParams.vue'
 import RightPanel from '../components/panels/RightPanel.vue'
 import { useDrawingStore } from '../stores/useDrawingStore'
 import { useAppStore } from '../stores/useAppStore'
+import { applyAppSettings, loadAppSettings } from '../core/settings/app-settings'
 
 const drawingStore = useDrawingStore()
 const app = useAppStore()
@@ -112,6 +113,7 @@ function onGlobalKeyDown(event) {
 } // End onGlobalKeyDown
 
 onMounted(() => {
+  applyAppSettings(loadAppSettings())
   drawingStore.rebuildZones()
   applyRightPanelWidth(rightPanelWidth.value)
   window.addEventListener('keydown', onGlobalKeyDown, true)

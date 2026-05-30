@@ -2,6 +2,16 @@ import { localToScreen, getLocalScale } from './viewport-transform'
 import { projectBoxToCameraRect, getCameraConfig } from '../core/view/view-camera'
 
 //=================
+function getCanvasBackgroundColor() {
+  try {
+    const value = getComputedStyle(document.documentElement).getPropertyValue('--mn-bg-canvas').trim()
+    return value || '#f4f4f4'
+  } catch (error) {
+    return '#f4f4f4'
+  }
+} // End getCanvasBackgroundColor
+
+//=================
 function drawLine(ctx, a, b, color = '#999', width = 1) {
   ctx.beginPath()
   ctx.strokeStyle = color
@@ -1212,7 +1222,7 @@ export function renderCanvas2D(ctx, payload) {
 
   ctx.clearRect(0, 0, width, height)
 
-  ctx.fillStyle = '#f4f4f4'
+  ctx.fillStyle = getCanvasBackgroundColor()
   ctx.fillRect(0, 0, width, height)
 
   if (showGrid) drawGrid(ctx, viewport, width, height)
