@@ -197,17 +197,18 @@ const store = createSimpleStore({
 
   //=================
   getActiveBox() {
-    const selectedBox = this.getSelectedBox()
+    const drawing = useDrawingStore()
+
+    const selectedBox = this.getSelectedBox ? this.getSelectedBox() : null
 
     if (selectedBox) return selectedBox
 
-    const drawing = useDrawingStore()
     const panelBoxId = drawing.getSelectedPanelBoxId?.()
 
     if (!panelBoxId) return null
 
-    return state.boxes.find((item) => item.id === panelBoxId) || null
-  } // End getActiveBox
+    return this.state.boxes.find((box) => box.id === panelBoxId) || null
+  }, // End getActiveBox
 }))
 
 //=================

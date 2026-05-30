@@ -1139,7 +1139,18 @@ const store = createSimpleStore({
 
     return getPanelFrameId(panel)
   }, // End getSelectedPanelBoxId
+  //=================
+  getSelectedPanelBoxId() {
+    const selectedPanel = this.getSelectedPanel()
 
+    if (!selectedPanel) return null
+
+    return selectedPanel.linkedFrameId
+      || selectedPanel.frameId
+      || selectedPanel.sourceBoxId
+      || selectedPanel.baseObjectId
+      || null
+  }, // End getSelectedPanelBoxId
   //=================
   selectDimensions(dimensionIds) {
     state.selectedDimensionIds = Array.isArray(dimensionIds) ? dimensionIds.filter(Boolean) : []
