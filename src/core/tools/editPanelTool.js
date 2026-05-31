@@ -124,5 +124,5 @@ export function isEditPanelTool(toolId) {
 
 //=================
 export function isEditPanelDrawTool(toolId) {
-  return ['editPanelLine', 'editPanelRect', 'editPanelArc', 'editPanelCircle', 'editPanelTape'].includes(toolId)
+  return ['editPanelSelect', 'editPanelLine', 'editPanelRect', 'editPanelArc', 'editPanelCircle', 'editPanelTape'].includes(toolId)
 } // End isEditPanelDrawTool

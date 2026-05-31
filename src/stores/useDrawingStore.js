@@ -2062,7 +2062,7 @@ const store = createSimpleStore({
       active: true,
       selectedPanelId: targetPanelId,
       context,
-      shapeTool: shapeTool || state.panelEdit?.shapeTool || null
+      shapeTool: shapeTool || state.panelEdit?.shapeTool || 'editPanelSelect'
     }
 
     return context

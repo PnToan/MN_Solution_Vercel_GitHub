@@ -158,6 +158,12 @@ const panelEditTape = ref({
   inputBuffer: ''
 })
 
+const panelEditHistory = ref({
+  undoStack: [],
+  redoStack: [],
+  max: 80
+})
+
 const selectDrag = ref({
   active: false,
   start: null,
@@ -172,6 +178,7 @@ const views = [
 ]
 
 const panelEditTools = [
+  { id: 'editPanelSelect', label: 'Select', icon: '/icons/toolbar/select.svg' },
   { id: 'editPanelLine', label: 'Line', icon: '/icons/toolbar/line.svg' },
   { id: 'editPanelRect', label: 'Rectangle', icon: '/icons/toolbar/rect.svg' },
   { id: 'editPanelArc', label: 'Arc', icon: '/icons/toolbar/arc.svg' },
@@ -182,11 +189,22 @@ const zoomLabel = computed(() => `${Math.round(app.state.viewport.zoom * 100)}%`
 const localX = computed(() => Math.round(app.state.mouse.localX))
 const localY = computed(() => Math.round(app.state.mouse.localY))
 const activePanelEditContext = computed(() => drawing.state.panelEdit?.active ? drawing.state.panelEdit.context : null)
-const panelEditCanvasCursorClass = computed(() => drawing.state.panelEdit?.shapeTool === 'editPanelTape' ? 'mn-cursor-panel-tape' : 'mn-cursor-crosshair')
+const panelEditCanvasCursorClass = computed(() => {
+  const shapeTool = drawing.state.panelEdit?.shapeTool
+
+  if (shapeTool === 'editPanelTape') return 'mn-cursor-panel-tape'
+  if (!shapeTool || shapeTool === 'editPanelSelect') return 'mn-cursor-pointer'
+
+  return 'mn-cursor-crosshair'
+})
 const panelEditFooterText = computed(() => {
   if (!activePanelEditContext.value) return ''
 
   const shapeTool = drawing.state.panelEdit?.shapeTool
+
+  if (!shapeTool || shapeTool === 'editPanelSelect') {
+    return `Select: ${activePanelEditContext.value.panelName} | ${activePanelEditContext.value.faceLabel} | Space để thoát lệnh hiện tại`
+  }
 
   if (shapeTool === 'editPanelTape') {
     const draft = panelEditTape.value.draft
@@ -604,13 +622,95 @@ function resetPanelEditTapeDraft() {
 } // End resetPanelEditTapeDraft
 
 //=================
+function clonePanelEditHistoryData(value) {
+  return JSON.parse(JSON.stringify(value || null))
+} // End clonePanelEditHistoryData
+
+//=================
+function createPanelEditHistorySnapshot() {
+  return {
+    guides: clonePanelEditHistoryData(panelEditTape.value.guides || [])
+  }
+} // End createPanelEditHistorySnapshot
+
+//=================
+function restorePanelEditHistorySnapshot(snapshot) {
+  panelEditTape.value = {
+    ...panelEditTape.value,
+    hoverSnap: null,
+    draft: null,
+    inputBuffer: '',
+    guides: clonePanelEditHistoryData(snapshot?.guides || [])
+  }
+} // End restorePanelEditHistorySnapshot
+
+//=================
+function pushPanelEditHistorySnapshot() {
+  const history = panelEditHistory.value
+
+  history.undoStack.push(createPanelEditHistorySnapshot())
+
+  if (history.undoStack.length > history.max) {
+    history.undoStack.shift()
+  }
+
+  history.redoStack = []
+} // End pushPanelEditHistorySnapshot
+
+//=================
+function clearPanelEditHistory() {
+  panelEditHistory.value = {
+    undoStack: [],
+    redoStack: [],
+    max: panelEditHistory.value.max || 80
+  }
+} // End clearPanelEditHistory
+
+//=================
+function undoPanelEditHistory() {
+  const history = panelEditHistory.value
+  const snapshot = history.undoStack.pop()
+
+  if (!snapshot) {
+    app.setStatus('Edit Panel: không còn bước để Undo')
+    return false
+  }
+
+  history.redoStack.push(createPanelEditHistorySnapshot())
+  restorePanelEditHistorySnapshot(snapshot)
+  app.setStatus('Edit Panel: Undo')
+  nextTick(resizePanelEditCanvas)
+
+  return true
+} // End undoPanelEditHistory
+
+//=================
+function redoPanelEditHistory() {
+  const history = panelEditHistory.value
+  const snapshot = history.redoStack.pop()
+
+  if (!snapshot) {
+    app.setStatus('Edit Panel: không còn bước để Redo')
+    return false
+  }
+
+  history.undoStack.push(createPanelEditHistorySnapshot())
+  restorePanelEditHistorySnapshot(snapshot)
+  app.setStatus('Edit Panel: Redo')
+  nextTick(resizePanelEditCanvas)
+
+  return true
+} // End redoPanelEditHistory
+
+//=================
 function exitPanelEditCommandToSelect() {
   const context = activePanelEditContext.value
 
   if (!context) return false
 
   resetPanelEditTapeDraft()
-  drawing.setPanelEditShapeTool(null)
+  drawing.setPanelEditShapeTool('editPanelSelect')
+  app.setTool('editPanel')
   app.setStatus(`Edit Panel: Select | ${context.panelName} | ${context.faceLabel}`)
   nextTick(resizePanelEditCanvas)
 
@@ -653,6 +753,8 @@ function commitPanelEditTapeGuide() {
   const draft = panelEditTape.value.draft
 
   if (!draft) return
+
+  pushPanelEditHistorySnapshot()
 
   panelEditTape.value = {
     ...panelEditTape.value,
@@ -838,6 +940,11 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
 } // End drawPanelEditCanvas
 //=================
 function selectPanelEditWindowTool(toolId) {
+  if (toolId === 'editPanelSelect') {
+    exitPanelEditCommandToSelect()
+    return
+  }
+
   const context = drawing.setPanelEditShapeTool(toolId)
 
   if (!context) {
@@ -869,6 +976,7 @@ function selectPanelEditFace(faceSide) {
     guides: [],
     inputBuffer: ''
   }
+  clearPanelEditHistory()
   app.setStatus(`Edit Panel: ${context.panelName} | ${context.faceLabel} | ${context.rearLabel}`)
   nextTick(resizePanelEditCanvas)
 } // End selectPanelEditFace
@@ -1017,6 +1125,7 @@ function applyPanelEdit() {
     guides: [],
     inputBuffer: ''
   }
+  clearPanelEditHistory()
   drawing.clearPanelEdit()
   app.setTool('select')
   app.setStatus('Edit Panel: cập nhật thành công')
@@ -2549,6 +2658,29 @@ function onWheel(event) {
 } // End onWheel
 
 //=================
+function handlePanelEditHistoryKey(event) {
+  if (!activePanelEditContext.value) return false
+
+  const key = event.key
+  const isUndo = (event.ctrlKey || event.metaKey) && !event.shiftKey && (key === 'z' || key === 'Z')
+  const isRedo = ((event.ctrlKey || event.metaKey) && !event.shiftKey && (key === 'y' || key === 'Y'))
+    || ((event.ctrlKey || event.metaKey) && event.shiftKey && (key === 'z' || key === 'Z'))
+
+  if (!isUndo && !isRedo) return false
+
+  event.preventDefault()
+  event.stopPropagation()
+
+  if (isUndo) {
+    undoPanelEditHistory()
+    return true
+  }
+
+  redoPanelEditHistory()
+  return true
+} // End handlePanelEditHistoryKey
+
+//=================
 function handlePanelEditTapeKey(event) {
   if (drawing.state.panelEdit?.shapeTool !== 'editPanelTape') return false
 
@@ -2643,6 +2775,8 @@ function onKeyDown(event) {
     exitPanelEditCommandToSelect()
     return
   }
+
+  if (handlePanelEditHistoryKey(event)) return
 
   if (handlePanelEditTapeKey(event)) return
 
@@ -2785,6 +2919,7 @@ watch(() => [
       guides: [],
       inputBuffer: ''
     }
+    clearPanelEditHistory()
   } else if (oldValue && (nextValue[2] !== oldValue[2] || nextValue[3] !== oldValue[3])) {
     panelEditTape.value = {
       hoverSnap: null,
@@ -2792,6 +2927,7 @@ watch(() => [
       guides: [],
       inputBuffer: ''
     }
+    clearPanelEditHistory()
   }
 
   nextTick(resizePanelEditCanvas)
