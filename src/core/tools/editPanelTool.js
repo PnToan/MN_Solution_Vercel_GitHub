@@ -46,8 +46,8 @@ function getPanelMajorFace(panel) {
 function getFaceOptions(face) {
   if (face.key === 'yz') {
     return [
-      { id: 'left', label: 'Mặt trái', viewKey: 'left', rearEdge: 'left', rearLabel: 'Cạnh Sau' },
-      { id: 'right', label: 'Mặt phải', viewKey: 'right', rearEdge: 'right', rearLabel: 'Cạnh Sau' }
+      { id: 'left', label: 'Mặt trái', viewKey: 'left', rearEdge: 'right', rearLabel: 'Cạnh Sau' },
+      { id: 'right', label: 'Mặt phải', viewKey: 'right', rearEdge: 'left', rearLabel: 'Cạnh Sau' }
     ]
   }
 

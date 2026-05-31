@@ -242,6 +242,7 @@ onMounted(() => {
 
   applyAppSettings(machineSettings)
   applyMachinePanelSettings(machineSettings)
+  drawingStore.ensureDefaultTestCabinet?.()
   drawingStore.rebuildZones()
   applyRightPanelWidth(rightPanelWidth.value)
   window.addEventListener('keydown', onGlobalKeyDown, true)

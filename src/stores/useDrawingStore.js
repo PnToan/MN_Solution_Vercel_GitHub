@@ -1550,6 +1550,139 @@ const store = createSimpleStore({
 
     state.zones = allZones
   }, // End rebuildZones
+
+  //=================
+  ensureDefaultTestCabinet() {
+    const boxStore = useBoxStore()
+
+    if (boxStore.state.boxes.length || state.panels.length) return false
+
+    const cabinet = useCabinetStore()
+    const width = 1200
+    const height = 2200
+    const depth = 580
+    const panelThickness = Math.max(1, toNumber(cabinet.state.panelThickness, 17.4))
+    const backThickness = 10
+    const toeKickHeight = 80
+    const boxId = `box_default_${Date.now()}`
+    const baseBox = {
+      id: boxId,
+      name: 'Box test 1200x2200x580',
+      x: 0,
+      y: 0,
+      z: 0,
+      width,
+      depth,
+      height,
+      panelThickness,
+      unit: cabinet.state.unit || 'mm',
+      color: 'rgba(0, 119, 204, 0.12)',
+      isDefaultTestBox: true
+    }
+
+    const makePanel = (panelSide, name, geometry, extra = {}) => ({
+      id: `panel_default_${panelSide}_${Date.now()}`,
+      name,
+      sourceType: 'default-test-box',
+      panelSide,
+      edge: panelSide,
+      linkedFrameId: boxId,
+      frameId: boxId,
+      sourceBoxId: boxId,
+      baseObjectId: boxId,
+      x3d: geometry.x,
+      y3d: geometry.y,
+      z3d: geometry.z,
+      xSize: geometry.xSize,
+      ySize: geometry.ySize,
+      zSize: geometry.zSize,
+      x: geometry.x,
+      y: geometry.z,
+      z: geometry.z,
+      width: geometry.xSize,
+      depth: geometry.ySize,
+      height: geometry.zSize,
+      panelThickness: geometry.thickness,
+      thickness: geometry.thickness,
+      dimEnabled: false,
+      ...extra
+    })
+
+    const panels = [
+      makePanel('left', 'Hông trái', {
+        x: 0,
+        y: 0,
+        z: 0,
+        xSize: panelThickness,
+        ySize: depth,
+        zSize: height,
+        thickness: panelThickness
+      }),
+      makePanel('right', 'Hông phải', {
+        x: width - panelThickness,
+        y: 0,
+        z: 0,
+        xSize: panelThickness,
+        ySize: depth,
+        zSize: height,
+        thickness: panelThickness
+      }),
+      makePanel('top', 'Nóc', {
+        x: 0,
+        y: 0,
+        z: height - panelThickness,
+        xSize: width,
+        ySize: depth,
+        zSize: panelThickness,
+        thickness: panelThickness
+      }),
+      makePanel('bottom', 'Đáy', {
+        x: 0,
+        y: 0,
+        z: toeKickHeight,
+        xSize: width,
+        ySize: depth,
+        zSize: panelThickness,
+        thickness: panelThickness
+      }),
+      makePanel('back', 'Hậu', {
+        x: 0,
+        y: depth - backThickness,
+        z: 0,
+        xSize: width,
+        ySize: backThickness,
+        zSize: height,
+        thickness: backThickness
+      }, {
+        cabinetInfoKind: 'back',
+        panelThickness: backThickness,
+        thickness: backThickness
+      }),
+      makePanel('toe_kick_front', 'Len chân', {
+        x: 0,
+        y: 0,
+        z: 0,
+        xSize: width,
+        ySize: panelThickness,
+        zSize: toeKickHeight,
+        thickness: panelThickness
+      })
+    ]
+
+    boxStore.setBoxes([baseBox])
+    boxStore.selectBox(boxId)
+    state.panels = panels
+    state.selectedPanelId = panels[0]?.id || null
+    state.selectedPanelIds = panels[0] ? [panels[0].id] : []
+    state.selectedDimensionIds = []
+    state.dimensions = []
+    state.move = createMoveState()
+    state.hover = null
+    state.snapPreview = null
+    this.rebuildZones()
+
+    return true
+  }, // End ensureDefaultTestCabinet
   //=================
   updatePanelsAfterBoxResize(oldBox, newBox) {
     if (!oldBox || !newBox || oldBox.id !== newBox.id) return

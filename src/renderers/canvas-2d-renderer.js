@@ -156,9 +156,9 @@ function drawPanelEditCutouts(ctx, viewport, panel, panelRect, currentView) {
     if (!cutoutRect) return
 
     drawRectLocal(ctx, viewport, cutoutRect, {
-      fill: getCanvasBackgroundColor(),
+      fill: 'rgba(0, 0, 0, 0.58)',
       stroke: '#111111',
-      lineWidth: 1.5
+      lineWidth: 1.8
     })
   })
 } // End drawPanelEditCutouts
