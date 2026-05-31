@@ -73,6 +73,8 @@ function normalizeInfoInputValue(path, value) {
 
   if (!Number.isFinite(numberValue)) return 0
 
+  if (path === 'topStrip.faceOffset') return numberValue
+
   return Math.round(numberValue)
 } // End normalizeInfoInputValue
 //=================
@@ -120,7 +122,12 @@ const store = createSimpleStore({
   setValue(path, value) {
     const selectedBox = this.getSelectedBox()
     const targetBoxId = selectedBox ? selectedBox.id : null
-    const nextValue = normalizeInfoInputValue(path, value)
+    let nextValue = normalizeInfoInputValue(path, value)
+
+    if (path === 'topStrip.faceOffset' && Number(nextValue) < 0) {
+      const panelThickness = Math.max(0, toNumber(state.info?.general?.panelThickness, 18))
+      nextValue = Math.max(Number(nextValue), -panelThickness)
+    }
 
     setNestedValue(state.info, path, nextValue)
 

@@ -30,6 +30,16 @@ function toNonNegativeNumber(value, fallback = 0) {
 } // End toNonNegativeNumber
 
 //=================
+function clampTopStripFaceOffset(value, thickness) {
+  const safeThickness = Math.max(0, toNumber(thickness, 0))
+  const numberValue = toNumber(value, 0)
+
+  if (numberValue < 0) return Math.max(numberValue, -safeThickness)
+
+  return numberValue
+} // End clampTopStripFaceOffset
+
+//=================
 function toInteger(value, fallback = 0) {
   const numberValue = Math.floor(toNumber(value, fallback))
 
@@ -289,7 +299,7 @@ function buildFramePanels(sourceBox, info, body, panels) {
   const topStripInset = normalizeBoolean(info?.topStrip?.inset)
   const topOverlap = normalizeBoolean(info?.general?.topOverlap)
   const keepSideFullHeightForInsetTopStrip = topStripEnabled && topStripInset && !topOverlap
-  const topShift = topStripEnabled && !keepSideFullHeightForInsetTopStrip ? toNonNegativeNumber(info.topStrip.size, 0) : 0
+  const topShift = topStripEnabled ? toNonNegativeNumber(info.topStrip.size, 0) : 0
   const toeHeight = normalizeBoolean(info?.toeKick?.enabled) ? toNonNegativeNumber(info.toeKick.height, 0) : 0
   const detachedToe = normalizeBoolean(info?.toeKick?.detached)
   const backEnabled = normalizeBoolean(info?.back?.enabled)
@@ -298,9 +308,10 @@ function buildFramePanels(sourceBox, info, body, panels) {
   const bottomCoverBack = backEnabled && normalizeBoolean(info?.back?.bottomCoverBack)
   const backStopDepth = getBackStopDepth(info, body)
   const bodyTop = body.z + body.height - topShift
+  const sideFrameTop = keepSideFullHeightForInsetTopStrip ? body.z + body.height : bodyTop
   const bottomZ = body.z + toeHeight
   const sideBottom = normalizeBoolean(info?.general?.bottomOverlap) ? bottomZ + t : bottomZ
-  const sideTop = normalizeBoolean(info?.general?.topOverlap) ? bodyTop - t : bodyTop
+  const sideTop = normalizeBoolean(info?.general?.topOverlap) ? sideFrameTop - t : sideFrameTop
   const sideZ = detachedToe ? body.z + toeHeight : sideBottom
   const sideHeight = Math.max(t, sideTop - sideZ)
   const innerX = body.x + t
@@ -317,7 +328,9 @@ function buildFramePanels(sourceBox, info, body, panels) {
     topCoverBack,
     bottomCoverBack,
     backThickness: backEnabled ? toPositiveNumber(info.back.thickness, Math.max(1, t / 3)) : 0,
-    backInset: backEnabled ? toNonNegativeNumber(info.back.inset, 0) : 0
+    backInset: backEnabled ? toNonNegativeNumber(info.back.inset, 0) : 0,
+    topStripEnabled,
+    topStripSize: topShift
   }
 
   if (normalizeBoolean(info?.general?.leftSide)) {
@@ -346,6 +359,7 @@ function buildFramePanels(sourceBox, info, body, panels) {
       orientation: 'horizontal',
       panelSide: 'top',
       panelOffsetFrom: 'top',
+      panelOffset: topShift,
       cabinetInfoFrame: frameMeta
     }))
   }
@@ -402,8 +416,8 @@ function buildTopStripPanels(sourceBox, info, body, panels) {
 
   const t = body.thickness
   const size = toPositiveNumber(info.topStrip.size, 50)
-  const faceOffset = toNumber(info.topStrip.faceOffset, 0)
-  const y = body.y + Math.max(0, faceOffset)
+  const faceOffset = clampTopStripFaceOffset(info.topStrip.faceOffset, t)
+  const y = body.y + faceOffset
   const inset = normalizeBoolean(info.topStrip.inset)
   const topOverlap = normalizeBoolean(info?.general?.topOverlap)
   const useFullWidth = !inset || faceOffset < 0

@@ -165,7 +165,7 @@ const InfoNumber = defineComponent({
     path: { type: String, required: true }
   },
   setup(props) {
-    const isDecimalNumber = props.path === 'general.panelThickness'
+    const isDecimalNumber = props.path === 'general.panelThickness' || props.path === 'topStrip.faceOffset'
 
     return () => h('label', { class: 'mn-info-row' }, [
       h('span', props.label),

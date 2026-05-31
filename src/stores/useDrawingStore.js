@@ -269,7 +269,8 @@ function updateCabinetInfoTopStripPanelAfterBoxResize(oldPanel, newBox) {
   const meta = oldPanel?.cabinetInfoTopStrip || {}
   const t = Math.max(1, toNumber(meta.bodyThickness, toNumber(oldPanel?.panelThickness ?? oldPanel?.ySize, 18)))
   const size = Math.max(1, toNumber(meta.size, toNumber(oldPanel?.zSize ?? oldPanel?.height, 50)))
-  const faceOffset = toNumber(meta.faceOffset, 0)
+  const rawFaceOffset = toNumber(meta.faceOffset, 0)
+  const faceOffset = rawFaceOffset < 0 ? Math.max(rawFaceOffset, -t) : rawFaceOffset
   const inset = meta.inset === true
   const useFullWidth = !inset || faceOffset < 0
   const boxX = toNumber(newBox?.x, oldPanel?.x3d ?? oldPanel?.x ?? 0)
@@ -278,7 +279,7 @@ function updateCabinetInfoTopStripPanelAfterBoxResize(oldPanel, newBox) {
   const boxWidth = Math.max(1, toNumber(newBox?.width, oldPanel?.xSize ?? oldPanel?.width ?? 1))
   const boxHeight = Math.max(1, toNumber(newBox?.height, oldPanel?.zSize ?? oldPanel?.height ?? 1))
   const nextX = useFullWidth ? boxX : boxX + t
-  const nextY = boxY + Math.max(0, faceOffset)
+  const nextY = boxY + faceOffset
   const nextZ = boxZ + boxHeight - size
   const nextWidth = useFullWidth ? boxWidth : Math.max(1, boxWidth - (2 * t))
 
