@@ -197,7 +197,9 @@ const panelEditFooterText = computed(() => {
       const distance = Math.abs(Number(draft.value || 0) - Number(draft.baseValue || 0))
       const inputText = input ? ` | Nhập: ${input}` : ''
 
-      return `Thước: ${draft.axis === 'vertical' ? 'Guide đứng' : 'Guide ngang'} | Khoảng cách ${Math.round(distance * 10) / 10} mm${inputText} | Enter để cố định hoặc click lần nữa`
+      const snapText = hoverSnap ? ` | Snap: ${hoverSnap.kind === 'circle' ? 'giao/điểm' : 'đường'}` : ''
+
+      return `Thước: ${draft.axis === 'vertical' ? 'Guide đứng' : 'Guide ngang'} | Khoảng cách ${Math.round(distance * 10) / 10} mm${inputText}${snapText} | Enter để cố định hoặc click lần nữa`
     }
 
     if (hoverSnap) {
@@ -388,21 +390,51 @@ function getPanelEditLocalFromScreen(context, layout, screenX, screenY) {
 } // End getPanelEditLocalFromScreen
 
 //=================
-function getPanelEditTapeSnap(context, layout, screenX, screenY) {
+function getPanelEditTapeSnap(context, layout, screenX, screenY, options = {}) {
   if (!context || !layout) return null
 
   const tolerance = 12
   const local = getPanelEditLocalFromScreen(context, layout, screenX, screenY)
-  const candidates = [
-    { key: 'left-bottom', x: 0, y: 0, axis: 'vertical', edge: 'left', kind: 'circle' },
-    { key: 'left-mid', x: 0, y: context.height / 2, axis: 'vertical', edge: 'left', kind: 'circle' },
-    { key: 'left-top', x: 0, y: context.height, axis: 'vertical', edge: 'left', kind: 'circle' },
-    { key: 'right-bottom', x: context.width, y: 0, axis: 'vertical', edge: 'right', kind: 'circle' },
-    { key: 'right-mid', x: context.width, y: context.height / 2, axis: 'vertical', edge: 'right', kind: 'circle' },
-    { key: 'right-top', x: context.width, y: context.height, axis: 'vertical', edge: 'right', kind: 'circle' },
-    { key: 'bottom-mid', x: context.width / 2, y: 0, axis: 'horizontal', edge: 'bottom', kind: 'circle' },
-    { key: 'top-mid', x: context.width / 2, y: context.height, axis: 'horizontal', edge: 'top', kind: 'circle' }
-  ]
+  const clampedLocal = {
+    x: Math.max(0, Math.min(context.width, local.x)),
+    y: Math.max(0, Math.min(context.height, local.y))
+  }
+  const includeGuides = options.includeGuides !== false
+  const includePanel = options.includePanel !== false
+  const guides = includeGuides ? panelEditTape.value.guides : []
+  const candidates = []
+
+  if (includePanel) {
+    candidates.push(
+      { key: 'left-bottom', x: 0, y: 0, axis: 'vertical', edge: 'left', kind: 'circle' },
+      { key: 'left-mid', x: 0, y: context.height / 2, axis: 'vertical', edge: 'left', kind: 'circle' },
+      { key: 'left-top', x: 0, y: context.height, axis: 'vertical', edge: 'left', kind: 'circle' },
+      { key: 'right-bottom', x: context.width, y: 0, axis: 'vertical', edge: 'right', kind: 'circle' },
+      { key: 'right-mid', x: context.width, y: context.height / 2, axis: 'vertical', edge: 'right', kind: 'circle' },
+      { key: 'right-top', x: context.width, y: context.height, axis: 'vertical', edge: 'right', kind: 'circle' },
+      { key: 'bottom-mid', x: context.width / 2, y: 0, axis: 'horizontal', edge: 'bottom', kind: 'circle' },
+      { key: 'top-mid', x: context.width / 2, y: context.height, axis: 'horizontal', edge: 'top', kind: 'circle' }
+    )
+  }
+
+  const verticalGuides = guides.filter((guide) => guide.axis === 'vertical')
+  const horizontalGuides = guides.filter((guide) => guide.axis === 'horizontal')
+
+  verticalGuides.forEach((verticalGuide) => {
+    horizontalGuides.forEach((horizontalGuide) => {
+      candidates.push({
+        key: `guide-cross-${verticalGuide.id}-${horizontalGuide.id}`,
+        x: Number(verticalGuide.value || 0),
+        y: Number(horizontalGuide.value || 0),
+        axis: options.preferredAxis || 'both',
+        edge: 'guide-cross',
+        kind: 'circle',
+        guideId: verticalGuide.id,
+        guideId2: horizontalGuide.id
+      })
+    })
+  })
+
   let bestPoint = null
 
   candidates.forEach((candidate) => {
@@ -410,7 +442,12 @@ function getPanelEditTapeSnap(context, layout, screenX, screenY) {
     const distance = Math.hypot(point.x - screenX, point.y - screenY)
 
     if (distance <= tolerance && (!bestPoint || distance < bestPoint.distance)) {
-      bestPoint = { ...candidate, screen: point, local: { x: candidate.x, y: candidate.y }, distance }
+      bestPoint = {
+        ...candidate,
+        screen: point,
+        local: { x: candidate.x, y: candidate.y },
+        distance
+      }
     }
   })
 
@@ -420,15 +457,79 @@ function getPanelEditTapeSnap(context, layout, screenX, screenY) {
   const insideX = screenX >= layout.left - tolerance && screenX <= layout.right + tolerance
   const edgeCandidates = []
 
-  if (insideY) {
-    edgeCandidates.push({ key: 'left-edge', distance: Math.abs(screenX - layout.left), axis: 'vertical', edge: 'left', kind: 'square', local: { x: 0, y: Math.max(0, Math.min(context.height, local.y)) }, screen: { x: layout.left, y: screenY } })
-    edgeCandidates.push({ key: 'right-edge', distance: Math.abs(screenX - layout.right), axis: 'vertical', edge: 'right', kind: 'square', local: { x: context.width, y: Math.max(0, Math.min(context.height, local.y)) }, screen: { x: layout.right, y: screenY } })
+  if (includePanel && insideY) {
+    edgeCandidates.push({
+      key: 'left-edge',
+      distance: Math.abs(screenX - layout.left),
+      axis: 'vertical',
+      edge: 'left',
+      kind: 'square',
+      local: { x: 0, y: clampedLocal.y },
+      screen: { x: layout.left, y: screenY }
+    })
+    edgeCandidates.push({
+      key: 'right-edge',
+      distance: Math.abs(screenX - layout.right),
+      axis: 'vertical',
+      edge: 'right',
+      kind: 'square',
+      local: { x: context.width, y: clampedLocal.y },
+      screen: { x: layout.right, y: screenY }
+    })
   }
 
-  if (insideX) {
-    edgeCandidates.push({ key: 'bottom-edge', distance: Math.abs(screenY - layout.bottom), axis: 'horizontal', edge: 'bottom', kind: 'square', local: { x: Math.max(0, Math.min(context.width, local.x)), y: 0 }, screen: { x: screenX, y: layout.bottom } })
-    edgeCandidates.push({ key: 'top-edge', distance: Math.abs(screenY - layout.top), axis: 'horizontal', edge: 'top', kind: 'square', local: { x: Math.max(0, Math.min(context.width, local.x)), y: context.height }, screen: { x: screenX, y: layout.top } })
+  if (includePanel && insideX) {
+    edgeCandidates.push({
+      key: 'bottom-edge',
+      distance: Math.abs(screenY - layout.bottom),
+      axis: 'horizontal',
+      edge: 'bottom',
+      kind: 'square',
+      local: { x: clampedLocal.x, y: 0 },
+      screen: { x: screenX, y: layout.bottom }
+    })
+    edgeCandidates.push({
+      key: 'top-edge',
+      distance: Math.abs(screenY - layout.top),
+      axis: 'horizontal',
+      edge: 'top',
+      kind: 'square',
+      local: { x: clampedLocal.x, y: context.height },
+      screen: { x: screenX, y: layout.top }
+    })
   }
+
+  verticalGuides.forEach((guide) => {
+    const guideValue = Number(guide.value || 0)
+    const point = getPanelEditPoint(context, layout.left, layout.top, layout.scale, guideValue, clampedLocal.y)
+
+    edgeCandidates.push({
+      key: `guide-vertical-${guide.id}`,
+      distance: Math.abs(screenX - point.x),
+      axis: 'vertical',
+      edge: 'guide',
+      kind: 'square',
+      guideId: guide.id,
+      local: { x: guideValue, y: clampedLocal.y },
+      screen: { x: point.x, y: screenY }
+    })
+  })
+
+  horizontalGuides.forEach((guide) => {
+    const guideValue = Number(guide.value || 0)
+    const point = getPanelEditPoint(context, layout.left, layout.top, layout.scale, clampedLocal.x, guideValue)
+
+    edgeCandidates.push({
+      key: `guide-horizontal-${guide.id}`,
+      distance: Math.abs(screenY - point.y),
+      axis: 'horizontal',
+      edge: 'guide',
+      kind: 'square',
+      guideId: guide.id,
+      local: { x: clampedLocal.x, y: guideValue },
+      screen: { x: screenX, y: point.y }
+    })
+  })
 
   const bestEdge = edgeCandidates
     .filter((candidate) => candidate.distance <= tolerance)
@@ -452,14 +553,17 @@ function drawPanelEditGuideLine(targetContext, context, layout, guide, options =
   targetContext.setLineDash(isDraft ? [8, 5] : [12, 5])
   targetContext.beginPath()
 
+  const canvasWidth = panelEditCanvasRef.value?.clientWidth || targetContext.canvas?.width || 0
+  const canvasHeight = panelEditCanvasRef.value?.clientHeight || targetContext.canvas?.height || 0
+
   if (guide.axis === 'vertical') {
     const point = getPanelEditPoint(context, layout.left, layout.top, layout.scale, value, 0)
     targetContext.moveTo(point.x, 0)
-    targetContext.lineTo(point.x, layout.top + layout.faceHeight + 160)
+    targetContext.lineTo(point.x, canvasHeight)
   } else {
     const point = getPanelEditPoint(context, layout.left, layout.top, layout.scale, 0, value)
     targetContext.moveTo(0, point.y)
-    targetContext.lineTo(layout.left + layout.faceWidth + 180, point.y)
+    targetContext.lineTo(canvasWidth, point.y)
   }
 
   targetContext.stroke()
@@ -503,14 +607,31 @@ function resetPanelEditTapeDraft() {
 function getPanelEditTapeDraftValueFromPointer(context, layout, draft, event) {
   const canvas = panelEditCanvasRef.value
 
-  if (!canvas || !context || !layout || !draft) return draft?.value || 0
+  if (!canvas || !context || !layout || !draft) {
+    return {
+      value: draft?.value || 0,
+      snap: null
+    }
+  }
 
   const rect = canvas.getBoundingClientRect()
   const screenX = event.clientX - rect.left
   const screenY = event.clientY - rect.top
+  const snap = getPanelEditTapeSnap(context, layout, screenX, screenY, { preferredAxis: draft.axis })
+
+  if (snap) {
+    return {
+      value: draft.axis === 'vertical' ? snap.local.x : snap.local.y,
+      snap
+    }
+  }
+
   const local = getPanelEditLocalFromScreen(context, layout, screenX, screenY)
 
-  return draft.axis === 'vertical' ? local.x : local.y
+  return {
+    value: draft.axis === 'vertical' ? local.x : local.y,
+    snap: null
+  }
 } // End getPanelEditTapeDraftValueFromPointer
 
 //=================
@@ -801,11 +922,14 @@ function onPanelEditPointerMove(event) {
 
   if (panelEditTape.value.draft) {
     const draft = panelEditTape.value.draft
+    const draftResult = getPanelEditTapeDraftValueFromPointer(context, layout, draft, event)
+
     panelEditTape.value = {
       ...panelEditTape.value,
+      hoverSnap: draftResult.snap,
       draft: {
         ...draft,
-        value: getPanelEditTapeDraftValueFromPointer(context, layout, draft, event)
+        value: draftResult.value
       }
     }
     resizePanelEditCanvas()
