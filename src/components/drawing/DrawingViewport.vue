@@ -37,6 +37,30 @@
       @blur="cancelBoxHeightInput"
     />
 
+    <section v-if="activePanelEditContext" class="mn-panel-edit-window">
+      <header class="mn-panel-edit-header">
+        <div class="mn-panel-edit-tools">
+          <button
+            v-for="tool in panelEditTools"
+            :key="tool.id"
+            type="button"
+            class="mn-panel-edit-tool-btn"
+            :class="{ active: drawing.state.panelEdit.shapeTool === tool.id || app.state.currentTool === tool.id }"
+            :title="tool.label"
+            @pointerdown.stop.prevent="selectPanelEditWindowTool(tool.id)"
+            @click.stop.prevent="selectPanelEditWindowTool(tool.id)"
+          >
+            <img :src="tool.icon" :alt="tool.label" class="mn-panel-edit-tool-icon" />
+          </button>
+        </div>
+        <div class="mn-panel-edit-title">
+          {{ activePanelEditContext.panelName }} · {{ activePanelEditContext.axesText }} · 0,0 trái dưới
+        </div>
+        <button type="button" class="mn-panel-edit-apply" @click.stop.prevent="applyPanelEdit">Áp dụng</button>
+      </header>
+      <canvas ref="panelEditCanvasRef" class="mn-panel-edit-canvas" />
+    </section>
+
   <Mini3DPreview v-if="app.state.mini3DVisible" />
   <button class="mn-preview-toggle" @click="app.toggleMini3D">{{ app.state.mini3DVisible ? 'Ẩn 3D' : 'Hiện 3D' }}</button>
   </main>
@@ -55,6 +79,7 @@ import { screenToLocal, localToScreen } from '../../renderers/viewport-transform
 import { projectBoxToCameraRect, cameraLocalToWorldPoint } from '../../core/view/view-camera'
 import { hitTestPanel, hitTestZoneEdge } from '../../core/snap/snap-engine'
 import { handleViewportKey } from '../../commands/keyboard-controller'
+import { isEditPanelDrawTool, isEditPanelTool } from '../../core/tools/editPanelTool'
 
 const app = useAppStore()
 const cabinet = useCabinetStore()
@@ -63,6 +88,7 @@ const drawing = useDrawingStore()
 const box = useBoxStore()
 const viewportRef = ref(null)
 const canvasRef = ref(null)
+const panelEditCanvasRef = ref(null)
 const dimInputRef = ref(null)
 const boxHeightInputRef = ref(null)
 
@@ -102,9 +128,18 @@ const views = [
   { id: 'front', label: 'Trước' }, { id: 'back', label: 'Sau' }, { id: 'left', label: 'Trái' },
   { id: 'right', label: 'Phải' }, { id: 'top', label: 'Trên' }, { id: 'bottom', label: 'Dưới' }
 ]
+
+const panelEditTools = [
+  { id: 'editPanelLine', label: 'Line', icon: '/icons/toolbar/line.svg' },
+  { id: 'editPanelRect', label: 'Rectangle', icon: '/icons/toolbar/rect.svg' },
+  { id: 'editPanelArc', label: 'Arc', icon: '/icons/toolbar/arc.svg' },
+  { id: 'editPanelCircle', label: 'Circle', icon: '/icons/toolbar/circle.svg' },
+  { id: 'editPanelTape', label: 'Tape Measure', icon: '/icons/toolbar/tape.svg' }
+]
 const zoomLabel = computed(() => `${Math.round(app.state.viewport.zoom * 100)}%`)
 const localX = computed(() => Math.round(app.state.mouse.localX))
 const localY = computed(() => Math.round(app.state.mouse.localY))
+const activePanelEditContext = computed(() => drawing.state.panelEdit?.active ? drawing.state.panelEdit.context : null)
 
 //=================
 function getWallBox3D() {
@@ -130,6 +165,7 @@ const canvasCursorClass = computed(() => {
   if (hoverDim.value && app.state.currentTool === 'select') return 'mn-cursor-pointer'
   if (app.state.currentTool === 'box') return 'mn-cursor-box'
   if (app.state.currentTool === 'panel') return 'mn-cursor-crosshair'
+  if (isEditPanelTool(app.state.currentTool) || isEditPanelDrawTool(app.state.currentTool)) return 'mn-cursor-crosshair'
   if (app.state.currentTool === 'select') return 'mn-cursor-select'
 
   return 'mn-cursor-default'
@@ -148,6 +184,7 @@ function resizeCanvas() {
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
   app.setViewportSize(rect.width, rect.height)
   draw()
+  nextTick(resizePanelEditCanvas)
 }
 
 //=================
@@ -155,6 +192,7 @@ function resizeCanvas() {
 function onAppSettingsApplied() {
   drawing.rebuildZones()
   draw()
+  nextTick(resizePanelEditCanvas)
 } // End onAppSettingsApplied
 
 function draw() {
@@ -199,6 +237,175 @@ function draw() {
     showGrid: app.state.showGrid
   })
 } // End draw
+
+//=================
+function getCssVariable(variableName, fallback) {
+  if (typeof window === 'undefined') return fallback
+
+  const value = window.getComputedStyle(document.documentElement).getPropertyValue(variableName).trim()
+
+  return value || fallback
+} // End getCssVariable
+
+//=================
+function getPanelEditPoint(context, offsetX, offsetY, scale, x, y) {
+  return {
+    x: offsetX + x * scale,
+    y: offsetY + (context.height - y) * scale
+  }
+} // End getPanelEditPoint
+
+//=================
+function resizePanelEditCanvas() {
+  const canvas = panelEditCanvasRef.value
+
+  if (!canvas) return
+
+  const rect = canvas.getBoundingClientRect()
+  const deviceRatio = window.devicePixelRatio || 1
+  canvas.width = Math.max(1, rect.width * deviceRatio)
+  canvas.height = Math.max(1, rect.height * deviceRatio)
+  canvas.style.width = `${rect.width}px`
+  canvas.style.height = `${rect.height}px`
+  const editContext = canvas.getContext('2d')
+  editContext.setTransform(deviceRatio, 0, 0, deviceRatio, 0, 0)
+  drawPanelEditCanvas(editContext, rect.width, rect.height)
+} // End resizePanelEditCanvas
+
+//=================
+function drawPanelEditCanvas(editContext = null, width = null, height = null) {
+  const canvas = panelEditCanvasRef.value
+  const context = activePanelEditContext.value
+
+  if (!canvas || !context) return
+
+  const targetContext = editContext || canvas.getContext('2d')
+  const canvasWidth = width || canvas.clientWidth
+  const canvasHeight = height || canvas.clientHeight
+  const backgroundColor = getCssVariable('--mn-bg-canvas', '#f4f4f4')
+  const panelColor = getCssVariable('--mn-panel-color', '#87ceff')
+  const borderColor = getCssVariable('--mn-panel-selected-line-color', '#008cff')
+  const dimColor = '#111111'
+  const originColor = '#ff0000'
+  const extensionColor = getCssVariable('--mn-border-main', '#d7dbe0')
+  const marginLeft = 92
+  const marginRight = 56
+  const marginTop = 64
+  const marginBottom = 76
+  const dimOffset = 24
+  const tickSize = 7
+  const availableWidth = Math.max(1, canvasWidth - marginLeft - marginRight)
+  const availableHeight = Math.max(1, canvasHeight - marginTop - marginBottom)
+  const scale = Math.min(
+    availableWidth / Math.max(1, context.width),
+    availableHeight / Math.max(1, context.height)
+  )
+  const faceWidth = context.width * scale
+  const faceHeight = context.height * scale
+  const offsetX = marginLeft + (availableWidth - faceWidth) / 2
+  const offsetY = marginTop + (availableHeight - faceHeight) / 2
+  const left = offsetX
+  const right = offsetX + faceWidth
+  const top = offsetY
+  const bottom = offsetY + faceHeight
+  const dimTopY = top - dimOffset
+  const dimLeftX = left - dimOffset
+  const originX = left - 34
+  const originY = bottom + 22
+
+  targetContext.clearRect(0, 0, canvasWidth, canvasHeight)
+  targetContext.fillStyle = backgroundColor
+  targetContext.fillRect(0, 0, canvasWidth, canvasHeight)
+
+  targetContext.save()
+  targetContext.fillStyle = panelColor
+  targetContext.globalAlpha = 0.8
+  targetContext.fillRect(left, top, faceWidth, faceHeight)
+  targetContext.restore()
+
+  targetContext.strokeStyle = borderColor
+  targetContext.lineWidth = 2
+  targetContext.strokeRect(left, top, faceWidth, faceHeight)
+
+  targetContext.strokeStyle = extensionColor
+  targetContext.lineWidth = 1
+  targetContext.setLineDash([4, 4])
+  targetContext.beginPath()
+  targetContext.moveTo(left, bottom)
+  targetContext.lineTo(originX, originY)
+  targetContext.stroke()
+  targetContext.setLineDash([])
+
+  targetContext.fillStyle = originColor
+  targetContext.font = '12px Arial, Helvetica, sans-serif'
+  targetContext.textAlign = 'left'
+  targetContext.textBaseline = 'middle'
+  targetContext.fillText('0,0', originX, originY)
+
+  targetContext.strokeStyle = dimColor
+  targetContext.fillStyle = dimColor
+  targetContext.lineWidth = 1.5
+  targetContext.font = '12px Arial, Helvetica, sans-serif'
+
+  targetContext.beginPath()
+  targetContext.moveTo(left, dimTopY)
+  targetContext.lineTo(right, dimTopY)
+  targetContext.moveTo(left, dimTopY - tickSize)
+  targetContext.lineTo(left, dimTopY + tickSize)
+  targetContext.moveTo(right, dimTopY - tickSize)
+  targetContext.lineTo(right, dimTopY + tickSize)
+  targetContext.stroke()
+  targetContext.textAlign = 'center'
+  targetContext.textBaseline = 'bottom'
+  targetContext.fillText(`${Math.round(context.width)} mm`, left + faceWidth / 2, dimTopY - 8)
+
+  targetContext.beginPath()
+  targetContext.moveTo(dimLeftX, top)
+  targetContext.lineTo(dimLeftX, bottom)
+  targetContext.moveTo(dimLeftX - tickSize, top)
+  targetContext.lineTo(dimLeftX + tickSize, top)
+  targetContext.moveTo(dimLeftX - tickSize, bottom)
+  targetContext.lineTo(dimLeftX + tickSize, bottom)
+  targetContext.stroke()
+  targetContext.save()
+  targetContext.translate(dimLeftX - 12, top + faceHeight / 2)
+  targetContext.rotate(-Math.PI / 2)
+  targetContext.textAlign = 'center'
+  targetContext.textBaseline = 'bottom'
+  targetContext.fillText(`${Math.round(context.height)} mm`, 0, 0)
+  targetContext.restore()
+
+  targetContext.textAlign = 'center'
+  targetContext.textBaseline = 'top'
+  targetContext.fillText(`${Math.round(context.width)} x ${Math.round(context.height)} mm`, left + faceWidth / 2, bottom + 12)
+} // End drawPanelEditCanvas
+
+//=================
+function selectPanelEditWindowTool(toolId) {
+  const context = drawing.setPanelEditShapeTool(toolId)
+
+  if (!context) {
+    app.setStatus('Edit Panel: chọn 1 tấm trước')
+    return
+  }
+
+  app.setTool(toolId)
+  app.setView(context.viewKey)
+  app.setStatus(`${toolId.replace('editPanel', '')}: ${context.panelName} | ${context.axesText}`)
+  nextTick(resizePanelEditCanvas)
+} // End selectPanelEditWindowTool
+
+//=================
+function applyPanelEdit() {
+  const context = activePanelEditContext.value
+
+  if (!context) return
+
+  drawing.clearPanelEdit()
+  app.setTool('select')
+  app.setStatus('Edit Panel: cập nhật thành công')
+  draw()
+} // End applyPanelEdit
 //=================
 function clampValue(value, min, max) {
   return Math.min(Math.max(value, min), max)
@@ -1459,6 +1666,23 @@ function onPointerDown(event) {
     draw()
     return
   }
+
+  if (isEditPanelTool(app.state.currentTool) || isEditPanelDrawTool(app.state.currentTool)) {
+    const context = drawing.state.panelEdit?.active
+      ? drawing.getPanelEditContext()
+      : drawing.startPanelEdit(null, app.state.currentTool)
+
+    if (!context) {
+      app.setStatus('Edit Panel: chọn 1 tấm trước')
+      draw()
+      return
+    }
+
+    app.setView(context.viewKey)
+    app.setStatus(`Edit Panel: ${context.panelName} | ${context.axesText} | gốc 0,0 trái dưới`)
+    draw()
+    return
+  }
   const panelHit = hitTestPanel(getVisiblePanels(), rawLocal)
 
   if (app.state.currentTool === 'select' && panelHit) {
@@ -1581,6 +1805,13 @@ function onPointerMove(event) {
 
     drawing.setHover(null)
     hoverDim.value = null
+    draw()
+    return
+  }
+
+  if (isEditPanelTool(app.state.currentTool) || isEditPanelDrawTool(app.state.currentTool)) {
+    drawing.clearSnapPreview()
+    drawing.setHover(null)
     draw()
     return
   }
@@ -1899,15 +2130,27 @@ watch(() => app.state.currentTool, (tool) => {
     draw()
   }
 })
+watch(() => [
+  drawing.state.panelEdit?.active,
+  drawing.state.panelEdit?.shapeTool,
+  drawing.state.panelEdit?.context?.panelId,
+  drawing.state.panelEdit?.context?.width,
+  drawing.state.panelEdit?.context?.height
+], () => {
+  nextTick(resizePanelEditCanvas)
+})
+
 onMounted(() => {
   resizeCanvas()
   drawing.rebuildZones()
   window.addEventListener('resize', resizeCanvas)
+  window.addEventListener('resize', resizePanelEditCanvas)
   window.addEventListener('mn-app-settings-applied', onAppSettingsApplied)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeCanvas)
+  window.removeEventListener('resize', resizePanelEditCanvas)
   window.removeEventListener('mn-app-settings-applied', onAppSettingsApplied)
 })
 </script>
@@ -1953,4 +2196,94 @@ onBeforeUnmount(() => {
   outline: none;
   box-shadow: none;
 }
+
+.mn-panel-edit-window {
+  position: absolute;
+  inset: 18px;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--mn-border-main);
+  border-radius: 8px;
+  background: var(--mn-bg-panel);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, .32);
+  overflow: hidden;
+}
+
+.mn-panel-edit-header {
+  height: 42px;
+  display: grid;
+  grid-template-columns: 1fr auto 92px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--mn-border-main);
+  background: var(--mn-bg-top);
+}
+
+.mn-panel-edit-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.mn-panel-edit-tool-btn {
+  width: 32px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--mn-border-main);
+  border-radius: 5px;
+  background: var(--mn-bg-panel-soft);
+  color: var(--mn-text-main);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mn-panel-edit-tool-btn:hover,
+.mn-panel-edit-tool-btn.active {
+  border-color: var(--mn-accent);
+  color: var(--mn-accent);
+}
+
+.mn-panel-edit-tool-icon {
+  width: 15px;
+  height: 15px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.mn-panel-edit-title {
+  max-width: 360px;
+  overflow: hidden;
+  color: var(--mn-text-sub);
+  font-size: 11px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mn-panel-edit-apply {
+  height: 28px;
+  border: 1px solid var(--mn-accent);
+  border-radius: 5px;
+  background: var(--mn-accent);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mn-panel-edit-canvas {
+  width: 100%;
+  height: calc(100% - 42px);
+  display: block;
+  background: var(--mn-bg-canvas);
+}
+
 </style>
