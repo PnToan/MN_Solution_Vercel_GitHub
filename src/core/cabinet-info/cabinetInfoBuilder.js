@@ -531,7 +531,7 @@ function buildHandleRailPanels(sourceBox, info, body, panels) {
   const middleDepth = Math.max(1, middleEndY - middleStartY)
 
   for (let index = 0; index < frontCount; index += 1) {
-    pushPanel(panels, createPanel(sourceBox, 'handle_front', `Diềm tay nắm trước ${index + 1}`, x, frontRailY + (index * t), topZ - (index * size), width, t, size, {
+    pushPanel(panels, createPanel(sourceBox, 'handle_front', `Diềm tay nắm trước ${index + 1}`, x, frontRailY + (index * t), topZ, width, t, size, {
       panelThickness: t,
       orientation: 'horizontal',
       panelSide: 'handle_front',
@@ -540,7 +540,7 @@ function buildHandleRailPanels(sourceBox, info, body, panels) {
   }
 
   for (let index = 0; index < rearCount; index += 1) {
-    pushPanel(panels, createPanel(sourceBox, 'handle_rear', `Diềm tay nắm sau ${index + 1}`, x, rearRailY - (index * t), topZ - (index * size), width, t, size, {
+    pushPanel(panels, createPanel(sourceBox, 'handle_rear', `Diềm tay nắm sau ${index + 1}`, x, rearRailY - (index * t), topZ, width, t, size, {
       panelThickness: t,
       orientation: 'horizontal',
       panelSide: 'handle_rear',

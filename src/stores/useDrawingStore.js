@@ -382,10 +382,10 @@ function updateCabinetInfoHandleRailPanelAfterBoxResize(oldPanel, newBox) {
 
   if (type === 'front' || oldPanel.panelSide === 'handle_front') {
     nextY = frontRailY + (index * t)
-    nextZ = topZ - (index * size)
+    nextZ = topZ
   } else if (type === 'rear' || oldPanel.panelSide === 'handle_rear') {
     nextY = rearRailY - (index * t)
-    nextZ = topZ - (index * size)
+    nextZ = topZ
   } else {
     nextX = getCabinetInfoHandleRailMiddleXForBox(index, Math.max(2, middleCount), x, width, t)
     nextY = middleStartY
