@@ -475,8 +475,12 @@ function buildTopStripPanels(sourceBox, info, body, panels) {
   const inset = normalizeBoolean(info.topStrip.inset)
   const topOverlap = normalizeBoolean(info?.general?.topOverlap)
   const sideZone = getCabinetSideZone(info, body)
-  const x = sideZone.x
-  const width = sideZone.width
+  const hasLeftSide = normalizeBoolean(info?.general?.leftSide)
+  const hasRightSide = normalizeBoolean(info?.general?.rightSide)
+  const leftCover = !inset && hasLeftSide ? t : 0
+  const rightCover = !inset && hasRightSide ? t : 0
+  const x = sideZone.x - leftCover
+  const width = sideZone.width + leftCover + rightCover
 
   pushPanel(panels, createPanel(sourceBox, 'top_strip', 'Thanh chỉ nóc', x, y, body.z + body.height - size, width, t, size, {
     panelThickness: t,
@@ -488,8 +492,8 @@ function buildTopStripPanels(sourceBox, info, body, panels) {
       inset,
       topOverlap,
       bodyThickness: t,
-      hasLeftSide: normalizeBoolean(info?.general?.leftSide),
-      hasRightSide: normalizeBoolean(info?.general?.rightSide),
+      hasLeftSide,
+      hasRightSide,
       bodyLeftFiller: toNonNegativeNumber(body.leftFiller, 0),
       bodyRightFiller: toNonNegativeNumber(body.rightFiller, 0)
     }
@@ -764,8 +768,12 @@ function buildToeKickPanels(sourceBox, info, body, panels) {
   const rearEnabled = normalizeBoolean(info.toeKick.rear)
   const middleCount = getToeKickMiddleCount(info.toeKick.middleCount)
   const zone = getCabinetInnerZone(info, body)
-  const x = zone.x
-  const width = zone.width
+  const hasLeftSide = normalizeBoolean(info?.general?.leftSide)
+  const hasRightSide = normalizeBoolean(info?.general?.rightSide)
+  const leftCover = detached && hasLeftSide ? t : 0
+  const rightCover = detached && hasRightSide ? t : 0
+  const x = zone.x - leftCover
+  const width = zone.width + leftCover + rightCover
   const bottomZ = body.z
   const frontRailY = body.y + faceOffset
   const backLimitY = getToeKickBackLimitY(info, body)

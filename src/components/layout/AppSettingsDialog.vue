@@ -11,6 +11,7 @@
         </div>
 
         <div class="mn-settings-actions">
+          <span v-if="settingApplyMessage" class="mn-settings-apply-message">{{ settingApplyMessage }}</span>
           <button class="mn-settings-btn" type="button" @click="saveCurrentSettings">Áp dụng</button>
           <button class="mn-settings-btn" type="button" @click="emitClose">Đóng</button>
         </div>
@@ -309,6 +310,7 @@ const tabs = [
 
 const loadedSettings = loadAppSettings()
 const activeTabId = ref('general')
+const settingApplyMessage = ref('')
 const form = reactive(loadedSettings)
 const app = useAppStore()
 const boxStore = useBoxStore()
@@ -439,7 +441,7 @@ function applyPanelSettingsToRuntime(settings) {
   })
 
   drawing.rebuildZones?.()
-  app.setStatus('Đã áp dụng setting theo máy')
+  app.setStatus('Cập nhật thành công')
 } // End applyPanelSettingsToRuntime
 
 //=================
@@ -453,6 +455,10 @@ function applyCurrentSettings() {
 //=================
 function saveCurrentSettings() {
   applyCurrentSettings()
+  settingApplyMessage.value = 'Cập nhật thành công'
+  window.setTimeout(() => {
+    settingApplyMessage.value = ''
+  }, 1800)
 } // End saveCurrentSettings
 
 //=================

@@ -449,13 +449,17 @@ function updateCabinetInfoTopStripPanelAfterBoxResize(oldPanel, newBox) {
   const faceOffset = rawFaceOffset < 0 ? Math.max(rawFaceOffset, -t) : rawFaceOffset
   const inset = meta.inset === true
   const sideZone = getCabinetInfoSideZoneForBox(newBox, meta, t)
+  const hasLeftSide = meta.hasLeftSide !== false
+  const hasRightSide = meta.hasRightSide !== false
+  const leftCover = !inset && hasLeftSide ? t : 0
+  const rightCover = !inset && hasRightSide ? t : 0
   const boxY = toNumber(newBox?.y, oldPanel?.y3d ?? 0)
   const boxZ = toNumber(newBox?.z, oldPanel?.z3d ?? oldPanel?.z ?? 0)
   const boxHeight = Math.max(1, toNumber(newBox?.height, oldPanel?.zSize ?? oldPanel?.height ?? 1))
-  const nextX = sideZone.x
+  const nextX = sideZone.x - leftCover
   const nextY = boxY + faceOffset
   const nextZ = boxZ + boxHeight - size
-  const nextWidth = sideZone.width
+  const nextWidth = sideZone.width + leftCover + rightCover
 
   return {
     ...oldPanel,
@@ -643,8 +647,12 @@ function updateCabinetInfoToeKickPanelAfterBoxResize(oldPanel, newBox) {
   const boxZ = toNumber(newBox?.z, oldPanel?.z3d ?? oldPanel?.z ?? 0)
   const boxWidth = Math.max(1, toNumber(newBox?.width, oldPanel?.xSize ?? oldPanel?.width ?? 1))
   const sideZone = getCabinetInfoSideZoneForBox(newBox, meta, t)
-  const x = sideZone.x
-  const width = sideZone.width
+  const hasLeftSide = meta.hasLeftSide !== false
+  const hasRightSide = meta.hasRightSide !== false
+  const leftCover = detached && hasLeftSide ? t : 0
+  const rightCover = detached && hasRightSide ? t : 0
+  const x = sideZone.x - leftCover
+  const width = sideZone.width + leftCover + rightCover
   const bottomZ = boxZ
   const frontRailY = boxY + faceOffset
   const backLimitY = getCabinetInfoToeKickBackLimitYForBox(newBox, meta, t)
