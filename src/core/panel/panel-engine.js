@@ -105,6 +105,34 @@ function getBoxY3d(zone) {
   )
 } // End getBoxY3d
 
+
+//=================
+function getShelfInsetInfo(zone) {
+  const sourceBox = zone?.sourceBox || zone?.baseObject || zone?.source
+  const info = zone?.shelfInset || sourceBox?.cabinetInfo?.shelfInset || {}
+
+  return {
+    enabled: info?.enabled === true,
+    vertical: Math.max(0, toNumber(info?.vertical, 0)),
+    horizontal: Math.max(0, toNumber(info?.horizontal, 0))
+  }
+} // End getShelfInsetInfo
+
+//=================
+function applyShelfInsetToPanelDepth(zone, orientation, y3d, ySize) {
+  const shelfInset = getShelfInsetInfo(zone)
+  const inset = shelfInset.enabled
+    ? (orientation === 'vertical' ? shelfInset.vertical : shelfInset.horizontal)
+    : 0
+  const safeInset = Math.max(0, Math.min(toNumber(inset, 0), Math.max(0, toNumber(ySize, 0) - 1)))
+
+  return {
+    y3d: roundOneDecimal(toNumber(y3d, 0) + safeInset),
+    ySize: roundOneDecimal(Math.max(1, toNumber(ySize, 1) - safeInset)),
+    shelfInset: safeInset
+  }
+} // End applyShelfInsetToPanelDepth
+
 //=================
 function createPanelBase(zone, edge, thickness, offset) {
   const id = nextPanelId(edge)
@@ -169,6 +197,7 @@ function createSidePanel(zone, edge, thickness, offset) {
   const zoneHeight = getZoneHeight(zone)
   const zoneDepth = getZoneDepth(zone)
   const y3d = getBoxY3d(zone)
+  const depthInfo = applyShelfInsetToPanelDepth(zone, 'vertical', y3d, zoneDepth)
   const safeOffset = clampNumber(offset, 0, Math.max(0, zoneWidth - thickness))
 
   const x3d = edge === 'left'
@@ -180,13 +209,14 @@ function createSidePanel(zone, edge, thickness, offset) {
 
     orientation: 'vertical',
     panelKind: 'side',
+    panelShelfInset: depthInfo.shelfInset,
 
     x3d: roundOneDecimal(x3d),
-    y3d: roundOneDecimal(y3d),
+    y3d: depthInfo.y3d,
     z3d: roundOneDecimal(minZ),
 
     xSize: roundOneDecimal(thickness),
-    ySize: roundOneDecimal(zoneDepth),
+    ySize: depthInfo.ySize,
     zSize: roundOneDecimal(zoneHeight),
 
     color: 'rgba(135, 206, 255, 0.8)'
@@ -202,6 +232,7 @@ function createTopBottomPanel(zone, edge, thickness, offset) {
   const zoneHeight = getZoneHeight(zone)
   const zoneDepth = getZoneDepth(zone)
   const y3d = getBoxY3d(zone)
+  const depthInfo = applyShelfInsetToPanelDepth(zone, 'horizontal', y3d, zoneDepth)
   const safeOffset = clampNumber(offset, 0, Math.max(0, zoneHeight - thickness))
 
   const z3d = edge === 'bottom'
@@ -213,13 +244,14 @@ function createTopBottomPanel(zone, edge, thickness, offset) {
 
     orientation: 'horizontal',
     panelKind: 'top_bottom',
+    panelShelfInset: depthInfo.shelfInset,
 
     x3d: roundOneDecimal(minX),
-    y3d: roundOneDecimal(y3d),
+    y3d: depthInfo.y3d,
     z3d: roundOneDecimal(z3d),
 
     xSize: roundOneDecimal(zoneWidth),
-    ySize: roundOneDecimal(zoneDepth),
+    ySize: depthInfo.ySize,
     zSize: roundOneDecimal(thickness),
 
     color: 'rgba(135, 206, 255, 0.8)'

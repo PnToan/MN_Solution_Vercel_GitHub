@@ -10,6 +10,27 @@ function cloneValue(value) {
   return JSON.parse(JSON.stringify(value))
 } // End cloneValue
 
+
+//=================
+function mergeCabinetInfo(baseInfo, savedInfo) {
+  const nextInfo = cloneValue(baseInfo)
+  const sourceInfo = savedInfo || {}
+
+  Object.keys(sourceInfo).forEach((key) => {
+    if (sourceInfo[key] && typeof sourceInfo[key] === 'object' && !Array.isArray(sourceInfo[key])) {
+      nextInfo[key] = {
+        ...(nextInfo[key] || {}),
+        ...sourceInfo[key]
+      }
+      return
+    }
+
+    nextInfo[key] = sourceInfo[key]
+  })
+
+  return nextInfo
+} // End mergeCabinetInfo
+
 //=================
 function toNumber(value, fallback = 0) {
   const numberValue = Number(value)
@@ -165,6 +186,10 @@ const store = createSimpleStore({
 
     this.restoreSelectedBox(selectedBox.id)
 
+    if (selectedBox.cabinetInfo) {
+      state.info = mergeCabinetInfo(createDefaultCabinetInfoState(), selectedBox.cabinetInfo)
+    }
+
     state.info.groupName = selectedBox.name || state.info.groupName || 'Box 1'
     state.info.general.cabinetDepth = toNumber(selectedBox.depth, state.info.general.cabinetDepth || 500)
 
@@ -246,6 +271,9 @@ const store = createSimpleStore({
 
     const targetBox = this.getSelectedBox()
     const oldBox = { ...targetBox }
+
+    targetBox.cabinetInfo = cloneValue(state.info)
+
     const nextPanels = buildCabinetInfoPanels(targetBox, cloneValue(state.info))
     const oldPanels = removeCabinetInfoPanelsForBox(drawing.state.panels, targetBox.id)
 
@@ -276,6 +304,7 @@ const store = createSimpleStore({
     }
 
     drawing.pushHistorySnapshot('Xóa MN Solution Info')
+    delete selectedBox.cabinetInfo
     drawing.state.panels = removeCabinetInfoPanelsForBox(drawing.state.panels, selectedBox.id)
     drawing.state.selectedPanelId = null
     drawing.state.selectedPanelIds = []

@@ -151,6 +151,12 @@ function resizeCanvas() {
 }
 
 //=================
+//=================
+function onAppSettingsApplied() {
+  drawing.rebuildZones()
+  draw()
+} // End onAppSettingsApplied
+
 function draw() {
   if (!ctx || !canvasRef.value) return
 
@@ -1897,10 +1903,12 @@ onMounted(() => {
   resizeCanvas()
   drawing.rebuildZones()
   window.addEventListener('resize', resizeCanvas)
+  window.addEventListener('mn-app-settings-applied', onAppSettingsApplied)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeCanvas)
+  window.removeEventListener('mn-app-settings-applied', onAppSettingsApplied)
 })
 </script>
 <style scoped>

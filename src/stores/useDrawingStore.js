@@ -105,6 +105,18 @@ function getZoneBlockingPanels(panels = []) {
 
 
 //=================
+function getBoxShelfInset(sourceBox) {
+  const info = sourceBox?.cabinetInfo?.shelfInset || {}
+
+  return {
+    enabled: info?.enabled === true,
+    vertical: Math.max(0, toNumber(info?.vertical, 0)),
+    horizontal: Math.max(0, toNumber(info?.horizontal, 0))
+  }
+} // End getBoxShelfInset
+
+
+//=================
 function getCabinetInfoBackGeometryForBox(sourceBox, panel) {
   const meta = panel?.cabinetInfoBack || {}
   const bodyThickness = toNumber(meta.bodyThickness, toNumber(sourceBox?.panelThickness, 18))
@@ -1333,6 +1345,7 @@ const store = createSimpleStore({
         sourceBoxId: baseBox.id,
         baseObjectId: baseBox.id,
         depth: baseBox.depth,
+        shelfInset: getBoxShelfInset(baseBox),
         source: baseBox,
         sourceBox: baseBox,
         baseObject: baseBox
@@ -1356,6 +1369,7 @@ const store = createSimpleStore({
         sourceBoxId: baseBox.id,
         baseObjectId: baseBox.id,
         depth: drawableDepth,
+        shelfInset: getBoxShelfInset(baseBox),
         sourceBox: baseBox,
         baseObject: baseBox
       }))
@@ -1413,6 +1427,7 @@ const store = createSimpleStore({
       sourceBoxId: newBox.id,
       baseObjectId: newBox.id,
       depth: newBox.depth,
+      shelfInset: getBoxShelfInset(newBox),
       source: newBox,
       sourceBox: newBox,
       baseObject: newBox
@@ -1551,6 +1566,7 @@ const store = createSimpleStore({
         sourceBoxId: newBox.id,
         baseObjectId: newBox.id,
         depth: currentZoneDepth,
+        shelfInset: getBoxShelfInset(newBox),
         sourceBox: newBox,
         baseObject: newBox
       }))
@@ -1622,6 +1638,7 @@ const store = createSimpleStore({
         panelOffset: offset,
         panelThickness: thickness,
         thickness,
+        panelShelfInset: nextPanel.panelShelfInset,
         dimEnabled: oldPanel.dimEnabled ?? false
       }
 

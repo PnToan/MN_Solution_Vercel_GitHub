@@ -11,6 +11,48 @@ function getCanvasBackgroundColor() {
   }
 } // End getCanvasBackgroundColor
 
+
+//=================
+function hexToRgba(hexValue, opacity = 1) {
+  const text = String(hexValue || '').trim()
+  const match = text.match(/^#([0-9a-fA-F]{6})$/)
+
+  if (!match) return null
+
+  const value = match[1]
+  const r = parseInt(value.slice(0, 2), 16)
+  const g = parseInt(value.slice(2, 4), 16)
+  const b = parseInt(value.slice(4, 6), 16)
+  const a = Math.max(0, Math.min(1, Number(opacity)))
+
+  return `rgba(${r}, ${g}, ${b}, ${a})`
+} // End hexToRgba
+
+//=================
+function getCssVariable(name, fallback) {
+  try {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+
+    return value || fallback
+  } catch (error) {
+    return fallback
+  }
+} // End getCssVariable
+
+//=================
+function getPanelFillColor(panel) {
+  const panelColor = getCssVariable('--mn-panel-color', '')
+  const opacity = getCssVariable('--mn-panel-opacity', '0.8')
+  const cssColor = hexToRgba(panelColor, opacity)
+
+  return cssColor || panel?.color || 'rgba(135, 206, 255, 0.8)'
+} // End getPanelFillColor
+
+//=================
+function getPanelLineColor() {
+  return getCssVariable('--mn-panel-selected-line-color', '#3a8fbd')
+} // End getPanelLineColor
+
 //=================
 function drawLine(ctx, a, b, color = '#999', width = 1) {
   ctx.beginPath()
@@ -351,8 +393,8 @@ function drawPanels(ctx, viewport, panels = [], selectedPanelIds = [], currentVi
     const selected = selectedIds.includes(panel.id)
 
     drawRectLocal(ctx, viewport, rect, {
-      fill: panel.color || 'rgba(135, 206, 255, 0.8)',
-      stroke: selected ? '#ff9f1a' : '#3a8fbd',
+      fill: getPanelFillColor(panel),
+      stroke: selected ? '#ff9f1a' : getPanelLineColor(),
       lineWidth: selected ? 3 : 2
     })
 
@@ -545,8 +587,8 @@ function drawPanelPreviewItems(ctx, viewport, previewItems = [], hover, currentV
     if (!rect) return
 
     drawRectLocal(ctx, viewport, rect, {
-      fill: panel.color || 'rgba(135, 206, 255, 0.8)',
-      stroke: '#3a8fbd',
+      fill: getPanelFillColor(panel),
+      stroke: getPanelLineColor(),
       lineWidth: 2
     })
   })
