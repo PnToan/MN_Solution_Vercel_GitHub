@@ -604,6 +604,20 @@ function resetPanelEditTapeDraft() {
 } // End resetPanelEditTapeDraft
 
 //=================
+function exitPanelEditCommandToSelect() {
+  const context = activePanelEditContext.value
+
+  if (!context) return false
+
+  resetPanelEditTapeDraft()
+  drawing.setPanelEditShapeTool(null)
+  app.setStatus(`Edit Panel: Select | ${context.panelName} | ${context.faceLabel}`)
+  nextTick(resizePanelEditCanvas)
+
+  return true
+} // End exitPanelEditCommandToSelect
+
+//=================
 function getPanelEditTapeDraftValueFromPointer(context, layout, draft, event) {
   const canvas = panelEditCanvasRef.value
 
@@ -749,8 +763,10 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
   const right = layout.right
   const top = layout.top
   const bottom = layout.bottom
-  const dimTopY = top - dimOffset
-  const dimLeftX = left - dimOffset
+  const horizontalDimSide = context.rearEdge === 'top' ? 'bottom' : 'top'
+  const verticalDimSide = context.rearEdge === 'left' ? 'right' : 'left'
+  const horizontalDimY = horizontalDimSide === 'top' ? top - dimOffset : bottom + dimOffset
+  const verticalDimX = verticalDimSide === 'left' ? left - dimOffset : right + dimOffset
 
   targetContext.clearRect(0, 0, canvasWidth, canvasHeight)
   targetContext.fillStyle = backgroundColor
@@ -786,28 +802,35 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
   targetContext.font = '12px Arial, Helvetica, sans-serif'
 
   targetContext.beginPath()
-  targetContext.moveTo(left, dimTopY)
-  targetContext.lineTo(right, dimTopY)
-  targetContext.moveTo(left, dimTopY - tickSize)
-  targetContext.lineTo(left, dimTopY + tickSize)
-  targetContext.moveTo(right, dimTopY - tickSize)
-  targetContext.lineTo(right, dimTopY + tickSize)
+  targetContext.moveTo(left, horizontalDimY)
+  targetContext.lineTo(right, horizontalDimY)
+  targetContext.moveTo(left, horizontalDimY - tickSize)
+  targetContext.lineTo(left, horizontalDimY + tickSize)
+  targetContext.moveTo(right, horizontalDimY - tickSize)
+  targetContext.lineTo(right, horizontalDimY + tickSize)
   targetContext.stroke()
   targetContext.textAlign = 'center'
-  targetContext.textBaseline = 'bottom'
-  targetContext.fillText(`${Math.round(context.width)} mm`, left + layout.faceWidth / 2, dimTopY - 8)
+  targetContext.textBaseline = horizontalDimSide === 'top' ? 'bottom' : 'top'
+  targetContext.fillText(
+    `${Math.round(context.width)} mm`,
+    left + layout.faceWidth / 2,
+    horizontalDimSide === 'top' ? horizontalDimY - 8 : horizontalDimY + 8
+  )
 
   targetContext.beginPath()
-  targetContext.moveTo(dimLeftX, top)
-  targetContext.lineTo(dimLeftX, bottom)
-  targetContext.moveTo(dimLeftX - tickSize, top)
-  targetContext.lineTo(dimLeftX + tickSize, top)
-  targetContext.moveTo(dimLeftX - tickSize, bottom)
-  targetContext.lineTo(dimLeftX + tickSize, bottom)
+  targetContext.moveTo(verticalDimX, top)
+  targetContext.lineTo(verticalDimX, bottom)
+  targetContext.moveTo(verticalDimX - tickSize, top)
+  targetContext.lineTo(verticalDimX + tickSize, top)
+  targetContext.moveTo(verticalDimX - tickSize, bottom)
+  targetContext.lineTo(verticalDimX + tickSize, bottom)
   targetContext.stroke()
   targetContext.save()
-  targetContext.translate(dimLeftX - 12, top + layout.faceHeight / 2)
-  targetContext.rotate(-Math.PI / 2)
+  targetContext.translate(
+    verticalDimSide === 'left' ? verticalDimX - 12 : verticalDimX + 12,
+    top + layout.faceHeight / 2
+  )
+  targetContext.rotate(verticalDimSide === 'left' ? -Math.PI / 2 : Math.PI / 2)
   targetContext.textAlign = 'center'
   targetContext.textBaseline = 'bottom'
   targetContext.fillText(`${Math.round(context.height)} mm`, 0, 0)
@@ -2093,6 +2116,12 @@ function onDimInputKeyDown(event) {
 function onPointerDown(event) {
   viewportRef.value.focus()
 
+  if (drawing.state.panelEdit?.active) {
+    event.preventDefault()
+    event.stopPropagation()
+    return
+  }
+
   const rawLocal = localFromEvent(event)
   const local = getBoxSnapLocal(rawLocal)
 
@@ -2302,6 +2331,12 @@ function onPointerDown(event) {
 } // End onPointerDown
 //=================
 function onPointerMove(event) {
+  if (drawing.state.panelEdit?.active) {
+    event.preventDefault()
+    event.stopPropagation()
+    return
+  }
+
   const rawLocal = localFromEvent(event)
   if (app.state.currentTool === 'select' && selectDrag.value.start && event.buttons === 1) {
     const point = getScreenPointFromEvent(event)
@@ -2483,6 +2518,12 @@ function onPointerUp(event) {
 } // End onPointerUp
 //=================
 function onWheel(event) {
+  if (drawing.state.panelEdit?.active) {
+    event.preventDefault()
+    event.stopPropagation()
+    return
+  }
+
   const rect = canvasRef.value.getBoundingClientRect()
   const screenX = event.clientX - rect.left
   const screenY = event.clientY - rect.top
@@ -2593,7 +2634,21 @@ function deleteCurrentSelection() {
 } // End deleteCurrentSelection
 //=================
 function onKeyDown(event) {
+  const key = event.key
+  const isSpace = key === ' ' || key === 'Spacebar' || event.code === 'Space'
+
+  if (activePanelEditContext.value && isSpace) {
+    event.preventDefault()
+    event.stopPropagation()
+    exitPanelEditCommandToSelect()
+    return
+  }
+
   if (handlePanelEditTapeKey(event)) return
+
+  if (activePanelEditContext.value) {
+    return
+  }
 
   if (event.key === 'Delete') {
     if (deleteCurrentSelection()) {
@@ -2603,8 +2658,6 @@ function onKeyDown(event) {
 
     return
   }
-  const key = event.key
-  const isSpace = key === ' ' || key === 'Spacebar' || event.code === 'Space'
 
   if (isSpace) {
     event.preventDefault()
@@ -2633,100 +2686,21 @@ function onKeyDown(event) {
     return
   }
 
-  if (!event.ctrlKey && key === 'H' && event.shiftKey) {
+  if (app.state.currentTool === 'move' && event.ctrlKey && !event.shiftKey && !event.altKey) {
     event.preventDefault()
     event.stopPropagation()
-    drawing.unhideAll()
-    draw()
-    return
-  }
-
-  if (!event.ctrlKey && !event.shiftKey && (key === 'h' || key === 'H')) {
-    event.preventDefault()
-    event.stopPropagation()
-    drawing.hideSelected()
+    moveCopyMode.value = !moveCopyMode.value
+    app.setStatus(moveCopyMode.value ? 'Move Copy: ON' : 'Move Copy: OFF')
     draw()
     return
   }
 
   if (key === 'Escape') {
-    event.preventDefault()
-    event.stopPropagation()
     exitToSelect()
     return
   }
 
-  if (app.state.currentTool === 'move' && (key === 'Control' || event.code === 'ControlLeft' || event.code === 'ControlRight')) {
-    event.preventDefault()
-    event.stopPropagation()
-
-    if (event.repeat) return
-
-    moveCopyMode.value = !moveCopyMode.value
-    app.setStatus(moveCopyMode.value ? 'Move: Copy đang bật' : 'Move: Copy đã tắt')
-    draw()
-    return
-  }
-
-  if (app.state.currentTool === 'panel') {
-    if (app.state.currentView !== 'front') {
-      return
-    }
-
-    if (/^[0-9]$/.test(key)) {
-      event.preventDefault()
-      drawing.appendPanelInput(key)
-      app.setStatus(`Vẽ Tấm: ${drawing.state.panelInputBuffer}`)
-      draw()
-      return
-    }
-
-    if (key === '/') {
-      event.preventDefault()
-      drawing.appendPanelInput(key)
-      app.setStatus(`Vẽ Tấm: ${drawing.state.panelInputBuffer}`)
-      draw()
-      return
-    }
-
-    if (key === 'Backspace') {
-      event.preventDefault()
-      drawing.backspacePanelInput()
-      app.setStatus(drawing.state.panelInputBuffer ? `Vẽ Tấm: ${drawing.state.panelInputBuffer}` : 'Vẽ Tấm')
-      draw()
-      return
-    }
-
-    if (key === 'Enter') {
-      event.preventDefault()
-      drawing.addPanelFromHover()
-      draw()
-      return
-    }
-  }
-
-  if (key === 'd' || key === 'D') {
-    event.preventDefault()
-    app.setTool('dimensions')
-    drawing.resetDimensionTool()
-    refreshDimensionSnapFromMouse()
-    app.setStatus('Dimensions: chọn điểm đầu')
-    draw()
-    return
-  }
-
-  if (key === 'm' || key === 'M') {
-    event.preventDefault()
-    moveCopyMode.value = false
-    app.setTool('move')
-    drawing.resetMoveTool()
-    app.setStatus('Move: chọn điểm snap của tấm hoặc Box')
-    draw()
-    return
-  }
-
-  handleViewportKey(event)
-  draw()
+  handleViewportKey(event, { app, drawing, box, wall, draw })
 } // End onKeyDown
 
 watch(() => [cabinet.state.width, cabinet.state.depth, cabinet.state.height, cabinet.state.panelThickness, app.state.currentView], () => {
