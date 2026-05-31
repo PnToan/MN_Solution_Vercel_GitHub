@@ -159,6 +159,12 @@ const panelEditTape = ref({
   inputBuffer: ''
 })
 
+const panelEditRect = ref({
+  hoverSnap: null,
+  draft: null,
+  rectangles: []
+})
+
 const panelEditHistory = ref({
   undoStack: [],
   redoStack: [],
@@ -181,7 +187,7 @@ const views = [
 const panelEditTools = [
   { id: 'editPanelSelect', label: 'Select', icon: '/icons/toolbar/select.svg' },
   { id: 'editPanelLine', label: 'Line', icon: '/icons/toolbar/line.svg' },
-  { id: 'editPanelRect', label: 'Rectangle', icon: '/icons/toolbar/rect.svg' },
+  { id: 'editPanelRect', label: 'Vẽ hình chữ nhật', icon: '/icons/toolbar/rect.svg' },
   { id: 'editPanelArc', label: 'Arc', icon: '/icons/toolbar/arc.svg' },
   { id: 'editPanelCircle', label: 'Circle', icon: '/icons/toolbar/circle.svg' },
   { id: 'editPanelTape', label: 'Thước', icon: '/icons/toolbar/tape.svg' }
@@ -226,6 +232,25 @@ const panelEditFooterText = computed(() => {
     }
 
     return 'Thước: rê chuột gần cạnh để bắt snap, click để tạo đường guide'
+  }
+
+  if (shapeTool === 'editPanelRect') {
+    const draft = panelEditRect.value.draft
+    const hoverSnap = panelEditRect.value.hoverSnap
+
+    if (draft) {
+      const width = Math.abs(Number(draft.current?.x || 0) - Number(draft.start?.x || 0))
+      const height = Math.abs(Number(draft.current?.y || 0) - Number(draft.start?.y || 0))
+      const snapText = hoverSnap ? ` | Snap: ${hoverSnap.kind === 'circle' ? 'điểm' : 'cạnh/guide'}` : ''
+
+      return `Vẽ hình chữ nhật: ${Math.round(width * 10) / 10} x ${Math.round(height * 10) / 10} mm${snapText} | click điểm góc chéo để hoàn tất`
+    }
+
+    if (hoverSnap) {
+      return `Vẽ hình chữ nhật: snap ${hoverSnap.kind === 'circle' ? 'điểm tròn' : 'cạnh/guide'} | click điểm đầu`
+    }
+
+    return 'Vẽ hình chữ nhật: click điểm đầu, click điểm góc chéo để tạo hình chữ nhật'
   }
 
   const toolName = panelEditTools.find((tool) => tool.id === shapeTool)?.label || 'Edit Panel'
@@ -623,6 +648,21 @@ function resetPanelEditTapeDraft() {
 } // End resetPanelEditTapeDraft
 
 //=================
+function resetPanelEditRectDraft() {
+  panelEditRect.value = {
+    ...panelEditRect.value,
+    hoverSnap: null,
+    draft: null
+  }
+} // End resetPanelEditRectDraft
+
+//=================
+function resetPanelEditCommandDrafts() {
+  resetPanelEditTapeDraft()
+  resetPanelEditRectDraft()
+} // End resetPanelEditCommandDrafts
+
+//=================
 function clonePanelEditHistoryData(value) {
   return JSON.parse(JSON.stringify(value || null))
 } // End clonePanelEditHistoryData
@@ -630,7 +670,8 @@ function clonePanelEditHistoryData(value) {
 //=================
 function createPanelEditHistorySnapshot() {
   return {
-    guides: clonePanelEditHistoryData(panelEditTape.value.guides || [])
+    guides: clonePanelEditHistoryData(panelEditTape.value.guides || []),
+    rectangles: clonePanelEditHistoryData(panelEditRect.value.rectangles || [])
   }
 } // End createPanelEditHistorySnapshot
 
@@ -642,6 +683,12 @@ function restorePanelEditHistorySnapshot(snapshot) {
     draft: null,
     inputBuffer: '',
     guides: clonePanelEditHistoryData(snapshot?.guides || [])
+  }
+  panelEditRect.value = {
+    ...panelEditRect.value,
+    hoverSnap: null,
+    draft: null,
+    rectangles: clonePanelEditHistoryData(snapshot?.rectangles || [])
   }
 } // End restorePanelEditHistorySnapshot
 
@@ -709,7 +756,7 @@ function exitPanelEditCommandToSelect() {
 
   if (!context) return false
 
-  resetPanelEditTapeDraft()
+  resetPanelEditCommandDrafts()
   drawing.setPanelEditShapeTool('editPanelSelect')
   app.setTool('editPanel')
   app.setStatus(`Edit Panel: Select | ${context.panelName} | ${context.faceLabel}`)
@@ -774,6 +821,108 @@ function commitPanelEditTapeGuide() {
   app.setStatus('Thước: đã tạo đường guide')
   nextTick(resizePanelEditCanvas)
 } // End commitPanelEditTapeGuide
+
+//=================
+function getPanelEditRectPointFromPointer(context, layout, event) {
+  const canvas = panelEditCanvasRef.value
+
+  if (!canvas || !context || !layout) return null
+
+  const rect = canvas.getBoundingClientRect()
+  const screenX = event.clientX - rect.left
+  const screenY = event.clientY - rect.top
+  const snap = getPanelEditTapeSnap(context, layout, screenX, screenY)
+
+  if (snap) {
+    return {
+      local: { ...snap.local },
+      snap
+    }
+  }
+
+  const local = getPanelEditLocalFromScreen(context, layout, screenX, screenY)
+
+  return {
+    local: {
+      x: Math.max(0, Math.min(context.width, local.x)),
+      y: Math.max(0, Math.min(context.height, local.y))
+    },
+    snap: null
+  }
+} // End getPanelEditRectPointFromPointer
+
+//=================
+function getPanelEditRectBounds(rectangle) {
+  const x1 = Number(rectangle?.start?.x || 0)
+  const y1 = Number(rectangle?.start?.y || 0)
+  const x2 = Number(rectangle?.end?.x ?? rectangle?.current?.x ?? x1)
+  const y2 = Number(rectangle?.end?.y ?? rectangle?.current?.y ?? y1)
+
+  return {
+    x: Math.min(x1, x2),
+    y: Math.min(y1, y2),
+    width: Math.abs(x2 - x1),
+    height: Math.abs(y2 - y1)
+  }
+} // End getPanelEditRectBounds
+
+//=================
+function drawPanelEditRectangle(targetContext, context, layout, rectangle, options = {}) {
+  if (!rectangle) return
+
+  const bounds = getPanelEditRectBounds(rectangle)
+
+  if (bounds.width <= 0 || bounds.height <= 0) return
+
+  const start = getPanelEditPoint(context, layout.left, layout.top, layout.scale, bounds.x, bounds.y + bounds.height)
+  const rectWidth = bounds.width * layout.scale
+  const rectHeight = bounds.height * layout.scale
+  const isDraft = options.draft === true
+
+  targetContext.save()
+  targetContext.strokeStyle = isDraft ? '#ff7a00' : '#111111'
+  targetContext.fillStyle = isDraft ? 'rgba(255, 122, 0, 0.12)' : 'rgba(0, 0, 0, 0.04)'
+  targetContext.lineWidth = isDraft ? 2 : 1.5
+  targetContext.setLineDash(isDraft ? [8, 5] : [])
+  targetContext.beginPath()
+  targetContext.rect(start.x, start.y, rectWidth, rectHeight)
+  targetContext.fill()
+  targetContext.stroke()
+  targetContext.restore()
+} // End drawPanelEditRectangle
+
+//=================
+function commitPanelEditRectangle() {
+  const draft = panelEditRect.value.draft
+
+  if (!draft) return
+
+  const bounds = getPanelEditRectBounds({ start: draft.start, end: draft.current })
+
+  if (bounds.width <= 0 || bounds.height <= 0) {
+    resetPanelEditRectDraft()
+    app.setStatus('Vẽ hình chữ nhật: kích thước không hợp lệ')
+    nextTick(resizePanelEditCanvas)
+    return
+  }
+
+  pushPanelEditHistorySnapshot()
+  panelEditRect.value = {
+    ...panelEditRect.value,
+    hoverSnap: null,
+    draft: null,
+    rectangles: [
+      ...panelEditRect.value.rectangles,
+      {
+        id: `rect-${Date.now()}-${panelEditRect.value.rectangles.length + 1}`,
+        start: { ...draft.start },
+        end: { ...draft.current }
+      }
+    ]
+  }
+  app.setStatus('Vẽ hình chữ nhật: đã tạo hình chữ nhật')
+  nextTick(resizePanelEditCanvas)
+} // End commitPanelEditRectangle
 
 //=================
 function drawPanelEditRearEdge(targetContext, context, layout) {
@@ -895,8 +1044,20 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
     drawPanelEditGuideLine(targetContext, context, layout, panelEditTape.value.draft, { draft: true })
   }
 
+  panelEditRect.value.rectangles.forEach((rectangle) => {
+    drawPanelEditRectangle(targetContext, context, layout, rectangle)
+  })
+
+  if (panelEditRect.value.draft) {
+    drawPanelEditRectangle(targetContext, context, layout, panelEditRect.value.draft, { draft: true })
+  }
+
   if (drawing.state.panelEdit?.shapeTool === 'editPanelTape') {
     drawPanelEditTapeSnap(targetContext, panelEditTape.value.hoverSnap)
+  }
+
+  if (drawing.state.panelEdit?.shapeTool === 'editPanelRect') {
+    drawPanelEditTapeSnap(targetContext, panelEditRect.value.hoverSnap)
   }
 
   targetContext.strokeStyle = dimColor
@@ -954,7 +1115,7 @@ function selectPanelEditWindowTool(toolId) {
   }
 
   app.setTool(toolId)
-  resetPanelEditTapeDraft()
+  resetPanelEditCommandDrafts()
   const toolName = panelEditTools.find((tool) => tool.id === toolId)?.label || toolId.replace('editPanel', '')
   app.setStatus(`${toolName}: ${context.panelName} | ${context.faceLabel} | ${context.rearLabel}`)
   nextTick(resizePanelEditCanvas)
@@ -976,6 +1137,11 @@ function selectPanelEditFace(faceSide) {
     draft: null,
     guides: [],
     inputBuffer: ''
+  }
+  panelEditRect.value = {
+    hoverSnap: null,
+    draft: null,
+    rectangles: []
   }
   clearPanelEditHistory()
   app.setStatus(`Edit Panel: ${context.panelName} | ${context.faceLabel} | ${context.rearLabel}`)
@@ -1002,7 +1168,44 @@ function onPanelEditPointerDown(event) {
     return
   }
 
-  if (drawing.state.panelEdit?.shapeTool !== 'editPanelTape' || event.button !== 0) return
+  if (event.button !== 0) return
+
+  const shapeTool = drawing.state.panelEdit?.shapeTool
+
+  if (shapeTool === 'editPanelRect') {
+    const rect = canvas.getBoundingClientRect()
+    const layout = getPanelEditLayout(context, rect.width, rect.height)
+    const point = getPanelEditRectPointFromPointer(context, layout, event)
+
+    if (!point) return
+
+    if (panelEditRect.value.draft) {
+      panelEditRect.value = {
+        ...panelEditRect.value,
+        hoverSnap: point.snap,
+        draft: {
+          ...panelEditRect.value.draft,
+          current: point.local
+        }
+      }
+      commitPanelEditRectangle()
+      return
+    }
+
+    panelEditRect.value = {
+      ...panelEditRect.value,
+      hoverSnap: point.snap,
+      draft: {
+        start: point.local,
+        current: point.local
+      }
+    }
+    app.setStatus('Vẽ hình chữ nhật: chọn điểm góc chéo')
+    resizePanelEditCanvas()
+    return
+  }
+
+  if (shapeTool !== 'editPanelTape') return
 
   if (panelEditTape.value.draft) {
     commitPanelEditTapeGuide()
@@ -1048,10 +1251,30 @@ function onPanelEditPointerMove(event) {
     return
   }
 
-  if (!canvas || !context || drawing.state.panelEdit?.shapeTool !== 'editPanelTape') return
+  if (!canvas || !context) return
 
   const rect = canvas.getBoundingClientRect()
   const layout = getPanelEditLayout(context, rect.width, rect.height)
+  const shapeTool = drawing.state.panelEdit?.shapeTool
+
+  if (shapeTool === 'editPanelRect') {
+    const point = getPanelEditRectPointFromPointer(context, layout, event)
+
+    panelEditRect.value = {
+      ...panelEditRect.value,
+      hoverSnap: point?.snap || null,
+      draft: panelEditRect.value.draft
+        ? {
+          ...panelEditRect.value.draft,
+          current: point?.local || panelEditRect.value.draft.current
+        }
+        : null
+    }
+    resizePanelEditCanvas()
+    return
+  }
+
+  if (shapeTool !== 'editPanelTape') return
 
   if (panelEditTape.value.draft) {
     const draft = panelEditTape.value.draft
@@ -1126,6 +1349,11 @@ function applyPanelEdit() {
     draft: null,
     guides: [],
     inputBuffer: ''
+  }
+  panelEditRect.value = {
+    hoverSnap: null,
+    draft: null,
+    rectangles: []
   }
   clearPanelEditHistory()
   drawing.clearPanelEdit()
@@ -2750,6 +2978,21 @@ function handlePanelEditTapeKey(event) {
 } // End handlePanelEditTapeKey
 
 //=================
+function handlePanelEditRectKey(event) {
+  if (drawing.state.panelEdit?.shapeTool !== 'editPanelRect') return false
+
+  if (event.key !== 'Escape') return false
+
+  event.preventDefault()
+  event.stopPropagation()
+  resetPanelEditRectDraft()
+  app.setStatus('Vẽ hình chữ nhật: đã hủy thao tác đang tạo')
+  resizePanelEditCanvas()
+
+  return true
+} // End handlePanelEditRectKey
+
+//=================
 function deleteCurrentSelection() {
   const hasPanels = Array.isArray(drawing.state.selectedPanelIds) && drawing.state.selectedPanelIds.length > 0
   const hasBoxes = Array.isArray(box.state.selectedBoxIds) && box.state.selectedBoxIds.length > 0
@@ -2781,6 +3024,8 @@ function onKeyDown(event) {
   if (handlePanelEditHistoryKey(event)) return
 
   if (handlePanelEditTapeKey(event)) return
+
+  if (handlePanelEditRectKey(event)) return
 
   if (activePanelEditContext.value) {
     event.preventDefault()
@@ -2865,6 +3110,10 @@ watch(() => app.state.currentTool, (tool) => {
     resetPanelEditTapeDraft()
   }
 
+  if (tool !== 'editPanelRect') {
+    resetPanelEditRectDraft()
+  }
+
   if (tool !== 'move') {
     moveCopyMode.value = false
   }
@@ -2923,6 +3172,11 @@ watch(() => [
       guides: [],
       inputBuffer: ''
     }
+    panelEditRect.value = {
+      hoverSnap: null,
+      draft: null,
+      rectangles: []
+    }
     clearPanelEditHistory()
   } else if (oldValue && (nextValue[2] !== oldValue[2] || nextValue[3] !== oldValue[3])) {
     panelEditTape.value = {
@@ -2930,6 +3184,11 @@ watch(() => [
       draft: null,
       guides: [],
       inputBuffer: ''
+    }
+    panelEditRect.value = {
+      hoverSnap: null,
+      draft: null,
+      rectangles: []
     }
     clearPanelEditHistory()
   }
