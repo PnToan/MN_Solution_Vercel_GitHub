@@ -37,10 +37,13 @@ import BottomParams from '../components/layout/BottomParams.vue'
 import RightPanel from '../components/panels/RightPanel.vue'
 import { useDrawingStore } from '../stores/useDrawingStore'
 import { useAppStore } from '../stores/useAppStore'
+import { useCabinetStore } from '../stores/useCabinetStore'
 import { applyAppSettings, loadAppSettings } from '../core/settings/app-settings'
+import { findShortcutAction, loadShortcutSettings, shortcutEventToText } from '../core/settings/shortcut-settings'
 
 const drawingStore = useDrawingStore()
 const app = useAppStore()
+const cabinet = useCabinetStore()
 const isRightPanelHidden = ref(true)
 const rightPanelWidth = ref(224)
 let rightPanelResizing = false
@@ -98,18 +101,109 @@ function toggleRightPanel() {
 } // End toggleRightPanel
 
 //=================
-function onGlobalKeyDown(event) {
-  const isSpace = event.key === ' ' || event.key === 'Spacebar' || event.code === 'Space'
+function isEditableShortcutTarget(event) {
+  const target = event.target
+  if (!target) return false
+  if (target.closest?.('.mn-settings-dialog')) return true
 
-  if (!isSpace) {
-    return
+  const tagName = String(target.tagName || '').toLowerCase()
+  return tagName === 'input' || tagName === 'textarea' || tagName === 'select' || target.isContentEditable
+} // End isEditableShortcutTarget
+
+//=================
+function projectPayload() {
+  return JSON.stringify({ cabinet: cabinet.state, panels: drawingStore.state.panels }, null, 2)
+} // End projectPayload
+
+//=================
+function newProject() {
+  drawingStore.state.panels = []
+  drawingStore.clearSelection()
+  drawingStore.rebuildZones()
+  app.setStatus('Đã tạo project mới')
+} // End newProject
+
+//=================
+function saveOfflineProject() {
+  localStorage.setItem('MN_Solution_Project', projectPayload())
+  app.setStatus('Đã lưu offline vào trình duyệt')
+} // End saveOfflineProject
+
+//=================
+function exportProjectFile() {
+  const blob = new Blob([projectPayload()], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+
+  a.href = url
+  a.download = 'mn-solution-project.json'
+  a.click()
+
+  URL.revokeObjectURL(url)
+  app.setStatus('Đã xuất file project')
+} // End exportProjectFile
+
+//=================
+function runShortcutAction(action) {
+  if (!action) return false
+
+  if (action.type === 'tool') {
+    app.setTool(action.value)
+    if (action.value === 'select') app.setStatus('Select')
+    return true
   }
+
+  if (action.type === 'view') {
+    app.setView(action.value)
+    return true
+  }
+
+  if (action.type === 'toggle3d') {
+    app.toggleMini3D()
+    return true
+  }
+
+  if (action.type === 'toggleInfo') {
+    toggleRightPanel()
+    return true
+  }
+
+  if (action.value === 'newProject') {
+    newProject()
+    return true
+  }
+
+  if (action.value === 'saveOffline') {
+    saveOfflineProject()
+    return true
+  }
+
+  if (action.value === 'exportFile') {
+    exportProjectFile()
+    return true
+  }
+
+  if (action.value === 'openSettings') {
+    window.dispatchEvent(new CustomEvent('mn-open-settings'))
+    return true
+  }
+
+  return false
+} // End runShortcutAction
+
+//=================
+function onGlobalKeyDown(event) {
+  if (isEditableShortcutTarget(event)) return
+
+  const shortcutText = shortcutEventToText(event)
+  const action = findShortcutAction(shortcutText, loadShortcutSettings())
+
+  if (!action) return
 
   event.preventDefault()
   event.stopPropagation()
 
-  app.setTool('select')
-  app.setStatus('Select')
+  runShortcutAction(action)
 } // End onGlobalKeyDown
 
 onMounted(() => {

@@ -1039,3 +1039,136 @@ img { display: block; max-width: 100%; }
     grid-template-columns: 1fr;
   }
 }
+
+/*=================*/
+.mn-shortcut-section {
+  height: 100%;
+}
+
+.mn-shortcut-filter-row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.mn-shortcut-layout {
+  min-height: 420px;
+  display: grid;
+  grid-template-columns: minmax(0, 62%) minmax(260px, 38%);
+  gap: 20px;
+  margin-top: 14px;
+}
+
+.mn-shortcut-left,
+.mn-shortcut-right {
+  min-height: 0;
+}
+
+.mn-shortcut-title {
+  margin-bottom: 6px;
+  color: #0b0b0b;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.mn-shortcut-title.assigned {
+  margin-top: 12px;
+}
+
+.mn-shortcut-function-list {
+  height: 390px;
+  overflow: auto;
+  border: 1px solid #9aa3ad;
+  background: #ffffff;
+}
+
+.mn-shortcut-function {
+  width: 100%;
+  min-height: 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 3px 6px;
+  border: 0;
+  background: #ffffff;
+  color: #0b0b0b;
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.mn-shortcut-function:hover,
+.mn-shortcut-function.active {
+  background: rgba(83,140,184,.18);
+}
+
+.mn-shortcut-function strong {
+  color: #36709c;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.mn-shortcut-add-row {
+  display: grid;
+  grid-template-columns: 1fr 34px;
+  gap: 6px;
+}
+
+.mn-shortcut-icon-btn {
+  width: 32px;
+  min-height: 32px;
+  border: 1px solid #d7dbe0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0b0b0b;
+  font-size: 16px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(0,0,0,.06);
+}
+
+.mn-shortcut-icon-btn:hover {
+  box-shadow: 0 10px 22px rgba(0,0,0,.10);
+}
+
+.mn-shortcut-assigned-list {
+  height: 190px;
+  overflow: auto;
+  border: 1px solid #9aa3ad;
+  background: #ffffff;
+  padding: 6px;
+}
+
+.mn-shortcut-assigned-item {
+  min-height: 30px;
+  display: grid;
+  grid-template-columns: 1fr 34px;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+  color: #0b0b0b;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.mn-shortcut-empty {
+  padding: 8px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.mn-shortcut-reset {
+  width: 100%;
+  min-height: 32px;
+  margin-top: 14px;
+}
+
+@media (max-width: 760px) {
+  .mn-shortcut-filter-row,
+  .mn-shortcut-layout {
+    grid-template-columns: 1fr;
+  }
+}

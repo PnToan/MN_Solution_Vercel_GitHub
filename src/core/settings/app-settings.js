@@ -1,9 +1,12 @@
+import { getDefaultShortcutSettings, normalizeShortcutSettings, saveShortcutSettings } from './shortcut-settings'
+
 const APP_SETTINGS_KEY = 'MN_Solution_App_Settings'
 
 export const DEFAULT_APP_SETTINGS = {
   font: 'arial',
   mode: 'dark',
-  canvasBackground: 'gray'
+  canvasBackground: 'gray',
+  shortcuts: getDefaultShortcutSettings()
 }
 
 const FONT_VALUE = {
@@ -25,6 +28,7 @@ function normalizeAppSettings(settings = {}) {
   if (!FONT_VALUE[safeSettings.font]) safeSettings.font = DEFAULT_APP_SETTINGS.font
   if (!['light', 'dark'].includes(safeSettings.mode)) safeSettings.mode = DEFAULT_APP_SETTINGS.mode
   if (!CANVAS_BACKGROUND_VALUE[safeSettings.canvasBackground]) safeSettings.canvasBackground = DEFAULT_APP_SETTINGS.canvasBackground
+  safeSettings.shortcuts = normalizeShortcutSettings(safeSettings.shortcuts)
 
   return safeSettings
 } // End normalizeAppSettings
@@ -45,6 +49,7 @@ export function loadAppSettings() {
 export function saveAppSettings(settings) {
   const nextSettings = normalizeAppSettings(settings)
   localStorage.setItem(APP_SETTINGS_KEY, JSON.stringify(nextSettings))
+  saveShortcutSettings(nextSettings.shortcuts)
   return nextSettings
 } // End saveAppSettings
 
@@ -52,6 +57,7 @@ export function saveAppSettings(settings) {
 export function resetAppSettings() {
   const nextSettings = { ...DEFAULT_APP_SETTINGS }
   localStorage.setItem(APP_SETTINGS_KEY, JSON.stringify(nextSettings))
+  saveShortcutSettings(nextSettings.shortcuts)
   return nextSettings
 } // End resetAppSettings
 

@@ -19,7 +19,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useAppStore } from '../../stores/useAppStore'
 import { useDrawingStore } from '../../stores/useDrawingStore'
 import { useCabinetStore } from '../../stores/useCabinetStore'
@@ -69,4 +69,17 @@ function exportJson() {
   a.click()
   URL.revokeObjectURL(url)
 } // End exportJson
+
+//=================
+function handleOpenSettingsEvent() {
+  openSettings()
+} // End handleOpenSettingsEvent
+
+onMounted(() => {
+  window.addEventListener('mn-open-settings', handleOpenSettingsEvent)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('mn-open-settings', handleOpenSettingsEvent)
+})
 </script>
