@@ -13,7 +13,6 @@
         <div class="mn-settings-actions">
           <button class="mn-settings-btn" type="button" @click="saveCurrentSettings">Áp dụng</button>
           <button class="mn-settings-btn" type="button" @click="emitClose">Đóng</button>
-          <span v-if="settingApplyMessage" class="mn-settings-apply-message">{{ settingApplyMessage }}</span>
         </div>
       </header>
 
@@ -160,7 +159,7 @@
                   <div class="mn-settings-field">
                     <label class="mn-settings-label" for="mn_panel_default_thickness">Độ dày Tấm mặc định</label>
                     <div class="mn-panel-input-row">
-                      <input id="mn_panel_default_thickness" v-model="form.panel.defaultThickness" class="mn-settings-control" type="text" inputmode="decimal" @change="applyCurrentSettings" />
+                      <input id="mn_panel_default_thickness" v-model.number="form.panel.defaultThickness" class="mn-settings-control" type="number" min="0" step="0.1" @change="applyCurrentSettings" />
                       <span class="mn-panel-unit">mm</span>
                     </div>
                   </div>
@@ -168,7 +167,7 @@
                   <div class="mn-settings-field">
                     <label class="mn-settings-label" for="mn_panel_back_thickness">Độ dày Tấm Hậu</label>
                     <div class="mn-panel-input-row">
-                      <input id="mn_panel_back_thickness" v-model="form.panel.backThickness" class="mn-settings-control" type="text" inputmode="decimal" @change="applyCurrentSettings" />
+                      <input id="mn_panel_back_thickness" v-model.number="form.panel.backThickness" class="mn-settings-control" type="number" min="0" step="0.1" @change="applyCurrentSettings" />
                       <span class="mn-panel-unit">mm</span>
                     </div>
                   </div>
@@ -200,6 +199,22 @@
                     <div class="mn-panel-opacity-row">
                       <input id="mn_panel_opacity" v-model.number="form.panel.opacity" class="mn-panel-range" type="range" min="0" max="100" step="1" @input="applyCurrentSettings" />
                       <input v-model.number="form.panel.opacity" class="mn-settings-control mn-panel-opacity-number" type="number" min="0" max="100" step="1" @change="applyCurrentSettings" />
+                    </div>
+                  </div>
+
+                  <div class="mn-settings-field">
+                    <label class="mn-settings-label" for="mn_back_panel_color">Màu Tấm hậu</label>
+                    <div class="mn-panel-color-row">
+                      <input id="mn_back_panel_color" v-model="form.panel.backColor" class="mn-panel-color" type="color" @input="applyCurrentSettings" />
+                      <input v-model="form.panel.backColor" class="mn-settings-control" type="text" maxlength="7" @change="applyCurrentSettings" />
+                    </div>
+                  </div>
+
+                  <div class="mn-settings-field">
+                    <label class="mn-settings-label" for="mn_back_panel_opacity">Độ Mờ Tấm hậu: {{ form.panel.backOpacity }}%</label>
+                    <div class="mn-panel-opacity-row">
+                      <input id="mn_back_panel_opacity" v-model.number="form.panel.backOpacity" class="mn-panel-range" type="range" min="0" max="100" step="1" @input="applyCurrentSettings" />
+                      <input v-model.number="form.panel.backOpacity" class="mn-settings-control mn-panel-opacity-number" type="number" min="0" max="100" step="1" @change="applyCurrentSettings" />
                     </div>
                   </div>
                 </div>
@@ -304,7 +319,6 @@ const shortcutSettings = reactive(normalizeShortcutSettings(loadedSettings.short
 const selectedShortcutId = ref(SHORTCUT_FUNCTIONS[0]?.id || '')
 const newShortcutText = ref('')
 const shortcutFilter = ref('')
-const settingApplyMessage = ref('')
 
 const activeTab = computed(() => tabs.find(tab => tab.id === activeTabId.value) || tabs[0])
 const selectedShortcutFunction = computed(() => SHORTCUT_FUNCTIONS.find(item => item.id === selectedShortcutId.value) || SHORTCUT_FUNCTIONS[0])
@@ -362,23 +376,6 @@ function roundSettingNumber(value, fallback = 0) {
   return Math.round(numberValue * 10) / 10
 } // End roundSettingNumber
 
-
-//=================
-function hexToRgba(hexValue, opacityPercent = 80) {
-  const text = String(hexValue || '').trim()
-  const match = text.match(/^#([0-9a-fA-F]{6})$/)
-
-  if (!match) return 'rgba(135, 206, 255, 0.8)'
-
-  const value = match[1]
-  const r = parseInt(value.slice(0, 2), 16)
-  const g = parseInt(value.slice(2, 4), 16)
-  const b = parseInt(value.slice(4, 6), 16)
-  const a = Math.max(0, Math.min(1, roundSettingNumber(opacityPercent, 80) / 100))
-
-  return `rgba(${r}, ${g}, ${b}, ${a})`
-} // End hexToRgba
-
 //=================
 function panelBelongsToBox(panel, boxId) {
   return panel.linkedFrameId === boxId
@@ -423,7 +420,6 @@ function updateCabinetInfoPanelSettingMeta(panel, defaultThickness, backThicknes
 function applyPanelSettingsToRuntime(settings) {
   const defaultThickness = roundSettingNumber(settings?.panel?.defaultThickness, 17.4)
   const backThickness = roundSettingNumber(settings?.panel?.backThickness, 10)
-  const panelColor = hexToRgba(settings?.panel?.panelColor, settings?.panel?.opacity)
 
   cabinet.state.panelThickness = defaultThickness
   cabinetInfo.state.info.general.panelThickness = defaultThickness
@@ -436,43 +432,27 @@ function applyPanelSettingsToRuntime(settings) {
     drawing.state.panels = drawing.state.panels.map((panel) => {
       if (!panelBelongsToBox(panel, box.id)) return panel
 
-      return {
-        ...updateCabinetInfoPanelSettingMeta(panel, defaultThickness, backThickness),
-        color: panelColor
-      }
+      return updateCabinetInfoPanelSettingMeta(panel, defaultThickness, backThickness)
     })
 
     drawing.updatePanelsAfterBoxResize?.(oldBox, box)
   })
 
-  drawing.state.panels = drawing.state.panels.map((panel) => ({
-    ...panel,
-    color: panelColor
-  }))
-
   drawing.rebuildZones?.()
-  app.setStatus('Lưu thành công')
+  app.setStatus('Đã áp dụng setting theo máy')
 } // End applyPanelSettingsToRuntime
 
 //=================
-function applyCurrentSettings(showMessage = false) {
+function applyCurrentSettings() {
   const savedSettings = saveAppSettings(currentSettingsPayload())
   syncShortcutSettings(savedSettings.shortcuts)
-  syncForm(savedSettings)
   applyAppSettings(savedSettings)
   applyPanelSettingsToRuntime(savedSettings)
-
-  if (showMessage) {
-    settingApplyMessage.value = 'Lưu thành công'
-    window.setTimeout(() => {
-      settingApplyMessage.value = ''
-    }, 1800)
-  }
 } // End applyCurrentSettings
 
 //=================
 function saveCurrentSettings() {
-  applyCurrentSettings(true)
+  applyCurrentSettings()
 } // End saveCurrentSettings
 
 //=================

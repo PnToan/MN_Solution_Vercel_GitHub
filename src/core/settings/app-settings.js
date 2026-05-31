@@ -13,6 +13,8 @@ export const DEFAULT_APP_SETTINGS = {
     panelColor: '#87ceff',
     selectedLineColor: '#008cff',
     opacity: 80,
+    backColor: '#87ceff',
+    backOpacity: 80,
     names: {
       topRail: 'Chỉ Nóc',
       leftSide: 'Hông Trái',
@@ -97,6 +99,8 @@ function normalizePanelSettings(panel = {}) {
     panelColor: normalizeHexColor(safePanel.panelColor, defaultPanel.panelColor),
     selectedLineColor: normalizeHexColor(safePanel.selectedLineColor, defaultPanel.selectedLineColor),
     opacity: normalizeNumber(safePanel.opacity, defaultPanel.opacity, 0, 100),
+    backColor: normalizeHexColor(safePanel.backColor, defaultPanel.backColor),
+    backOpacity: normalizeNumber(safePanel.backOpacity, defaultPanel.backOpacity, 0, 100),
     names: normalizePanelNames(safePanel.names)
   }
 } // End normalizePanelSettings
@@ -199,6 +203,8 @@ export function applyAppSettings(settings) {
   root.style.setProperty('--mn-panel-color', nextSettings.panel.panelColor)
   root.style.setProperty('--mn-panel-selected-line-color', nextSettings.panel.selectedLineColor)
   root.style.setProperty('--mn-panel-opacity', String(nextSettings.panel.opacity / 100))
+  root.style.setProperty('--mn-back-panel-color', nextSettings.panel.backColor)
+  root.style.setProperty('--mn-back-panel-opacity', String(nextSettings.panel.backOpacity / 100))
   root.setAttribute('data-mn-mode', nextSettings.mode)
 
   window.dispatchEvent(new Event('resize'))

@@ -105,18 +105,6 @@ function getZoneBlockingPanels(panels = []) {
 
 
 //=================
-function getBoxShelfInset(sourceBox) {
-  const info = sourceBox?.cabinetInfo?.shelfInset || {}
-
-  return {
-    enabled: info?.enabled === true,
-    vertical: Math.max(0, toNumber(info?.vertical, 0)),
-    horizontal: Math.max(0, toNumber(info?.horizontal, 0))
-  }
-} // End getBoxShelfInset
-
-
-//=================
 function getCabinetInfoBackGeometryForBox(sourceBox, panel) {
   const meta = panel?.cabinetInfoBack || {}
   const bodyThickness = toNumber(meta.bodyThickness, toNumber(sourceBox?.panelThickness, 18))
@@ -152,8 +140,10 @@ function getCabinetInfoBackGeometryForBox(sourceBox, panel) {
   const bottomCoverBack = meta.bottomCoverBack === true
   const leftInset = hasLeftSide ? bodyThickness : 0
   const rightInset = hasRightSide ? bodyThickness : 0
-  const bottomInset = hasBottom && !bottomCoverBack ? bodyThickness : 0
-  const topInset = hasTop && !topCoverBack ? bodyThickness : 0
+  const toeKickHeight = meta.toeKickEnabled === true ? Math.max(0, toNumber(meta.toeKickHeight, 0)) : 0
+  const topStripSize = meta.topStripEnabled === true ? Math.max(0, toNumber(meta.topStripSize, 0)) : 0
+  const bottomInset = hasBottom && !bottomCoverBack ? toeKickHeight + bodyThickness : 0
+  const topInset = hasTop && !topCoverBack ? topStripSize + bodyThickness : 0
   const x = body.x + leftInset - (hasLeftSide ? grooveDepth : 0)
   const width = Math.max(
     1,
@@ -515,8 +505,10 @@ function updateCabinetInfoToeKickPanelAfterBoxResize(oldPanel, newBox) {
   const boxY = toNumber(newBox?.y, oldPanel?.y3d ?? 0)
   const boxZ = toNumber(newBox?.z, oldPanel?.z3d ?? oldPanel?.z ?? 0)
   const boxWidth = Math.max(1, toNumber(newBox?.width, oldPanel?.xSize ?? oldPanel?.width ?? 1))
-  const x = detached ? boxX : boxX + t
-  const width = detached ? boxWidth : Math.max(1, boxWidth - (2 * t))
+  const leftInset = meta.hasLeftSide === false ? 0 : t
+  const rightInset = meta.hasRightSide === false ? 0 : t
+  const x = detached ? boxX : boxX + leftInset
+  const width = detached ? boxWidth : Math.max(1, boxWidth - leftInset - rightInset)
   const bottomZ = boxZ
   const frontRailY = boxY + faceOffset
   const backLimitY = getCabinetInfoToeKickBackLimitYForBox(newBox, meta, t)
@@ -615,6 +607,39 @@ function parseCabinetInfoDoorStopDivisionFormula(formula, totalSize, thickness) 
   return offsets
 } // End parseCabinetInfoDoorStopDivisionFormula
 
+
+//=================
+function getCabinetInfoInnerZoneForBox(newBox, meta, thickness) {
+  const boxX = toNumber(newBox?.x, 0)
+  const boxY = toNumber(newBox?.y, 0)
+  const boxZ = toNumber(newBox?.z, 0)
+  const boxWidth = Math.max(1, toNumber(newBox?.width, 1))
+  const boxDepth = Math.max(1, toNumber(newBox?.depth, 1))
+  const boxHeight = Math.max(1, toNumber(newBox?.height, 1))
+  const hasLeftSide = meta.hasLeftSide === true
+  const hasRightSide = meta.hasRightSide === true
+  const hasTop = meta.hasTop === true
+  const hasBottom = meta.hasBottom === true
+  const topStripSize = meta.topStripEnabled === true ? Math.max(0, toNumber(meta.topStripSize, 0)) : 0
+  const toeKickHeight = meta.toeKickEnabled === true ? Math.max(0, toNumber(meta.toeKickHeight, 0)) : 0
+  const leftInset = hasLeftSide ? thickness : 0
+  const rightInset = hasRightSide ? thickness : 0
+  const bottomInset = hasBottom ? toeKickHeight + thickness : toeKickHeight
+  const topInset = hasTop ? topStripSize + thickness : topStripSize
+  const backLimitY = meta.hasBack === true
+    ? boxY + boxDepth - Math.max(0, toNumber(meta.backInset, 0)) - Math.max(1, toNumber(meta.backThickness, Math.max(1, thickness / 3)))
+    : boxY + boxDepth
+
+  return {
+    x: boxX + leftInset,
+    y: boxY,
+    z: boxZ + bottomInset,
+    width: Math.max(1, boxWidth - leftInset - rightInset),
+    depth: Math.max(1, backLimitY - boxY),
+    height: Math.max(1, boxHeight - bottomInset - topInset)
+  }
+} // End getCabinetInfoInnerZoneForBox
+
 //=================
 function updateCabinetInfoDoorStopPanelAfterBoxResize(oldPanel, newBox) {
   const meta = oldPanel?.cabinetInfoDoorStop || {}
@@ -624,19 +649,15 @@ function updateCabinetInfoDoorStopPanelAfterBoxResize(oldPanel, newBox) {
   const faceOffset = toNumber(meta.faceOffset, 0)
   const formula = String(meta.formula || '').trim()
   const index = Math.max(0, Math.floor(toNumber(meta.index, 0)))
-  const boxX = toNumber(newBox?.x, oldPanel?.x3d ?? oldPanel?.x ?? 0)
-  const boxY = toNumber(newBox?.y, oldPanel?.y3d ?? 0)
-  const boxZ = toNumber(newBox?.z, oldPanel?.z3d ?? oldPanel?.z ?? 0)
-  const boxWidth = Math.max(1, toNumber(newBox?.width, oldPanel?.xSize ?? oldPanel?.width ?? 1))
-  const boxHeight = Math.max(1, toNumber(newBox?.height, oldPanel?.zSize ?? oldPanel?.height ?? 1))
-  const clearHeight = Math.max(1, boxHeight - (2 * t))
+  const zone = getCabinetInfoInnerZoneForBox(newBox, meta, t)
+  const clearHeight = zone.height
   const offsets = parseCabinetInfoDoorStopDivisionFormula(formula, clearHeight, t)
-  const fallbackOffset = Math.max(0, Math.min(clearHeight, toNumber(oldPanel?.z3d, boxZ + t) - boxZ - t))
+  const fallbackOffset = Math.max(0, Math.min(clearHeight, toNumber(oldPanel?.z3d, zone.z) - zone.z))
   const offset = offsets[index] ?? fallbackOffset
-  const nextX = boxX + t
-  const nextY = boxY + faceOffset
-  const nextZ = boxZ + t + offset
-  const nextWidth = Math.max(1, boxWidth - (2 * t))
+  const nextX = zone.x
+  const nextY = zone.y + faceOffset
+  const nextZ = zone.z + offset
+  const nextWidth = zone.width
   const nextDepth = horizontal ? size : t
   const nextHeight = horizontal ? t : size
 
@@ -1345,7 +1366,6 @@ const store = createSimpleStore({
         sourceBoxId: baseBox.id,
         baseObjectId: baseBox.id,
         depth: baseBox.depth,
-        shelfInset: getBoxShelfInset(baseBox),
         source: baseBox,
         sourceBox: baseBox,
         baseObject: baseBox
@@ -1369,7 +1389,6 @@ const store = createSimpleStore({
         sourceBoxId: baseBox.id,
         baseObjectId: baseBox.id,
         depth: drawableDepth,
-        shelfInset: getBoxShelfInset(baseBox),
         sourceBox: baseBox,
         baseObject: baseBox
       }))
@@ -1427,7 +1446,6 @@ const store = createSimpleStore({
       sourceBoxId: newBox.id,
       baseObjectId: newBox.id,
       depth: newBox.depth,
-      shelfInset: getBoxShelfInset(newBox),
       source: newBox,
       sourceBox: newBox,
       baseObject: newBox
@@ -1566,7 +1584,6 @@ const store = createSimpleStore({
         sourceBoxId: newBox.id,
         baseObjectId: newBox.id,
         depth: currentZoneDepth,
-        shelfInset: getBoxShelfInset(newBox),
         sourceBox: newBox,
         baseObject: newBox
       }))
@@ -1638,7 +1655,6 @@ const store = createSimpleStore({
         panelOffset: offset,
         panelThickness: thickness,
         thickness,
-        panelShelfInset: nextPanel.panelShelfInset,
         dimEnabled: oldPanel.dimEnabled ?? false
       }
 

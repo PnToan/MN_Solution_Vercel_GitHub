@@ -13,19 +13,18 @@ function getCanvasBackgroundColor() {
 
 
 //=================
-function hexToRgba(hexValue, opacity = 1) {
-  const text = String(hexValue || '').trim()
-  const match = text.match(/^#([0-9a-fA-F]{6})$/)
+function hexToRgba(hex, opacity = 1) {
+  const text = String(hex || '').trim()
+  const match = /^#?([0-9a-fA-F]{6})$/.exec(text)
 
-  if (!match) return null
+  if (!match) return `rgba(135, 206, 255, ${opacity})`
 
   const value = match[1]
   const r = parseInt(value.slice(0, 2), 16)
   const g = parseInt(value.slice(2, 4), 16)
   const b = parseInt(value.slice(4, 6), 16)
-  const a = Math.max(0, Math.min(1, Number(opacity)))
 
-  return `rgba(${r}, ${g}, ${b}, ${a})`
+  return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, opacity))})`
 } // End hexToRgba
 
 //=================
@@ -40,18 +39,24 @@ function getCssVariable(name, fallback) {
 } // End getCssVariable
 
 //=================
-function getPanelFillColor(panel) {
-  const panelColor = getCssVariable('--mn-panel-color', '')
-  const opacity = getCssVariable('--mn-panel-opacity', '0.8')
-  const cssColor = hexToRgba(panelColor, opacity)
+function getRuntimePanelFill(panel) {
+  const isBackPanel = panel?.panelSide === 'back' || panel?.cabinetInfoKind === 'back'
+  const color = isBackPanel
+    ? getCssVariable('--mn-back-panel-color', '#87ceff')
+    : getCssVariable('--mn-panel-color', '#87ceff')
+  const opacity = Number(isBackPanel
+    ? getCssVariable('--mn-back-panel-opacity', '0.8')
+    : getCssVariable('--mn-panel-opacity', '0.8'))
 
-  return cssColor || panel?.color || 'rgba(135, 206, 255, 0.8)'
-} // End getPanelFillColor
+  return hexToRgba(color, Number.isFinite(opacity) ? opacity : 0.8)
+} // End getRuntimePanelFill
 
 //=================
-function getPanelLineColor() {
+function getRuntimePanelStroke(selected) {
+  if (selected) return '#ff9f1a'
+
   return getCssVariable('--mn-panel-selected-line-color', '#3a8fbd')
-} // End getPanelLineColor
+} // End getRuntimePanelStroke
 
 //=================
 function drawLine(ctx, a, b, color = '#999', width = 1) {
@@ -393,8 +398,8 @@ function drawPanels(ctx, viewport, panels = [], selectedPanelIds = [], currentVi
     const selected = selectedIds.includes(panel.id)
 
     drawRectLocal(ctx, viewport, rect, {
-      fill: getPanelFillColor(panel),
-      stroke: selected ? '#ff9f1a' : getPanelLineColor(),
+      fill: getRuntimePanelFill(panel),
+      stroke: getRuntimePanelStroke(selected),
       lineWidth: selected ? 3 : 2
     })
 
@@ -587,8 +592,8 @@ function drawPanelPreviewItems(ctx, viewport, previewItems = [], hover, currentV
     if (!rect) return
 
     drawRectLocal(ctx, viewport, rect, {
-      fill: getPanelFillColor(panel),
-      stroke: getPanelLineColor(),
+      fill: panel.color || 'rgba(135, 206, 255, 0.8)',
+      stroke: '#3a8fbd',
       lineWidth: 2
     })
   })

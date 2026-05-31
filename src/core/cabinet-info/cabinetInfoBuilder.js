@@ -239,7 +239,11 @@ function getBackBuildMeta(info, body) {
     hasLeftSide: normalizeBoolean(info?.general?.leftSide),
     hasRightSide: normalizeBoolean(info?.general?.rightSide),
     hasTop: normalizeBoolean(info?.general?.top),
-    hasBottom: normalizeBoolean(info?.general?.bottom)
+    hasBottom: normalizeBoolean(info?.general?.bottom),
+    topStripEnabled: normalizeBoolean(info?.topStrip?.enabled),
+    topStripSize: normalizeBoolean(info?.topStrip?.enabled) ? toNonNegativeNumber(info.topStrip.size, 0) : 0,
+    toeKickEnabled: normalizeBoolean(info?.toeKick?.enabled),
+    toeKickHeight: normalizeBoolean(info?.toeKick?.enabled) ? toNonNegativeNumber(info.toeKick.height, 0) : 0
   }
 } // End getBackBuildMeta
 
@@ -271,8 +275,10 @@ function getBackGeometry(body, meta) {
   const bottomCoverBack = normalizeBoolean(meta.bottomCoverBack)
   const leftInset = hasLeftSide ? t : 0
   const rightInset = hasRightSide ? t : 0
-  const bottomInset = hasBottom && !bottomCoverBack ? t : 0
-  const topInset = hasTop && !topCoverBack ? t : 0
+  const toeKickHeight = normalizeBoolean(meta.toeKickEnabled) ? toNonNegativeNumber(meta.toeKickHeight, 0) : 0
+  const topStripSize = normalizeBoolean(meta.topStripEnabled) ? toNonNegativeNumber(meta.topStripSize, 0) : 0
+  const bottomInset = hasBottom && !bottomCoverBack ? toeKickHeight + t : 0
+  const topInset = hasTop && !topCoverBack ? topStripSize + t : 0
   const x = body.x + leftInset - (hasLeftSide ? grooveDepth : 0)
   const width = Math.max(
     1,
@@ -455,6 +461,38 @@ function buildTopStripPanels(sourceBox, info, body, panels) {
   }))
 } // End buildTopStripPanels
 
+
+//=================
+function getCabinetInnerZone(info, body) {
+  const t = body.thickness
+  const hasLeftSide = normalizeBoolean(info?.general?.leftSide)
+  const hasRightSide = normalizeBoolean(info?.general?.rightSide)
+  const hasTop = normalizeBoolean(info?.general?.top)
+  const hasBottom = normalizeBoolean(info?.general?.bottom)
+  const topStripSize = normalizeBoolean(info?.topStrip?.enabled) ? toNonNegativeNumber(info.topStrip.size, 0) : 0
+  const toeKickHeight = normalizeBoolean(info?.toeKick?.enabled) ? toNonNegativeNumber(info.toeKick.height, 0) : 0
+  const leftInset = hasLeftSide ? t : 0
+  const rightInset = hasRightSide ? t : 0
+  const bottomPanelZ = body.z + toeKickHeight
+  const bottomInset = hasBottom ? toeKickHeight + t : toeKickHeight
+  const topInset = hasTop ? topStripSize + t : topStripSize
+  const x = body.x + leftInset
+  const z = body.z + bottomInset
+  const width = Math.max(1, body.width - leftInset - rightInset)
+  const height = Math.max(1, body.height - bottomInset - topInset)
+
+  return {
+    x,
+    y: body.y,
+    z,
+    width,
+    depth: getBackStopDepth(info, body),
+    height,
+    topZ: body.z + body.height - topStripSize,
+    bottomPanelZ
+  }
+} // End getCabinetInnerZone
+
 //=================
 function getHandleRailTopZ(info, body, size) {
   const t = body.thickness
@@ -582,14 +620,15 @@ function buildDoorStopPanels(sourceBox, info, body, panels) {
   const horizontal = normalizeBoolean(info.doorStop.horizontal)
   const faceOffset = toNumber(info.doorStop.faceOffset, 0)
   const formula = String(info.doorStop.formula || '').trim()
+  const zone = getCabinetInnerZone(info, body)
   const y = body.y + faceOffset
-  const x = body.x + t
-  const width = Math.max(1, body.width - (2 * t))
-  const clearHeight = Math.max(1, body.height - (2 * t))
+  const x = zone.x
+  const width = zone.width
+  const clearHeight = zone.height
   const offsets = parseDivisionFormula(formula, clearHeight, t)
 
   offsets.forEach((offset, index) => {
-    const z = body.z + t + offset
+    const z = zone.z + offset
 
     pushPanel(panels, createPanel(sourceBox, 'door_stop', `Thanh chặn cánh ${index + 1}`, x, y, z, width, horizontal ? size : t, horizontal ? t : size, {
       panelThickness: t,
@@ -601,7 +640,18 @@ function buildDoorStopPanels(sourceBox, info, body, panels) {
         size,
         horizontal,
         faceOffset,
-        formula
+        formula,
+        hasLeftSide: normalizeBoolean(info?.general?.leftSide),
+        hasRightSide: normalizeBoolean(info?.general?.rightSide),
+        hasTop: normalizeBoolean(info?.general?.top),
+        hasBottom: normalizeBoolean(info?.general?.bottom),
+        topStripEnabled: normalizeBoolean(info?.topStrip?.enabled),
+        topStripSize: normalizeBoolean(info?.topStrip?.enabled) ? toNonNegativeNumber(info.topStrip.size, 0) : 0,
+        toeKickEnabled: normalizeBoolean(info?.toeKick?.enabled),
+        toeKickHeight: normalizeBoolean(info?.toeKick?.enabled) ? toNonNegativeNumber(info.toeKick.height, 0) : 0,
+        hasBack: normalizeBoolean(info?.back?.enabled),
+        backThickness: normalizeBoolean(info?.back?.enabled) ? toPositiveNumber(info.back.thickness, Math.max(1, body.thickness / 3)) : 0,
+        backInset: normalizeBoolean(info?.back?.enabled) ? toNonNegativeNumber(info.back.inset, 0) : 0
       }
     }))
   })
@@ -651,6 +701,8 @@ function createToeKickMeta(info, body, type, index, count) {
     detached: normalizeBoolean(info?.toeKick?.detached),
     rear: normalizeBoolean(info?.toeKick?.rear),
     middleCount: getToeKickMiddleCount(info?.toeKick?.middleCount),
+    hasLeftSide: normalizeBoolean(info?.general?.leftSide),
+    hasRightSide: normalizeBoolean(info?.general?.rightSide),
     hasBack: normalizeBoolean(info?.back?.enabled),
     backThickness: normalizeBoolean(info?.back?.enabled) ? toPositiveNumber(info.back.thickness, Math.max(1, body.thickness / 3)) : 0,
     backInset: normalizeBoolean(info?.back?.enabled) ? toNonNegativeNumber(info.back.inset, 0) : 0
@@ -667,8 +719,9 @@ function buildToeKickPanels(sourceBox, info, body, panels) {
   const detached = normalizeBoolean(info.toeKick.detached)
   const rearEnabled = normalizeBoolean(info.toeKick.rear)
   const middleCount = getToeKickMiddleCount(info.toeKick.middleCount)
-  const x = detached ? body.x : body.x + t
-  const width = detached ? body.width : Math.max(1, body.width - (2 * t))
+  const zone = getCabinetInnerZone(info, body)
+  const x = detached ? body.x : zone.x
+  const width = detached ? body.width : zone.width
   const bottomZ = body.z
   const frontRailY = body.y + faceOffset
   const backLimitY = getToeKickBackLimitY(info, body)
