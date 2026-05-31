@@ -891,11 +891,13 @@ function drawPanelEditRectangle(targetContext, context, layout, rectangle, optio
   targetContext.save()
   const isCutout = rectangle.operation === 'cutout'
   if (isCutout && !isDraft) {
+    targetContext.fillStyle = getCssVariable('--mn-bg-canvas', '#f4f4f4')
     targetContext.strokeStyle = '#111111'
     targetContext.lineWidth = 1.8
     targetContext.setLineDash([])
     targetContext.beginPath()
     targetContext.rect(start.x, start.y, rectWidth, rectHeight)
+    targetContext.fill()
     targetContext.stroke()
     targetContext.restore()
     return
@@ -2175,15 +2177,24 @@ function getSelectedIdsByDragRect(selectRect) {
     ? rectTouchesRect
     : rectContainsRect
 
-  const panelIds = getVisiblePanels()
-    .filter((panel) => {
+  const panelHits = getVisiblePanels()
+    .map((panel) => {
       const rect = getPanelSelectRect(panel)
 
-      if (!rect || rect.width <= 0 || rect.height <= 0) return false
+      if (!rect || rect.width <= 0 || rect.height <= 0) return null
+      if (!checkRect(selectRect, rect)) return null
 
-      return checkRect(selectRect, rect)
+      return {
+        panel,
+        rect,
+        isBackPanel: panel.panelSide === 'back' || panel.cabinetInfoKind === 'back'
+      }
     })
-    .map((panel) => panel.id)
+    .filter(Boolean)
+  const hasNonBackPanelHit = panelHits.some((hit) => !hit.isBackPanel)
+  const panelIds = panelHits
+    .filter((hit) => !(hasNonBackPanelHit && hit.isBackPanel))
+    .map((hit) => hit.panel.id)
 
   const dimensionIds = drawing.getRenderableDimensions(app.state.currentView)
     .filter((dimension) => {
