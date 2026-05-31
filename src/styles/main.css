@@ -1326,3 +1326,25 @@ img { display: block; max-width: 100%; }
     font-size: 12px;
   }
 }
+
+:root[data-mn-mode="light"] .mn-left-toolbar,
+:root[data-mn-mode="light"] .mn-tool-btn,
+:root[data-mn-mode="light"] .mn-panel-edit-tool-btn {
+  background: #ffffff;
+}
+
+:root[data-mn-mode="dark"] .mn-left-toolbar,
+:root[data-mn-mode="dark"] .mn-tool-btn,
+:root[data-mn-mode="dark"] .mn-panel-edit-tool-btn {
+  background: #000000;
+}
+
+:root[data-mn-mode="light"] .mn-tool-icon,
+:root[data-mn-mode="light"] .mn-panel-edit-tool-icon {
+  filter: brightness(0) saturate(100%);
+}
+
+:root[data-mn-mode="dark"] .mn-tool-icon,
+:root[data-mn-mode="dark"] .mn-panel-edit-tool-icon {
+  filter: brightness(0) invert(1);
+}

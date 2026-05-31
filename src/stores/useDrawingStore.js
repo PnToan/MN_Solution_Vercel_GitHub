@@ -10,6 +10,7 @@ import {
   splitZoneByCount
 } from '../core/panel/panel-engine'
 import { getCameraConfig, projectBoxToCameraRect } from '../core/view/view-camera'
+import { buildPanelEditContext } from '../core/tools/editPanelTool'
 import {
   cancelMove,
   commitMoveToTarget,
@@ -1255,6 +1256,12 @@ const store = createSimpleStore({
   selectedPanelId: null,
   selectedPanelIds: [],
   selectedDimensionIds: [],
+  panelEdit: {
+    active: false,
+    selectedPanelId: null,
+    context: null,
+    shapeTool: null
+  },
   panelInputBuffer: '',
   move: createMoveState(),
   dimensions: [],
@@ -2038,6 +2045,59 @@ const store = createSimpleStore({
       || selectedPanel.cabinetBoxId
       || null
   }, // End getSelectedPanelBoxId
+  //=================
+  startPanelEdit(panelId = null, shapeTool = null) {
+    const targetPanelId = panelId || state.selectedPanelId || state.selectedPanelIds?.[0] || null
+
+    if (!targetPanelId) return null
+
+    const panel = state.panels.find((item) => item.id === targetPanelId) || null
+    const context = buildPanelEditContext(panel)
+
+    if (!context) return null
+
+    state.selectedPanelId = targetPanelId
+    state.selectedPanelIds = [targetPanelId]
+    state.panelEdit = {
+      active: true,
+      selectedPanelId: targetPanelId,
+      context,
+      shapeTool: shapeTool || state.panelEdit?.shapeTool || null
+    }
+
+    return context
+  }, // End startPanelEdit
+
+  //=================
+  setPanelEditShapeTool(shapeTool) {
+    if (!state.panelEdit?.active) {
+      const context = this.startPanelEdit(null, shapeTool)
+
+      return context
+    }
+
+    state.panelEdit = {
+      ...state.panelEdit,
+      shapeTool
+    }
+
+    return state.panelEdit.context
+  }, // End setPanelEditShapeTool
+
+  //=================
+  clearPanelEdit() {
+    state.panelEdit = {
+      active: false,
+      selectedPanelId: null,
+      context: null,
+      shapeTool: null
+    }
+  }, // End clearPanelEdit
+
+  //=================
+  getPanelEditContext() {
+    return state.panelEdit?.context || null
+  }, // End getPanelEditContext
   selectDimensions(dimensionIds) {
     state.selectedDimensionIds = Array.isArray(dimensionIds) ? dimensionIds.filter(Boolean) : []
   }, // End selectDimensions
