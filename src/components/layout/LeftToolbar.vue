@@ -55,7 +55,6 @@ function selectTool(toolId) {
       return
     }
 
-    app.setView(context.viewKey)
     app.setStatus(`Edit Panel: ${context.panelName} | ${context.faceLabel} | ${context.rearLabel}`)
     return
   }

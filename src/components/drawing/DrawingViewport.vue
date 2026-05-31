@@ -341,28 +341,38 @@ function getPanelEditLayout(context, canvasWidth, canvasHeight) {
 //=================
 function drawPanelEditRearEdge(targetContext, context, layout) {
   const rearColor = '#ff0000'
+  const rearOffset = 100 * layout.scale
   const labelOffset = 18
   const tickSize = 8
   let start = null
   let end = null
   let label = null
+  let tickDirection = 'horizontal'
 
   if (context.rearEdge === 'left') {
-    start = { x: layout.left, y: layout.top }
-    end = { x: layout.left, y: layout.bottom }
-    label = { x: layout.left - labelOffset, y: layout.top + layout.faceHeight / 2, rotate: -Math.PI / 2 }
+    const x = layout.left - rearOffset
+    start = { x, y: layout.top }
+    end = { x, y: layout.bottom }
+    label = { x: x - labelOffset, y: layout.top + layout.faceHeight / 2, rotate: -Math.PI / 2 }
+    tickDirection = 'horizontal'
   } else if (context.rearEdge === 'right') {
-    start = { x: layout.right, y: layout.top }
-    end = { x: layout.right, y: layout.bottom }
-    label = { x: layout.right + labelOffset, y: layout.top + layout.faceHeight / 2, rotate: Math.PI / 2 }
+    const x = layout.right + rearOffset
+    start = { x, y: layout.top }
+    end = { x, y: layout.bottom }
+    label = { x: x + labelOffset, y: layout.top + layout.faceHeight / 2, rotate: Math.PI / 2 }
+    tickDirection = 'horizontal'
   } else if (context.rearEdge === 'top') {
-    start = { x: layout.left, y: layout.top }
-    end = { x: layout.right, y: layout.top }
-    label = { x: layout.left + layout.faceWidth / 2, y: layout.top - labelOffset, rotate: 0 }
+    const y = layout.top - rearOffset
+    start = { x: layout.left, y }
+    end = { x: layout.right, y }
+    label = { x: layout.left + layout.faceWidth / 2, y: y - labelOffset, rotate: 0 }
+    tickDirection = 'vertical'
   } else {
-    start = { x: layout.left, y: layout.bottom }
-    end = { x: layout.right, y: layout.bottom }
-    label = { x: layout.left + layout.faceWidth / 2, y: layout.bottom + labelOffset, rotate: 0 }
+    const y = layout.bottom + rearOffset
+    start = { x: layout.left, y }
+    end = { x: layout.right, y }
+    label = { x: layout.left + layout.faceWidth / 2, y: y + labelOffset, rotate: 0 }
+    tickDirection = 'vertical'
   }
 
   targetContext.save()
@@ -376,10 +386,17 @@ function drawPanelEditRearEdge(targetContext, context, layout) {
 
   targetContext.lineWidth = 1.5
   targetContext.beginPath()
-  targetContext.moveTo(start.x - tickSize, start.y)
-  targetContext.lineTo(start.x + tickSize, start.y)
-  targetContext.moveTo(end.x - tickSize, end.y)
-  targetContext.lineTo(end.x + tickSize, end.y)
+  if (tickDirection === 'horizontal') {
+    targetContext.moveTo(start.x - tickSize, start.y)
+    targetContext.lineTo(start.x + tickSize, start.y)
+    targetContext.moveTo(end.x - tickSize, end.y)
+    targetContext.lineTo(end.x + tickSize, end.y)
+  } else {
+    targetContext.moveTo(start.x, start.y - tickSize)
+    targetContext.lineTo(start.x, start.y + tickSize)
+    targetContext.moveTo(end.x, end.y - tickSize)
+    targetContext.lineTo(end.x, end.y + tickSize)
+  }
   targetContext.stroke()
 
   targetContext.translate(label.x, label.y)
@@ -405,8 +422,6 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
   const panelColor = getCssVariable('--mn-panel-color', '#87ceff')
   const borderColor = getCssVariable('--mn-panel-selected-line-color', '#008cff')
   const dimColor = '#111111'
-  const originColor = '#ff0000'
-  const extensionColor = getCssVariable('--mn-border-main', '#d7dbe0')
   const dimOffset = 28
   const tickSize = 7
   const layout = getPanelEditLayout(context, canvasWidth, canvasHeight)
@@ -416,8 +431,6 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
   const bottom = layout.bottom
   const dimTopY = top - dimOffset
   const dimLeftX = left - dimOffset
-  const originX = left - 54
-  const originY = bottom + 28
 
   targetContext.clearRect(0, 0, canvasWidth, canvasHeight)
   targetContext.fillStyle = backgroundColor
@@ -435,20 +448,6 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
 
   drawPanelEditRearEdge(targetContext, context, layout)
 
-  targetContext.strokeStyle = extensionColor
-  targetContext.lineWidth = 1
-  targetContext.setLineDash([4, 4])
-  targetContext.beginPath()
-  targetContext.moveTo(left, bottom)
-  targetContext.lineTo(originX, originY)
-  targetContext.stroke()
-  targetContext.setLineDash([])
-
-  targetContext.fillStyle = originColor
-  targetContext.font = '12px Arial, Helvetica, sans-serif'
-  targetContext.textAlign = 'left'
-  targetContext.textBaseline = 'middle'
-  targetContext.fillText(context.rearLabel || 'Cạnh Sau', originX, originY)
 
   targetContext.strokeStyle = dimColor
   targetContext.fillStyle = dimColor
@@ -482,10 +481,6 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
   targetContext.textBaseline = 'bottom'
   targetContext.fillText(`${Math.round(context.height)} mm`, 0, 0)
   targetContext.restore()
-
-  targetContext.textAlign = 'center'
-  targetContext.textBaseline = 'top'
-  targetContext.fillText(`${Math.round(context.width)} x ${Math.round(context.height)} mm`, left + layout.faceWidth / 2, bottom + 14)
 } // End drawPanelEditCanvas
 //=================
 function selectPanelEditWindowTool(toolId) {
@@ -497,7 +492,6 @@ function selectPanelEditWindowTool(toolId) {
   }
 
   app.setTool(toolId)
-  app.setView(context.viewKey)
   app.setStatus(`${toolId.replace('editPanel', '')}: ${context.panelName} | ${context.faceLabel} | ${context.rearLabel}`)
   nextTick(resizePanelEditCanvas)
 } // End selectPanelEditWindowTool
@@ -513,7 +507,6 @@ function selectPanelEditFace(faceSide) {
     panX: 0,
     panY: 0
   }
-  app.setView(context.viewKey)
   app.setStatus(`Edit Panel: ${context.panelName} | ${context.faceLabel} | ${context.rearLabel}`)
   nextTick(resizePanelEditCanvas)
 } // End selectPanelEditFace
@@ -1864,7 +1857,6 @@ function onPointerDown(event) {
       return
     }
 
-    app.setView(context.viewKey)
     app.setStatus(`Edit Panel: ${context.panelName} | ${context.faceLabel} | ${context.rearLabel}`)
     draw()
     return
