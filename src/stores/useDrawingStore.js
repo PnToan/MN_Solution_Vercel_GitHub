@@ -75,17 +75,37 @@ function getPanelResizeOrder(panel) {
 
 
 //=================
-function getCabinetInfoSideZoneForBox(newBox, meta, thickness) {
+function getCabinetInfoBodyRectForBox(newBox, meta, thickness) {
   const boxX = toNumber(newBox?.x, 0)
+  const boxY = toNumber(newBox?.y, 0)
+  const boxZ = toNumber(newBox?.z, 0)
   const boxWidth = Math.max(1, toNumber(newBox?.width, 1))
+  const leftFiller = Math.max(0, toNumber(meta?.bodyLeftFiller, 0))
+  const rightFiller = Math.max(0, toNumber(meta?.bodyRightFiller, 0))
+
+  return {
+    x: boxX + leftFiller,
+    y: boxY,
+    z: boxZ,
+    width: Math.max(thickness * 2, boxWidth - leftFiller - rightFiller),
+    depth: Math.max(1, toNumber(newBox?.depth, 1)),
+    height: Math.max(1, toNumber(newBox?.height, 1)),
+    leftFiller,
+    rightFiller
+  }
+} // End getCabinetInfoBodyRectForBox
+
+//=================
+function getCabinetInfoSideZoneForBox(newBox, meta, thickness) {
+  const body = getCabinetInfoBodyRectForBox(newBox, meta, thickness)
   const hasLeftSide = meta.hasLeftSide !== false
   const hasRightSide = meta.hasRightSide !== false
   const leftInset = hasLeftSide ? thickness : 0
   const rightInset = hasRightSide ? thickness : 0
 
   return {
-    x: boxX + leftInset,
-    width: Math.max(1, boxWidth - leftInset - rightInset)
+    x: body.x + leftInset,
+    width: Math.max(1, body.width - leftInset - rightInset)
   }
 } // End getCabinetInfoSideZoneForBox
 
@@ -127,14 +147,7 @@ function getCabinetInfoBackGeometryForBox(sourceBox, panel) {
   const backThickness = Math.max(1, toNumber(meta.backThickness, toNumber(panel?.panelThickness ?? panel?.ySize, 5)))
   const grooveDepth = Math.max(0, toNumber(meta.grooveDepth, 0))
   const inset = Math.max(0, toNumber(meta.inset, 0))
-  const body = {
-    x: toNumber(sourceBox?.x, 0),
-    y: toNumber(sourceBox?.y, 0),
-    z: toNumber(sourceBox?.z, 0),
-    width: Math.max(1, toNumber(sourceBox?.width, 1)),
-    depth: Math.max(1, toNumber(sourceBox?.depth, 1)),
-    height: Math.max(1, toNumber(sourceBox?.height, 1))
-  }
+  const body = getCabinetInfoBodyRectForBox(sourceBox, meta, bodyThickness)
   const y = body.y + body.depth - inset - backThickness
 
   if (meta.overlayBack === true) {
@@ -319,6 +332,113 @@ function updateCabinetInfoFramePanelDepthAfterBoxResize(panel, newBox) {
     depth: nextDepth
   }
 } // End updateCabinetInfoFramePanelDepthAfterBoxResize
+
+//=================
+function updateCabinetInfoFramePanelAfterBoxResize(oldPanel, newBox) {
+  const meta = oldPanel?.cabinetInfoFrame || {}
+  const t = Math.max(1, toNumber(meta.bodyThickness, toNumber(oldPanel?.panelThickness ?? oldPanel?.thickness, 18)))
+  const body = getCabinetInfoBodyRectForBox(newBox, meta, t)
+  const side = String(oldPanel.panelSide || oldPanel.edge || '').trim()
+  const hasLeftSide = meta.hasLeftSide === true
+  const hasRightSide = meta.hasRightSide === true
+  const hasTop = meta.hasTop === true
+  const hasBottom = meta.hasBottom === true
+  const topOverlap = meta.topOverlap === true
+  const bottomOverlap = meta.bottomOverlap === true
+  const topStripEnabled = meta.topStripEnabled === true
+  const topStripInset = meta.topStripInset === true
+  const topStripSize = topStripEnabled ? Math.max(0, toNumber(meta.topStripSize, 0)) : 0
+  const toeKickEnabled = meta.toeKickEnabled === true
+  const toeKickHeight = toeKickEnabled ? Math.max(0, toNumber(meta.toeKickHeight, 0)) : 0
+  const detachedToe = meta.detachedToe === true
+  const overlayBack = meta.overlayBack === true
+  const topCoverBack = meta.topCoverBack === true
+  const bottomCoverBack = meta.bottomCoverBack === true
+  const backThickness = Math.max(0, toNumber(meta.backThickness, 0))
+  const backInset = Math.max(0, toNumber(meta.backInset, 0))
+  const backStopDepth = Math.max(1, body.depth - backThickness - backInset)
+  const topShift = topStripSize
+  const bodyTop = body.z + body.height - topShift
+  const sideFrameTop = topStripEnabled && topStripInset && !topOverlap ? body.z + body.height : bodyTop
+  const bottomZ = body.z + toeKickHeight
+  const sideBottom = hasBottom && bottomOverlap ? bottomZ + t : bottomZ
+  const sideTop = hasTop && topOverlap ? sideFrameTop - t : sideFrameTop
+  const sideZ = toeKickEnabled && !detachedToe ? body.z : (detachedToe ? body.z + toeKickHeight : sideBottom)
+  const sideHeight = Math.max(t, sideTop - sideZ)
+  const topLeftInset = !topOverlap && hasLeftSide ? t : 0
+  const topRightInset = !topOverlap && hasRightSide ? t : 0
+  const bottomLeftInset = !bottomOverlap && hasLeftSide ? t : 0
+  const bottomRightInset = !bottomOverlap && hasRightSide ? t : 0
+  const topX = body.x + topLeftInset
+  const topWidth = Math.max(t, body.width - topLeftInset - topRightInset)
+  const bottomX = body.x + bottomLeftInset
+  const bottomWidth = Math.max(t, body.width - bottomLeftInset - bottomRightInset)
+  const sideDepth = overlayBack ? backStopDepth : body.depth
+  const topDepth = (overlayBack || topCoverBack) ? backStopDepth : body.depth
+  const bottomDepth = (overlayBack || bottomCoverBack) ? backStopDepth : body.depth
+  let nextX = oldPanel.x3d
+  let nextY = body.y
+  let nextZ = oldPanel.z3d
+  let nextWidth = oldPanel.xSize
+  let nextDepth = oldPanel.ySize
+  let nextHeight = oldPanel.zSize
+
+  if (side === 'left') {
+    nextX = body.x
+    nextZ = sideZ
+    nextWidth = t
+    nextDepth = sideDepth
+    nextHeight = sideHeight
+  } else if (side === 'right') {
+    nextX = body.x + body.width - t
+    nextZ = sideZ
+    nextWidth = t
+    nextDepth = sideDepth
+    nextHeight = sideHeight
+  } else if (side === 'top') {
+    nextX = topX
+    nextZ = bodyTop - t
+    nextWidth = topWidth
+    nextDepth = topDepth
+    nextHeight = t
+  } else if (side === 'bottom') {
+    nextX = bottomX
+    nextZ = bottomZ
+    nextWidth = bottomWidth
+    nextDepth = bottomDepth
+    nextHeight = t
+  } else {
+    return oldPanel
+  }
+
+  return {
+    ...oldPanel,
+    x3d: nextX,
+    y3d: nextY,
+    z3d: nextZ,
+    xSize: nextWidth,
+    ySize: nextDepth,
+    zSize: nextHeight,
+    x: nextX,
+    y: nextZ,
+    z: nextZ,
+    width: nextWidth,
+    depth: nextDepth,
+    height: nextHeight,
+    linkedFrameId: newBox.id,
+    frameId: newBox.id,
+    sourceBoxId: newBox.id,
+    baseObjectId: newBox.id,
+    panelThickness: t,
+    thickness: t,
+    cabinetInfoFrame: {
+      ...meta,
+      bodyThickness: t,
+      topStripSize,
+      toeKickHeight
+    }
+  }
+} // End updateCabinetInfoFramePanelAfterBoxResize
 
 //=================
 function updateCabinetInfoTopStripPanelAfterBoxResize(oldPanel, newBox) {
@@ -626,12 +746,13 @@ function parseCabinetInfoDoorStopDivisionFormula(formula, totalSize, thickness) 
 
 //=================
 function getCabinetInfoInnerZoneForBox(newBox, meta, thickness) {
-  const boxX = toNumber(newBox?.x, 0)
-  const boxY = toNumber(newBox?.y, 0)
-  const boxZ = toNumber(newBox?.z, 0)
-  const boxWidth = Math.max(1, toNumber(newBox?.width, 1))
-  const boxDepth = Math.max(1, toNumber(newBox?.depth, 1))
-  const boxHeight = Math.max(1, toNumber(newBox?.height, 1))
+  const body = getCabinetInfoBodyRectForBox(newBox, meta, thickness)
+  const boxX = body.x
+  const boxY = body.y
+  const boxZ = body.z
+  const boxWidth = body.width
+  const boxDepth = body.depth
+  const boxHeight = body.height
   const hasLeftSide = meta.hasLeftSide === true
   const hasRightSide = meta.hasRightSide === true
   const hasTop = meta.hasTop === true
@@ -1544,6 +1665,16 @@ const store = createSimpleStore({
     panelsInBox.forEach((oldPanel) => {
       if (oldPanel.sourceType === 'cabinet-info' && oldPanel.panelSide === 'back') {
         nextPanelsInBox.push(updateCabinetInfoBackPanelAfterBoxResize(oldPanel, oldBox, newBox))
+        return
+      }
+
+      if (oldPanel.sourceType === 'cabinet-info' && (
+        oldPanel.panelSide === 'left'
+        || oldPanel.panelSide === 'right'
+        || oldPanel.panelSide === 'top'
+        || oldPanel.panelSide === 'bottom'
+      )) {
+        nextPanelsInBox.push(updateCabinetInfoFramePanelAfterBoxResize(oldPanel, newBox))
         return
       }
 

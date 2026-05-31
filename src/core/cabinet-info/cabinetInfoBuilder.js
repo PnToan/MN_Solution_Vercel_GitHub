@@ -87,7 +87,9 @@ function getBodyRect(sourceBox, info) {
     width,
     depth: toPositiveNumber(info?.general?.cabinetDepth, toPositiveNumber(sourceBox.depth, 1)),
     height: toPositiveNumber(sourceBox.height, 1),
-    thickness
+    thickness,
+    leftFiller,
+    rightFiller
   }
 } // End getBodyRect
 
@@ -258,7 +260,9 @@ function getBackBuildMeta(info, body) {
     topStripEnabled: normalizeBoolean(info?.topStrip?.enabled),
     topStripSize: normalizeBoolean(info?.topStrip?.enabled) ? toNonNegativeNumber(info.topStrip.size, 0) : 0,
     toeKickEnabled: normalizeBoolean(info?.toeKick?.enabled),
-    toeKickHeight: normalizeBoolean(info?.toeKick?.enabled) ? toNonNegativeNumber(info.toeKick.height, 0) : 0
+    toeKickHeight: normalizeBoolean(info?.toeKick?.enabled) ? toNonNegativeNumber(info.toeKick.height, 0) : 0,
+    bodyLeftFiller: toNonNegativeNumber(body.leftFiller, 0),
+    bodyRightFiller: toNonNegativeNumber(body.rightFiller, 0)
   }
 } // End getBackBuildMeta
 
@@ -368,7 +372,19 @@ function buildFramePanels(sourceBox, info, body, panels) {
     backThickness: backEnabled ? toPositiveNumber(info.back.thickness, Math.max(1, t / 3)) : 0,
     backInset: backEnabled ? toNonNegativeNumber(info.back.inset, 0) : 0,
     topStripEnabled,
-    topStripSize: topShift
+    topStripSize: topShift,
+    toeKickEnabled: normalizeBoolean(info?.toeKick?.enabled),
+    toeKickHeight: toeHeight,
+    detachedToe,
+    hasLeftSide,
+    hasRightSide,
+    hasTop,
+    hasBottom,
+    topOverlap: normalizeBoolean(info?.general?.topOverlap),
+    bottomOverlap: normalizeBoolean(info?.general?.bottomOverlap),
+    topStripInset,
+    bodyLeftFiller: toNonNegativeNumber(body.leftFiller, 0),
+    bodyRightFiller: toNonNegativeNumber(body.rightFiller, 0)
   }
 
   if (hasLeftSide) {
@@ -473,7 +489,9 @@ function buildTopStripPanels(sourceBox, info, body, panels) {
       topOverlap,
       bodyThickness: t,
       hasLeftSide: normalizeBoolean(info?.general?.leftSide),
-      hasRightSide: normalizeBoolean(info?.general?.rightSide)
+      hasRightSide: normalizeBoolean(info?.general?.rightSide),
+      bodyLeftFiller: toNonNegativeNumber(body.leftFiller, 0),
+      bodyRightFiller: toNonNegativeNumber(body.rightFiller, 0)
     }
   }))
 } // End buildTopStripPanels
@@ -574,7 +592,9 @@ function createHandleRailMeta(info, body, type, index, count) {
     hasRightSide: normalizeBoolean(info?.general?.rightSide),
     hasBack: normalizeBoolean(info?.back?.enabled),
     backThickness: normalizeBoolean(info?.back?.enabled) ? toPositiveNumber(info.back.thickness, Math.max(1, body.thickness / 3)) : 0,
-    backInset: normalizeBoolean(info?.back?.enabled) ? toNonNegativeNumber(info.back.inset, 0) : 0
+    backInset: normalizeBoolean(info?.back?.enabled) ? toNonNegativeNumber(info.back.inset, 0) : 0,
+    bodyLeftFiller: toNonNegativeNumber(body.leftFiller, 0),
+    bodyRightFiller: toNonNegativeNumber(body.rightFiller, 0)
   }
 } // End createHandleRailMeta
 
@@ -671,7 +691,9 @@ function buildDoorStopPanels(sourceBox, info, body, panels) {
         toeKickHeight: normalizeBoolean(info?.toeKick?.enabled) ? toNonNegativeNumber(info.toeKick.height, 0) : 0,
         hasBack: normalizeBoolean(info?.back?.enabled),
         backThickness: normalizeBoolean(info?.back?.enabled) ? toPositiveNumber(info.back.thickness, Math.max(1, body.thickness / 3)) : 0,
-        backInset: normalizeBoolean(info?.back?.enabled) ? toNonNegativeNumber(info.back.inset, 0) : 0
+        backInset: normalizeBoolean(info?.back?.enabled) ? toNonNegativeNumber(info.back.inset, 0) : 0,
+        bodyLeftFiller: toNonNegativeNumber(body.leftFiller, 0),
+        bodyRightFiller: toNonNegativeNumber(body.rightFiller, 0)
       }
     }))
   })
@@ -725,7 +747,9 @@ function createToeKickMeta(info, body, type, index, count) {
     hasRightSide: normalizeBoolean(info?.general?.rightSide),
     hasBack: normalizeBoolean(info?.back?.enabled),
     backThickness: normalizeBoolean(info?.back?.enabled) ? toPositiveNumber(info.back.thickness, Math.max(1, body.thickness / 3)) : 0,
-    backInset: normalizeBoolean(info?.back?.enabled) ? toNonNegativeNumber(info.back.inset, 0) : 0
+    backInset: normalizeBoolean(info?.back?.enabled) ? toNonNegativeNumber(info.back.inset, 0) : 0,
+    bodyLeftFiller: toNonNegativeNumber(body.leftFiller, 0),
+    bodyRightFiller: toNonNegativeNumber(body.rightFiller, 0)
   }
 } // End createToeKickMeta
 
