@@ -65,6 +65,139 @@ function getPanelFrameId(panel) {
   return panel?.linkedFrameId || panel?.frameId || panel?.sourceBoxId || panel?.baseObjectId || null
 } // End getPanelFrameId
 
+
+//=================
+function getCabinetInfoBackGeometryForBox(sourceBox, panel) {
+  const meta = panel?.cabinetInfoBack || {}
+  const bodyThickness = toNumber(meta.bodyThickness, toNumber(sourceBox?.panelThickness, 18))
+  const backThickness = Math.max(1, toNumber(meta.backThickness, toNumber(panel?.panelThickness ?? panel?.ySize, 5)))
+  const grooveDepth = Math.max(0, toNumber(meta.grooveDepth, 0))
+  const inset = Math.max(0, toNumber(meta.inset, 0))
+  const body = {
+    x: toNumber(sourceBox?.x, 0),
+    y: toNumber(sourceBox?.y, 0),
+    z: toNumber(sourceBox?.z, 0),
+    width: Math.max(1, toNumber(sourceBox?.width, 1)),
+    depth: Math.max(1, toNumber(sourceBox?.depth, 1)),
+    height: Math.max(1, toNumber(sourceBox?.height, 1))
+  }
+  const y = body.y + body.depth - inset - backThickness
+
+  if (meta.overlayBack === true) {
+    return {
+      x: body.x,
+      y,
+      z: body.z,
+      width: body.width,
+      depth: backThickness,
+      height: body.height
+    }
+  }
+
+  const hasLeftSide = meta.hasLeftSide === true
+  const hasRightSide = meta.hasRightSide === true
+  const hasTop = meta.hasTop === true
+  const hasBottom = meta.hasBottom === true
+  const topCoverBack = meta.topCoverBack === true
+  const bottomCoverBack = meta.bottomCoverBack === true
+  const leftInset = hasLeftSide ? bodyThickness : 0
+  const rightInset = hasRightSide ? bodyThickness : 0
+  const bottomInset = hasBottom && !bottomCoverBack ? bodyThickness : 0
+  const topInset = hasTop && !topCoverBack ? bodyThickness : 0
+  const x = body.x + leftInset - (hasLeftSide ? grooveDepth : 0)
+  const width = Math.max(
+    1,
+    body.width
+      - leftInset
+      - rightInset
+      + (hasLeftSide ? grooveDepth : 0)
+      + (hasRightSide ? grooveDepth : 0)
+  )
+  const z = body.z + bottomInset - (hasBottom && !bottomCoverBack ? grooveDepth : 0)
+  const height = Math.max(
+    1,
+    body.height
+      - bottomInset
+      - topInset
+      + (hasBottom && !bottomCoverBack ? grooveDepth : 0)
+      + (hasTop && !topCoverBack ? grooveDepth : 0)
+  )
+
+  return {
+    x,
+    y,
+    z,
+    width,
+    depth: backThickness,
+    height
+  }
+} // End getCabinetInfoBackGeometryForBox
+
+//=================
+function updateCabinetInfoBackPanelAfterBoxResize(oldPanel, oldBox, newBox) {
+  const oldGeometry = getCabinetInfoBackGeometryForBox(oldBox, oldPanel)
+  const newGeometry = getCabinetInfoBackGeometryForBox(newBox, oldPanel)
+  const oldX = toNumber(oldPanel?.x3d ?? oldPanel?.x, oldGeometry.x)
+  const oldWidth = Math.max(1, toNumber(oldPanel?.xSize ?? oldPanel?.width, oldGeometry.width))
+  const startRatio = oldGeometry.width > 0 ? Math.max(0, Math.min(1, (oldX - oldGeometry.x) / oldGeometry.width)) : 0
+  const endRatio = oldGeometry.width > 0 ? Math.max(startRatio, Math.min(1, (oldX + oldWidth - oldGeometry.x) / oldGeometry.width)) : 1
+  const nextX = newGeometry.x + (startRatio * newGeometry.width)
+  const nextWidth = Math.max(1, (endRatio - startRatio) * newGeometry.width)
+
+  return {
+    ...oldPanel,
+    x3d: nextX,
+    y3d: newGeometry.y,
+    z3d: newGeometry.z,
+    xSize: nextWidth,
+    ySize: newGeometry.depth,
+    zSize: newGeometry.height,
+    x: nextX,
+    y: newGeometry.z,
+    z: newGeometry.z,
+    width: nextWidth,
+    depth: newGeometry.depth,
+    height: newGeometry.height,
+    linkedFrameId: newBox.id,
+    frameId: newBox.id,
+    sourceBoxId: newBox.id,
+    baseObjectId: newBox.id,
+    panelOffsetFrom: 'back',
+    panelOffset: toNumber(oldPanel?.panelOffset, 0),
+    panelThickness: newGeometry.depth,
+    thickness: newGeometry.depth
+  }
+} // End updateCabinetInfoBackPanelAfterBoxResize
+
+//=================
+function updateCabinetInfoFramePanelDepthAfterBoxResize(panel, newBox) {
+  const meta = panel?.cabinetInfoFrame
+
+  if (!meta) return panel
+
+  const side = panel.panelSide || panel.edge
+  const backThickness = Math.max(0, toNumber(meta.backThickness, 0))
+  const backInset = Math.max(0, toNumber(meta.backInset, 0))
+  const backStopDepth = Math.max(1, toNumber(newBox?.depth, 1) - backThickness - backInset)
+  let nextDepth = toNumber(newBox?.depth, panel.ySize ?? panel.depth ?? 1)
+
+  if (meta.overlayBack === true) {
+    nextDepth = backStopDepth
+  } else if (side === 'top' && meta.topCoverBack === true) {
+    nextDepth = backStopDepth
+  } else if (side === 'bottom' && meta.bottomCoverBack === true) {
+    nextDepth = backStopDepth
+  }
+
+  return {
+    ...panel,
+    y3d: toNumber(newBox?.y, panel.y3d ?? 0),
+    ySize: nextDepth,
+    depth: nextDepth
+  }
+} // End updateCabinetInfoFramePanelDepthAfterBoxResize
+
+
 //=================
 function getPanelAxisMin(panel, axis) {
   if (axis === 'x') return toNumber(panel.x3d ?? panel.x, 0)
@@ -835,6 +968,11 @@ const store = createSimpleStore({
     }
 
     panelsInBox.forEach((oldPanel) => {
+      if (oldPanel.sourceType === 'cabinet-info' && oldPanel.panelSide === 'back') {
+        nextPanelsInBox.push(updateCabinetInfoBackPanelAfterBoxResize(oldPanel, oldBox, newBox))
+        return
+      }
+
       const edge = getPanelEdge(oldPanel)
       if (!edge) return
 
@@ -904,7 +1042,7 @@ const store = createSimpleStore({
       const nextPanel = createPanelOnZoneEdge(targetZone, edge, thickness, offset)
       if (!nextPanel) return
 
-      nextPanelsInBox.push({
+      const resizedPanel = {
         ...oldPanel,
         ...nextPanel,
         id: oldPanel.id,
@@ -922,7 +1060,9 @@ const store = createSimpleStore({
         panelThickness: thickness,
         thickness,
         dimEnabled: oldPanel.dimEnabled ?? false
-      })
+      }
+
+      nextPanelsInBox.push(updateCabinetInfoFramePanelDepthAfterBoxResize(resizedPanel, newBox))
     })
 
     state.panels = [

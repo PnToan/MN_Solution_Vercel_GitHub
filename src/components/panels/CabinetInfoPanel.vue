@@ -41,6 +41,7 @@
       <InfoText label="Công thức chia" path="back.splitFormula" placeholder="/2 hoặc 400,300" />
       <InfoCheck label="Nóc trùm hậu" path="back.topCoverBack" />
       <InfoCheck label="Đáy trùm hậu" path="back.bottomCoverBack" />
+      <InfoCheck label="Hậu trùm" path="back.overlayBack" />
     </InfoSection>
 
     <InfoSection title="Thanh Chỉ Nóc" section-key="topStrip">

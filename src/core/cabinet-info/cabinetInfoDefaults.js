@@ -19,7 +19,8 @@ export function createDefaultCabinetInfoState() {
       inset: 10,
       splitFormula: '',
       topCoverBack: false,
-      bottomCoverBack: false
+      bottomCoverBack: false,
+      overlayBack: false
     },
     topStrip: {
       enabled: false,

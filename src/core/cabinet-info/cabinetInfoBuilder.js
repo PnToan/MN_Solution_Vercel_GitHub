@@ -114,6 +114,7 @@ function createPanel(sourceBox, kind, name, x3d, y3d, z3d, xSize, ySize, zSize, 
     panelSide: meta.panelSide || kind,
     panelOffsetFrom: meta.panelOffsetFrom || kind,
     panelOffset: meta.panelOffset || 0,
+    ...meta,
     dimEnabled: false,
     x3d: safeX,
     y3d: safeY,
@@ -176,11 +177,103 @@ function pushPanel(panels, panel) {
 } // End pushPanel
 
 //=================
+function getBackStopDepth(info, body) {
+  if (!normalizeBoolean(info?.back?.enabled)) return body.depth
+
+  const backThickness = toPositiveNumber(info.back.thickness, Math.max(1, body.thickness / 3))
+  const inset = toNonNegativeNumber(info.back.inset, 0)
+  const stopDepth = body.depth - backThickness - inset
+
+  return Math.max(1, stopDepth)
+} // End getBackStopDepth
+
+//=================
+function getBackBuildMeta(info, body) {
+  return {
+    bodyThickness: body.thickness,
+    grooveDepth: toNonNegativeNumber(info?.back?.grooveDepth, 0),
+    backThickness: toPositiveNumber(info?.back?.thickness, Math.max(1, body.thickness / 3)),
+    inset: toNonNegativeNumber(info?.back?.inset, 0),
+    overlayBack: normalizeBoolean(info?.back?.overlayBack),
+    topCoverBack: normalizeBoolean(info?.back?.topCoverBack),
+    bottomCoverBack: normalizeBoolean(info?.back?.bottomCoverBack),
+    hasLeftSide: normalizeBoolean(info?.general?.leftSide),
+    hasRightSide: normalizeBoolean(info?.general?.rightSide),
+    hasTop: normalizeBoolean(info?.general?.top),
+    hasBottom: normalizeBoolean(info?.general?.bottom)
+  }
+} // End getBackBuildMeta
+
+//=================
+function getBackGeometry(body, meta) {
+  const t = toPositiveNumber(meta.bodyThickness, body.thickness)
+  const grooveDepth = toNonNegativeNumber(meta.grooveDepth, 0)
+  const backThickness = toPositiveNumber(meta.backThickness, Math.max(1, t / 3))
+  const inset = toNonNegativeNumber(meta.inset, 0)
+  const backFaceY = body.y + body.depth
+  const y = backFaceY - inset - backThickness
+
+  if (normalizeBoolean(meta.overlayBack)) {
+    return {
+      x: body.x,
+      y,
+      z: body.z,
+      width: body.width,
+      depth: backThickness,
+      height: body.height
+    }
+  }
+
+  const hasLeftSide = normalizeBoolean(meta.hasLeftSide)
+  const hasRightSide = normalizeBoolean(meta.hasRightSide)
+  const hasTop = normalizeBoolean(meta.hasTop)
+  const hasBottom = normalizeBoolean(meta.hasBottom)
+  const topCoverBack = normalizeBoolean(meta.topCoverBack)
+  const bottomCoverBack = normalizeBoolean(meta.bottomCoverBack)
+  const leftInset = hasLeftSide ? t : 0
+  const rightInset = hasRightSide ? t : 0
+  const bottomInset = hasBottom && !bottomCoverBack ? t : 0
+  const topInset = hasTop && !topCoverBack ? t : 0
+  const x = body.x + leftInset - (hasLeftSide ? grooveDepth : 0)
+  const width = Math.max(
+    1,
+    body.width
+      - leftInset
+      - rightInset
+      + (hasLeftSide ? grooveDepth : 0)
+      + (hasRightSide ? grooveDepth : 0)
+  )
+  const z = body.z + bottomInset - (hasBottom && !bottomCoverBack ? grooveDepth : 0)
+  const height = Math.max(
+    1,
+    body.height
+      - bottomInset
+      - topInset
+      + (hasBottom && !bottomCoverBack ? grooveDepth : 0)
+      + (hasTop && !topCoverBack ? grooveDepth : 0)
+  )
+
+  return {
+    x,
+    y,
+    z,
+    width,
+    depth: backThickness,
+    height
+  }
+} // End getBackGeometry
+
+//=================
 function buildFramePanels(sourceBox, info, body, panels) {
   const t = body.thickness
   const topShift = normalizeBoolean(info?.topStrip?.enabled) ? toNonNegativeNumber(info.topStrip.size, 0) : 0
   const toeHeight = normalizeBoolean(info?.toeKick?.enabled) ? toNonNegativeNumber(info.toeKick.height, 0) : 0
   const detachedToe = normalizeBoolean(info?.toeKick?.detached)
+  const backEnabled = normalizeBoolean(info?.back?.enabled)
+  const overlayBack = backEnabled && normalizeBoolean(info?.back?.overlayBack)
+  const topCoverBack = backEnabled && normalizeBoolean(info?.back?.topCoverBack)
+  const bottomCoverBack = backEnabled && normalizeBoolean(info?.back?.bottomCoverBack)
+  const backStopDepth = getBackStopDepth(info, body)
   const bodyTop = body.z + body.height - topShift
   const bottomZ = body.z + toeHeight
   const sideBottom = normalizeBoolean(info?.general?.bottomOverlap) ? bottomZ + t : bottomZ
@@ -193,40 +286,54 @@ function buildFramePanels(sourceBox, info, body, panels) {
   const topBottomWidth = normalizeBoolean(info?.general?.topOverlap) ? body.width : innerWidth
   const bottomX = normalizeBoolean(info?.general?.bottomOverlap) ? body.x : innerX
   const bottomWidth = normalizeBoolean(info?.general?.bottomOverlap) ? body.width : innerWidth
+  const sideDepth = overlayBack ? backStopDepth : body.depth
+  const topDepth = (overlayBack || topCoverBack) ? backStopDepth : body.depth
+  const bottomDepth = (overlayBack || bottomCoverBack) ? backStopDepth : body.depth
+  const frameMeta = {
+    overlayBack,
+    topCoverBack,
+    bottomCoverBack,
+    backThickness: backEnabled ? toPositiveNumber(info.back.thickness, Math.max(1, t / 3)) : 0,
+    backInset: backEnabled ? toNonNegativeNumber(info.back.inset, 0) : 0
+  }
 
   if (normalizeBoolean(info?.general?.leftSide)) {
-    pushPanel(panels, createPanel(sourceBox, 'left_side', 'Hông trái', body.x, body.y, sideZ, t, body.depth, sideHeight, {
+    pushPanel(panels, createPanel(sourceBox, 'left_side', 'Hông trái', body.x, body.y, sideZ, t, sideDepth, sideHeight, {
       panelThickness: t,
       orientation: 'vertical',
       panelSide: 'left',
-      panelOffsetFrom: 'left'
+      panelOffsetFrom: 'left',
+      cabinetInfoFrame: frameMeta
     }))
   }
 
   if (normalizeBoolean(info?.general?.rightSide)) {
-    pushPanel(panels, createPanel(sourceBox, 'right_side', 'Hông phải', body.x + body.width - t, body.y, sideZ, t, body.depth, sideHeight, {
+    pushPanel(panels, createPanel(sourceBox, 'right_side', 'Hông phải', body.x + body.width - t, body.y, sideZ, t, sideDepth, sideHeight, {
       panelThickness: t,
       orientation: 'vertical',
       panelSide: 'right',
-      panelOffsetFrom: 'right'
+      panelOffsetFrom: 'right',
+      cabinetInfoFrame: frameMeta
     }))
   }
 
   if (normalizeBoolean(info?.general?.top)) {
-    pushPanel(panels, createPanel(sourceBox, 'top', 'Tấm nóc', topBottomX, body.y, bodyTop - t, topBottomWidth, body.depth, t, {
+    pushPanel(panels, createPanel(sourceBox, 'top', 'Tấm nóc', topBottomX, body.y, bodyTop - t, topBottomWidth, topDepth, t, {
       panelThickness: t,
       orientation: 'horizontal',
       panelSide: 'top',
-      panelOffsetFrom: 'top'
+      panelOffsetFrom: 'top',
+      cabinetInfoFrame: frameMeta
     }))
   }
 
   if (normalizeBoolean(info?.general?.bottom)) {
-    pushPanel(panels, createPanel(sourceBox, 'bottom', 'Tấm đáy', bottomX, body.y, bottomZ, bottomWidth, body.depth, t, {
+    pushPanel(panels, createPanel(sourceBox, 'bottom', 'Tấm đáy', bottomX, body.y, bottomZ, bottomWidth, bottomDepth, t, {
       panelThickness: t,
       orientation: 'horizontal',
       panelSide: 'bottom',
-      panelOffsetFrom: 'bottom'
+      panelOffsetFrom: 'bottom',
+      cabinetInfoFrame: frameMeta
     }))
   }
 } // End buildFramePanels
@@ -235,82 +342,35 @@ function buildFramePanels(sourceBox, info, body, panels) {
 function buildBackPanels(sourceBox, info, body, panels) {
   if (!normalizeBoolean(info?.back?.enabled)) return
 
-  const t = body.thickness
-  const grooveDepth = toNonNegativeNumber(info.back.grooveDepth, 0)
-  const backThickness = toPositiveNumber(info.back.thickness, Math.max(1, t / 3))
-  const inset = toNumber(info.back.inset, 0)
+  const meta = getBackBuildMeta(info, body)
+  const backGeometry = getBackGeometry(body, meta)
+  const splitOffsets = parseDivisionFormula(info.back.splitFormula, backGeometry.width, meta.backThickness)
+  let startX = backGeometry.x
 
-  const hasLeftSide = normalizeBoolean(info?.general?.leftSide)
-  const hasRightSide = normalizeBoolean(info?.general?.rightSide)
-  const hasTop = normalizeBoolean(info?.general?.top)
-  const hasBottom = normalizeBoolean(info?.general?.bottom)
-
-  const leftInset = hasLeftSide ? t : 0
-  const rightInset = hasRightSide ? t : 0
-  const bottomInset = hasBottom ? t : 0
-  const topInset = hasTop ? t : 0
-
-  const x = body.x + leftInset - (hasLeftSide ? grooveDepth : 0)
-  const width = Math.max(
-    1,
-    body.width
-      - leftInset
-      - rightInset
-      + (hasLeftSide ? grooveDepth : 0)
-      + (hasRightSide ? grooveDepth : 0)
-  )
-
-  const z = body.z + bottomInset - (hasBottom ? grooveDepth : 0)
-  const height = Math.max(
-    1,
-    body.height
-      - bottomInset
-      - topInset
-      + (hasBottom ? grooveDepth : 0)
-      + (hasTop ? grooveDepth : 0)
-  )
-
-  const backFaceY = body.y + body.depth
-  const y = backFaceY - inset - backThickness
-
-  const splitOffsets = parseDivisionFormula(info.back.splitFormula, width, backThickness)
-  let startX = x
+  const createBackPanel = (name, panelX, panelWidth) => createPanel(sourceBox, 'back', name, panelX, backGeometry.y, backGeometry.z, panelWidth, backGeometry.depth, backGeometry.height, {
+    panelThickness: backGeometry.depth,
+    orientation: 'vertical',
+    panelSide: 'back',
+    panelOffsetFrom: 'back',
+    cabinetInfoBack: meta,
+    backBaseX: backGeometry.x,
+    backBaseWidth: backGeometry.width
+  })
 
   if (!splitOffsets.length) {
-    pushPanel(
-      panels,
-      createPanel(sourceBox, 'back', 'Tấm hậu', x, y, z, width, backThickness, height, {
-        panelThickness: backThickness,
-        orientation: 'vertical',
-        panelSide: 'back'
-      })
-    )
+    pushPanel(panels, createBackPanel('Tấm hậu', backGeometry.x, backGeometry.width))
     return
   }
 
   splitOffsets.forEach((offset, index) => {
-    const panelWidth = x + offset - startX
+    const panelWidth = backGeometry.x + offset - startX
 
-    pushPanel(
-      panels,
-      createPanel(sourceBox, 'back', `Tấm hậu ${index + 1}`, startX, y, z, panelWidth, backThickness, height, {
-        panelThickness: backThickness,
-        orientation: 'vertical',
-        panelSide: 'back'
-      })
-    )
+    pushPanel(panels, createBackPanel(`Tấm hậu ${index + 1}`, startX, panelWidth))
 
-    startX = x + offset
+    startX = backGeometry.x + offset
   })
 
-  pushPanel(
-    panels,
-    createPanel(sourceBox, 'back', `Tấm hậu ${splitOffsets.length + 1}`, startX, y, z, x + width - startX, backThickness, height, {
-      panelThickness: backThickness,
-      orientation: 'vertical',
-      panelSide: 'back'
-    })
-  )
+  pushPanel(panels, createBackPanel(`Tấm hậu ${splitOffsets.length + 1}`, startX, backGeometry.x + backGeometry.width - startX))
 } // End buildBackPanels
 
 //=================
@@ -502,9 +562,9 @@ export function buildCabinetInfoPanels(sourceBox, info) {
   const body = getBodyRect(sourceBox, info)
   const panels = []
 
+  buildBackPanels(sourceBox, info, body, panels)
   buildFillerPanels(sourceBox, info, body, panels)
   buildFramePanels(sourceBox, info, body, panels)
-  buildBackPanels(sourceBox, info, body, panels)
   buildTopStripPanels(sourceBox, info, body, panels)
   buildHandleRailPanels(sourceBox, info, body, panels)
   buildDoorStopPanels(sourceBox, info, body, panels)
