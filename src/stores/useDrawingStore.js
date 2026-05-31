@@ -2115,6 +2115,41 @@ const store = createSimpleStore({
   getPanelEditContext() {
     return state.panelEdit?.context || null
   }, // End getPanelEditContext
+
+  //=================
+  applyPanelEditOperations(payload = {}) {
+    const panelId = payload.panelId || state.panelEdit?.selectedPanelId || null
+
+    if (!panelId) return null
+
+    const rectangles = Array.isArray(payload.rectangles) ? payload.rectangles : []
+    const normalizedRectangles = rectangles.map((rectangle) => ({
+      id: rectangle.id,
+      start: { ...rectangle.start },
+      end: { ...rectangle.end },
+      operation: rectangle.operation || 'none',
+      faceSide: payload.faceSide || state.panelEdit?.context?.faceSide || null,
+      faceKey: payload.faceKey || state.panelEdit?.context?.faceKey || null
+    }))
+
+    state.panels = state.panels.map((panel) => {
+      if (panel.id !== panelId) return panel
+
+      return {
+        ...panel,
+        editPanelShapes: [
+          ...(Array.isArray(panel.editPanelShapes) ? panel.editPanelShapes : []),
+          ...normalizedRectangles.filter((rectangle) => rectangle.operation !== 'cutout')
+        ],
+        editPanelCutouts: [
+          ...(Array.isArray(panel.editPanelCutouts) ? panel.editPanelCutouts : []),
+          ...normalizedRectangles.filter((rectangle) => rectangle.operation === 'cutout')
+        ]
+      }
+    })
+
+    return normalizedRectangles
+  }, // End applyPanelEditOperations
   selectDimensions(dimensionIds) {
     state.selectedDimensionIds = Array.isArray(dimensionIds) ? dimensionIds.filter(Boolean) : []
   }, // End selectDimensions

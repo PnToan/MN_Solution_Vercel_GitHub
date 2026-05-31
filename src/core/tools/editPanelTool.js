@@ -126,3 +126,34 @@ export function isEditPanelTool(toolId) {
 export function isEditPanelDrawTool(toolId) {
   return ['editPanelSelect', 'editPanelLine', 'editPanelRect', 'editPanelArc', 'editPanelCircle', 'editPanelTape'].includes(toolId)
 } // End isEditPanelDrawTool
+
+
+//=================
+export function getEditPanelToolCursorClass(toolId) {
+  if (toolId === 'editPanelTape') return 'mn-cursor-panel-tape'
+  if (toolId === 'editPanelRect') return 'mn-cursor-panel-rect'
+  if (!toolId || toolId === 'editPanelSelect') return 'mn-cursor-pointer'
+
+  return 'mn-cursor-crosshair'
+} // End getEditPanelToolCursorClass
+
+//=================
+export function createPanelEditRectangleRecord(draft, options = {}) {
+  if (!draft?.start || !draft?.current) return null
+
+  const x1 = Number(draft.start.x || 0)
+  const y1 = Number(draft.start.y || 0)
+  const x2 = Number(draft.current.x || 0)
+  const y2 = Number(draft.current.y || 0)
+  const width = Math.abs(x2 - x1)
+  const height = Math.abs(y2 - y1)
+
+  if (width <= 0 || height <= 0) return null
+
+  return {
+    id: options.id || `rect-${Date.now()}`,
+    start: { x: x1, y: y1 },
+    end: { x: x2, y: y2 },
+    operation: options.operation || 'none'
+  }
+} // End createPanelEditRectangleRecord

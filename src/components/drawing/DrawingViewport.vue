@@ -83,6 +83,15 @@
         @wheel.stop.prevent="onPanelEditWheel"
         @contextmenu.prevent
       />
+      <div
+        v-if="panelEditRect.pendingAction"
+        class="mn-panel-edit-action-dialog"
+        @pointerdown.stop.prevent
+        @click.stop.prevent
+      >
+        <button type="button" class="mn-panel-edit-action-btn" @click.stop.prevent="confirmPanelEditRectangleAction('none')">None</button>
+        <button type="button" class="mn-panel-edit-action-btn danger" @click.stop.prevent="confirmPanelEditRectangleAction('cutout')">Khấu</button>
+      </div>
       <footer class="mn-panel-edit-footer">
         {{ panelEditFooterText }}
       </footer>
@@ -106,7 +115,7 @@ import { screenToLocal, localToScreen } from '../../renderers/viewport-transform
 import { projectBoxToCameraRect, cameraLocalToWorldPoint } from '../../core/view/view-camera'
 import { hitTestPanel, hitTestZoneEdge } from '../../core/snap/snap-engine'
 import { handleViewportKey } from '../../commands/keyboard-controller'
-import { isEditPanelDrawTool, isEditPanelTool } from '../../core/tools/editPanelTool'
+import { createPanelEditRectangleRecord, getEditPanelToolCursorClass, isEditPanelDrawTool, isEditPanelTool } from '../../core/tools/editPanelTool'
 
 const app = useAppStore()
 const cabinet = useCabinetStore()
@@ -162,6 +171,7 @@ const panelEditTape = ref({
 const panelEditRect = ref({
   hoverSnap: null,
   draft: null,
+  pendingAction: null,
   rectangles: []
 })
 
@@ -196,14 +206,7 @@ const zoomLabel = computed(() => `${Math.round(app.state.viewport.zoom * 100)}%`
 const localX = computed(() => Math.round(app.state.mouse.localX))
 const localY = computed(() => Math.round(app.state.mouse.localY))
 const activePanelEditContext = computed(() => drawing.state.panelEdit?.active ? drawing.state.panelEdit.context : null)
-const panelEditCanvasCursorClass = computed(() => {
-  const shapeTool = drawing.state.panelEdit?.shapeTool
-
-  if (shapeTool === 'editPanelTape') return 'mn-cursor-panel-tape'
-  if (!shapeTool || shapeTool === 'editPanelSelect') return 'mn-cursor-pointer'
-
-  return 'mn-cursor-crosshair'
-})
+const panelEditCanvasCursorClass = computed(() => getEditPanelToolCursorClass(drawing.state.panelEdit?.shapeTool))
 const panelEditFooterText = computed(() => {
   if (!activePanelEditContext.value) return ''
 
@@ -237,6 +240,10 @@ const panelEditFooterText = computed(() => {
   if (shapeTool === 'editPanelRect') {
     const draft = panelEditRect.value.draft
     const hoverSnap = panelEditRect.value.hoverSnap
+
+    if (panelEditRect.value.pendingAction) {
+      return 'Vẽ hình chữ nhật: chọn None để giữ nét vẽ hoặc Khấu để push thủng panel'
+    }
 
     if (draft) {
       const width = Math.abs(Number(draft.current?.x || 0) - Number(draft.start?.x || 0))
@@ -652,7 +659,8 @@ function resetPanelEditRectDraft() {
   panelEditRect.value = {
     ...panelEditRect.value,
     hoverSnap: null,
-    draft: null
+    draft: null,
+    pendingAction: null
   }
 } // End resetPanelEditRectDraft
 
@@ -688,6 +696,7 @@ function restorePanelEditHistorySnapshot(snapshot) {
     ...panelEditRect.value,
     hoverSnap: null,
     draft: null,
+    pendingAction: null,
     rectangles: clonePanelEditHistoryData(snapshot?.rectangles || [])
   }
 } // End restorePanelEditHistorySnapshot
@@ -880,14 +889,26 @@ function drawPanelEditRectangle(targetContext, context, layout, rectangle, optio
   const isDraft = options.draft === true
 
   targetContext.save()
-  targetContext.strokeStyle = isDraft ? '#ff7a00' : '#111111'
-  targetContext.fillStyle = isDraft ? 'rgba(255, 122, 0, 0.12)' : 'rgba(0, 0, 0, 0.04)'
+  const isCutout = rectangle.operation === 'cutout'
+
+  targetContext.strokeStyle = isDraft ? '#ff7a00' : (isCutout ? '#d90000' : '#111111')
+  targetContext.fillStyle = isDraft ? 'rgba(255, 122, 0, 0.12)' : (isCutout ? 'rgba(217, 0, 0, 0.12)' : 'rgba(0, 0, 0, 0.04)')
   targetContext.lineWidth = isDraft ? 2 : 1.5
   targetContext.setLineDash(isDraft ? [8, 5] : [])
   targetContext.beginPath()
   targetContext.rect(start.x, start.y, rectWidth, rectHeight)
   targetContext.fill()
   targetContext.stroke()
+
+  if (isCutout && !isDraft) {
+    targetContext.beginPath()
+    targetContext.moveTo(start.x, start.y)
+    targetContext.lineTo(start.x + rectWidth, start.y + rectHeight)
+    targetContext.moveTo(start.x + rectWidth, start.y)
+    targetContext.lineTo(start.x, start.y + rectHeight)
+    targetContext.stroke()
+  }
+
   targetContext.restore()
 } // End drawPanelEditRectangle
 
@@ -897,32 +918,55 @@ function commitPanelEditRectangle() {
 
   if (!draft) return
 
-  const bounds = getPanelEditRectBounds({ start: draft.start, end: draft.current })
+  const rectangle = createPanelEditRectangleRecord(draft, {
+    id: `rect-${Date.now()}-${panelEditRect.value.rectangles.length + 1}`,
+    operation: 'none'
+  })
 
-  if (bounds.width <= 0 || bounds.height <= 0) {
+  if (!rectangle) {
     resetPanelEditRectDraft()
     app.setStatus('Vẽ hình chữ nhật: kích thước không hợp lệ')
     nextTick(resizePanelEditCanvas)
     return
   }
 
-  pushPanelEditHistorySnapshot()
   panelEditRect.value = {
     ...panelEditRect.value,
     hoverSnap: null,
     draft: null,
-    rectangles: [
-      ...panelEditRect.value.rectangles,
-      {
-        id: `rect-${Date.now()}-${panelEditRect.value.rectangles.length + 1}`,
-        start: { ...draft.start },
-        end: { ...draft.current }
-      }
-    ]
+    pendingAction: rectangle
   }
-  app.setStatus('Vẽ hình chữ nhật: đã tạo hình chữ nhật')
+  app.setStatus('Vẽ hình chữ nhật: chọn None hoặc Khấu')
   nextTick(resizePanelEditCanvas)
 } // End commitPanelEditRectangle
+
+//=================
+function confirmPanelEditRectangleAction(operation) {
+  const pending = panelEditRect.value.pendingAction
+
+  if (!pending) return
+
+  pushPanelEditHistorySnapshot()
+
+  const rectangle = {
+    ...pending,
+    operation: operation === 'cutout' ? 'cutout' : 'none'
+  }
+
+  panelEditRect.value = {
+    ...panelEditRect.value,
+    hoverSnap: null,
+    draft: null,
+    pendingAction: null,
+    rectangles: [
+      ...panelEditRect.value.rectangles,
+      rectangle
+    ]
+  }
+
+  app.setStatus(operation === 'cutout' ? 'Vẽ hình chữ nhật: đã chọn Khấu xuyên panel' : 'Vẽ hình chữ nhật: đã tạo hình chữ nhật')
+  nextTick(resizePanelEditCanvas)
+} // End confirmPanelEditRectangleAction
 
 //=================
 function drawPanelEditRearEdge(targetContext, context, layout) {
@@ -1048,6 +1092,10 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
     drawPanelEditRectangle(targetContext, context, layout, rectangle)
   })
 
+  if (panelEditRect.value.pendingAction) {
+    drawPanelEditRectangle(targetContext, context, layout, panelEditRect.value.pendingAction, { draft: true })
+  }
+
   if (panelEditRect.value.draft) {
     drawPanelEditRectangle(targetContext, context, layout, panelEditRect.value.draft, { draft: true })
   }
@@ -1141,6 +1189,7 @@ function selectPanelEditFace(faceSide) {
   panelEditRect.value = {
     hoverSnap: null,
     draft: null,
+    pendingAction: null,
     rectangles: []
   }
   clearPanelEditHistory()
@@ -1169,6 +1218,8 @@ function onPanelEditPointerDown(event) {
   }
 
   if (event.button !== 0) return
+
+  if (panelEditRect.value.pendingAction) return
 
   const shapeTool = drawing.state.panelEdit?.shapeTool
 
@@ -1256,6 +1307,11 @@ function onPanelEditPointerMove(event) {
   const rect = canvas.getBoundingClientRect()
   const layout = getPanelEditLayout(context, rect.width, rect.height)
   const shapeTool = drawing.state.panelEdit?.shapeTool
+
+  if (panelEditRect.value.pendingAction) {
+    resizePanelEditCanvas()
+    return
+  }
 
   if (shapeTool === 'editPanelRect') {
     const point = getPanelEditRectPointFromPointer(context, layout, event)
@@ -1350,9 +1406,16 @@ function applyPanelEdit() {
     guides: [],
     inputBuffer: ''
   }
+  drawing.applyPanelEditOperations({
+    panelId: context.panelId,
+    faceSide: context.faceSide,
+    faceKey: context.faceKey,
+    rectangles: panelEditRect.value.rectangles
+  })
   panelEditRect.value = {
     hoverSnap: null,
     draft: null,
+    pendingAction: null,
     rectangles: []
   }
   clearPanelEditHistory()
@@ -3372,6 +3435,49 @@ onBeforeUnmount(() => {
 
 .mn-cursor-panel-tape {
   cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 2 L4 23 L9 18 L13 29 L17 27 L13 16 L21 16 Z' fill='white' stroke='%23111111' stroke-width='1.4' stroke-linejoin='round'/%3E%3Cg transform='translate(15 21) rotate(-18)'%3E%3Crect x='0' y='0' width='15' height='5' rx='1' fill='%23fff7c2' stroke='%23111111' stroke-width='1'/%3E%3Cpath d='M3 0 L3 3 M6 0 L6 2 M9 0 L9 3 M12 0 L12 2' stroke='%23111111' stroke-width='1'/%3E%3C/g%3E%3C/svg%3E") 4 2, crosshair;
+}
+
+.mn-cursor-panel-rect {
+  cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 2 L4 22 L9 17 L13 27 L17 25 L13 15 L20 15 Z' fill='white' stroke='%23111111' stroke-width='1.4' stroke-linejoin='round'/%3E%3Crect x='13' y='21' width='14' height='8' rx='1.5' fill='%23dbefff' stroke='%230077CC' stroke-width='1.5'/%3E%3C/svg%3E") 4 2, crosshair;
+}
+
+.mn-panel-edit-action-dialog {
+  position: absolute;
+  left: 50%;
+  top: 58px;
+  z-index: 30;
+  width: 150px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--mn-border-main);
+  border-radius: 7px;
+  background: var(--mn-bg-panel);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .24);
+}
+
+.mn-panel-edit-action-btn {
+  height: 32px;
+  border: 0;
+  border-bottom: 1px solid var(--mn-border-main);
+  background: var(--mn-bg-panel);
+  color: var(--mn-text-main);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mn-panel-edit-action-btn:last-child {
+  border-bottom: 0;
+}
+
+.mn-panel-edit-action-btn:hover {
+  background: var(--mn-bg-panel-soft);
+}
+
+.mn-panel-edit-action-btn.danger {
+  color: #d90000;
 }
 
 .mn-panel-edit-footer {
