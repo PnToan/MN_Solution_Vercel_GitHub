@@ -10,6 +10,15 @@ function toNumber(value, fallback = 0) {
 } // End toNumber
 
 //=================
+function roundOneDecimal(value) {
+  const numberValue = Number(value)
+
+  if (!Number.isFinite(numberValue)) return 0
+
+  return Math.round(numberValue * 10) / 10
+} // End roundOneDecimal
+
+//=================
 function toPositiveNumber(value, fallback = 1) {
   const numberValue = toNumber(value, fallback)
 
@@ -97,12 +106,12 @@ function withFrontRect(panel) {
 
 //=================
 function createPanel(sourceBox, kind, name, x3d, y3d, z3d, xSize, ySize, zSize, meta = {}) {
-  const safeX = toNumber(x3d, 0)
-  const safeY = toNumber(y3d, 0)
-  const safeZ = toNumber(z3d, 0)
-  const safeXSize = Math.max(0, toNumber(xSize, 0))
-  const safeYSize = Math.max(0, toNumber(ySize, 0))
-  const safeZSize = Math.max(0, toNumber(zSize, 0))
+  const safeX = roundOneDecimal(toNumber(x3d, 0))
+  const safeY = roundOneDecimal(toNumber(y3d, 0))
+  const safeZ = roundOneDecimal(toNumber(z3d, 0))
+  const safeXSize = Math.max(0, roundOneDecimal(toNumber(xSize, 0)))
+  const safeYSize = Math.max(0, roundOneDecimal(toNumber(ySize, 0)))
+  const safeZSize = Math.max(0, roundOneDecimal(toNumber(zSize, 0)))
 
   if (safeXSize <= 0 || safeYSize <= 0 || safeZSize <= 0) return null
 

@@ -1,5 +1,5 @@
 import { createSimpleStore } from './createStore'
-import { normalizePositiveNumber } from '../core/geometry/number-utils'
+import { normalizePositiveNumber, roundOneDecimal } from '../core/geometry/number-utils'
 import { useDrawingStore } from './useDrawingStore'
 import { useCabinetStore } from './useCabinetStore'
 let boxIdSeed = 1
@@ -148,7 +148,7 @@ const store = createSimpleStore({
     const item = state.boxes.find((box) => box.id === boxId)
     if (!item) return
 
-    const rawValue = Number(value)
+    const rawValue = roundOneDecimal(value)
     if (!Number.isFinite(rawValue) || rawValue <= 0) return
 
     const oldBox = { ...item }

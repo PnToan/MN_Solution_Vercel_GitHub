@@ -65,6 +65,13 @@ function getPanelFrameId(panel) {
   return panel?.linkedFrameId || panel?.frameId || panel?.sourceBoxId || panel?.baseObjectId || null
 } // End getPanelFrameId
 
+//=================
+function getPanelResizeOrder(panel) {
+  if (panel?.sourceType === 'cabinet-info') return 0
+
+  return 1
+} // End getPanelResizeOrder
+
 
 //=================
 function isCabinetInfoBackPanel(panel) {
@@ -1377,7 +1384,7 @@ const store = createSimpleStore({
         || panel.frameId === newBox.id
         || panel.sourceBoxId === newBox.id
         || panel.baseObjectId === newBox.id
-    })
+    }).sort((a, b) => getPanelResizeOrder(a) - getPanelResizeOrder(b))
 
     const panelsOutsideBox = state.panels.filter((panel) => {
       return !(panel.linkedFrameId === newBox.id
@@ -1645,7 +1652,7 @@ const store = createSimpleStore({
         || panel.frameId === boxId
         || panel.sourceBoxId === boxId
         || panel.baseObjectId === boxId
-    })
+    }).sort((a, b) => getPanelResizeOrder(a) - getPanelResizeOrder(b))
 
     if (!panelsInBox.length) {
       this.rebuildZones()
@@ -2164,7 +2171,7 @@ const store = createSimpleStore({
   //=================
   setDimensionValue(dimensionId, value) {
     const dimension = this.getDimensionById(dimensionId)
-    const numberValue = typeof value === 'string' ? Number(value.replace(',', '.')) : Number(value)
+    const numberValue = typeof value === 'string' ? Number(value.trim()) : Number(value)
 
     if (!dimension || !Number.isFinite(numberValue) || numberValue <= 0) return false
 

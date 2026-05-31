@@ -16,7 +16,7 @@ function toNumber(value, fallback = 0) {
 
   if (!Number.isFinite(numberValue)) return fallback
 
-  return numberValue
+  return Math.round(numberValue * 10) / 10
 } // End toNumber
 
 //=================
@@ -245,13 +245,16 @@ const store = createSimpleStore({
     this.applyDepthToSelectedBox()
 
     const targetBox = this.getSelectedBox()
+    const oldBox = { ...targetBox }
     const nextPanels = buildCabinetInfoPanels(targetBox, cloneValue(state.info))
     const oldPanels = removeCabinetInfoPanelsForBox(drawing.state.panels, targetBox.id)
 
     drawing.state.panels = [
-      ...oldPanels,
-      ...nextPanels
+      ...nextPanels,
+      ...oldPanels
     ]
+
+    drawing.updatePanelsAfterBoxResize?.(oldBox, targetBox)
 
     this.restoreSelectedBox(targetBoxId)
 

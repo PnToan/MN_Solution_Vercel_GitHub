@@ -15,7 +15,7 @@ export function createDefaultCabinetInfoState() {
     back: {
       enabled: false,
       grooveDepth: 10,
-      thickness: 5,
+      thickness: 10,
       inset: 10,
       splitFormula: '',
       topCoverBack: false,

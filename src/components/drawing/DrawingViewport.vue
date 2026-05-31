@@ -1238,7 +1238,7 @@ function onBoxHeightInputKeyDown(event) {
 } // End onBoxHeightInputKeyDown
 //=================
 function commitDimInput() {
-  const rawValue = String(dimInput.value.value || '').replace(',', '.')
+  const rawValue = String(dimInput.value.value || '').trim()
   const numberValue = Number(rawValue)
 
   if (!Number.isFinite(numberValue) || numberValue <= 0) {

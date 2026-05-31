@@ -38,12 +38,14 @@ import RightPanel from '../components/panels/RightPanel.vue'
 import { useDrawingStore } from '../stores/useDrawingStore'
 import { useAppStore } from '../stores/useAppStore'
 import { useCabinetStore } from '../stores/useCabinetStore'
+import { useCabinetInfoStore } from '../stores/useCabinetInfoStore'
 import { applyAppSettings, loadAppSettings } from '../core/settings/app-settings'
 import { findShortcutAction, loadShortcutSettings, shortcutEventToText } from '../core/settings/shortcut-settings'
 
 const drawingStore = useDrawingStore()
 const app = useAppStore()
 const cabinet = useCabinetStore()
+const cabinetInfo = useCabinetInfoStore()
 const isRightPanelHidden = ref(true)
 const rightPanelWidth = ref(224)
 let rightPanelResizing = false
@@ -192,6 +194,16 @@ function runShortcutAction(action) {
 } // End runShortcutAction
 
 //=================
+function applyMachinePanelSettings(settings) {
+  const defaultThickness = Math.round(Number(settings?.panel?.defaultThickness || 17.4) * 10) / 10
+  const backThickness = Math.round(Number(settings?.panel?.backThickness || 10) * 10) / 10
+
+  cabinet.state.panelThickness = defaultThickness
+  cabinetInfo.state.info.general.panelThickness = defaultThickness
+  cabinetInfo.state.info.back.thickness = backThickness
+} // End applyMachinePanelSettings
+
+//=================
 function onGlobalKeyDown(event) {
   if (isEditableShortcutTarget(event)) return
 
@@ -207,7 +219,10 @@ function onGlobalKeyDown(event) {
 } // End onGlobalKeyDown
 
 onMounted(() => {
-  applyAppSettings(loadAppSettings())
+  const machineSettings = loadAppSettings()
+
+  applyAppSettings(machineSettings)
+  applyMachinePanelSettings(machineSettings)
   drawingStore.rebuildZones()
   applyRightPanelWidth(rightPanelWidth.value)
   window.addEventListener('keydown', onGlobalKeyDown, true)

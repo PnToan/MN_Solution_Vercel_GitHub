@@ -19,6 +19,15 @@ function toNumber(value, fallback = 0) {
 } // End toNumber
 
 //=================
+function roundOneDecimal(value) {
+  const numberValue = Number(value)
+
+  if (!Number.isFinite(numberValue)) return 0
+
+  return Math.round(numberValue * 10) / 10
+} // End roundOneDecimal
+
+//=================
 function clampNumber(value, min, max) {
   const numberValue = toNumber(value, min)
 
@@ -172,13 +181,13 @@ function createSidePanel(zone, edge, thickness, offset) {
     orientation: 'vertical',
     panelKind: 'side',
 
-    x3d,
-    y3d,
-    z3d: minZ,
+    x3d: roundOneDecimal(x3d),
+    y3d: roundOneDecimal(y3d),
+    z3d: roundOneDecimal(minZ),
 
-    xSize: thickness,
-    ySize: zoneDepth,
-    zSize: zoneHeight,
+    xSize: roundOneDecimal(thickness),
+    ySize: roundOneDecimal(zoneDepth),
+    zSize: roundOneDecimal(zoneHeight),
 
     color: 'rgba(135, 206, 255, 0.8)'
   })
@@ -205,13 +214,13 @@ function createTopBottomPanel(zone, edge, thickness, offset) {
     orientation: 'horizontal',
     panelKind: 'top_bottom',
 
-    x3d: minX,
-    y3d,
-    z3d,
+    x3d: roundOneDecimal(minX),
+    y3d: roundOneDecimal(y3d),
+    z3d: roundOneDecimal(z3d),
 
-    xSize: zoneWidth,
-    ySize: zoneDepth,
-    zSize: thickness,
+    xSize: roundOneDecimal(zoneWidth),
+    ySize: roundOneDecimal(zoneDepth),
+    zSize: roundOneDecimal(thickness),
 
     color: 'rgba(135, 206, 255, 0.8)'
   })

@@ -13,7 +13,7 @@ function normalizePositiveNumber(value, fallback = 1) {
     return fallback
   }
 
-  return numberValue
+  return Math.round(numberValue * 10) / 10
 }
 
 const store = createSimpleStore({

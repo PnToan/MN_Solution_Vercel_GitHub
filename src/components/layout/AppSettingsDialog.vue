@@ -11,7 +11,7 @@
         </div>
 
         <div class="mn-settings-actions">
-          <button class="mn-settings-btn" type="button" @click="saveCurrentSettings">Lưu</button>
+          <button class="mn-settings-btn" type="button" @click="saveCurrentSettings">Áp dụng</button>
           <button class="mn-settings-btn" type="button" @click="emitClose">Đóng</button>
         </div>
       </header>
@@ -251,6 +251,11 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { useAppStore } from '../../stores/useAppStore'
+import { useBoxStore } from '../../stores/useBoxStore'
+import { useCabinetInfoStore } from '../../stores/useCabinetInfoStore'
+import { useCabinetStore } from '../../stores/useCabinetStore'
+import { useDrawingStore } from '../../stores/useDrawingStore'
 import {
   applyAppSettings,
   exportAppSettings,
@@ -289,6 +294,11 @@ const tabs = [
 const loadedSettings = loadAppSettings()
 const activeTabId = ref('general')
 const form = reactive(loadedSettings)
+const app = useAppStore()
+const boxStore = useBoxStore()
+const cabinetInfo = useCabinetInfoStore()
+const cabinet = useCabinetStore()
+const drawing = useDrawingStore()
 const shortcutSettings = reactive(normalizeShortcutSettings(loadedSettings.shortcuts))
 const selectedShortcutId = ref(SHORTCUT_FUNCTIONS[0]?.id || '')
 const newShortcutText = ref('')
@@ -342,10 +352,86 @@ function setActiveTab(tabId) {
 } // End setActiveTab
 
 //=================
+function roundSettingNumber(value, fallback = 0) {
+  const numberValue = Number(value)
+
+  if (!Number.isFinite(numberValue)) return fallback
+
+  return Math.round(numberValue * 10) / 10
+} // End roundSettingNumber
+
+//=================
+function panelBelongsToBox(panel, boxId) {
+  return panel.linkedFrameId === boxId
+    || panel.frameId === boxId
+    || panel.sourceBoxId === boxId
+    || panel.baseObjectId === boxId
+} // End panelBelongsToBox
+
+//=================
+function updateCabinetInfoPanelSettingMeta(panel, defaultThickness, backThickness) {
+  if (panel.sourceType !== 'cabinet-info') {
+    return {
+      ...panel,
+      panelThickness: defaultThickness,
+      thickness: defaultThickness
+    }
+  }
+
+  const nextPanel = { ...panel }
+
+  if (nextPanel.cabinetInfoBack) {
+    nextPanel.cabinetInfoBack = {
+      ...nextPanel.cabinetInfoBack,
+      bodyThickness: defaultThickness,
+      backThickness
+    }
+  }
+
+  ;['cabinetInfoTopStrip', 'cabinetInfoHandleRail', 'cabinetInfoToeKick', 'cabinetInfoDoorStop', 'cabinetInfoFiller'].forEach((key) => {
+    if (!nextPanel[key]) return
+
+    nextPanel[key] = {
+      ...nextPanel[key],
+      bodyThickness: defaultThickness
+    }
+  })
+
+  return nextPanel
+} // End updateCabinetInfoPanelSettingMeta
+
+//=================
+function applyPanelSettingsToRuntime(settings) {
+  const defaultThickness = roundSettingNumber(settings?.panel?.defaultThickness, 17.4)
+  const backThickness = roundSettingNumber(settings?.panel?.backThickness, 10)
+
+  cabinet.state.panelThickness = defaultThickness
+  cabinetInfo.state.info.general.panelThickness = defaultThickness
+  cabinetInfo.state.info.back.thickness = backThickness
+
+  boxStore.state.boxes.forEach((box) => {
+    const oldBox = { ...box }
+
+    box.panelThickness = defaultThickness
+    drawing.state.panels = drawing.state.panels.map((panel) => {
+      if (!panelBelongsToBox(panel, box.id)) return panel
+
+      return updateCabinetInfoPanelSettingMeta(panel, defaultThickness, backThickness)
+    })
+
+    drawing.updatePanelsAfterBoxResize?.(oldBox, box)
+  })
+
+  drawing.rebuildZones?.()
+  app.setStatus('Đã áp dụng setting theo máy')
+} // End applyPanelSettingsToRuntime
+
+//=================
 function applyCurrentSettings() {
   const savedSettings = saveAppSettings(currentSettingsPayload())
   syncShortcutSettings(savedSettings.shortcuts)
   applyAppSettings(savedSettings)
+  applyPanelSettingsToRuntime(savedSettings)
 } // End applyCurrentSettings
 
 //=================
@@ -358,6 +444,7 @@ function loadDefaultSettings() {
   const defaultSettings = resetAppSettings()
   syncForm(defaultSettings)
   applyAppSettings(defaultSettings)
+  applyPanelSettingsToRuntime(defaultSettings)
 } // End loadDefaultSettings
 
 //=================
@@ -367,6 +454,7 @@ async function importSettings() {
     const savedSettings = saveAppSettings(importedSettings)
     syncForm(savedSettings)
     applyAppSettings(savedSettings)
+    applyPanelSettingsToRuntime(savedSettings)
   } catch (error) {
     if (error && error.message === 'NO_FILE_SELECTED') return
     alert('File setting không hợp lệ.')

@@ -69,7 +69,9 @@ function normalizeNumber(value, fallback, min = 0, max = Number.POSITIVE_INFINIT
 
   if (!Number.isFinite(numberValue)) return fallback
 
-  return Math.max(min, Math.min(max, numberValue))
+  const clampedValue = Math.max(min, Math.min(max, numberValue))
+
+  return Math.round(clampedValue * 10) / 10
 } // End normalizeNumber
 
 //=================

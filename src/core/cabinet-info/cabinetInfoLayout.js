@@ -5,7 +5,7 @@ let cabinetSeed = 1
 //=================
 function toNumber(value, fallback = 0) {
   if (typeof value === 'string') {
-    const normalized = value.trim().replace(',', '.')
+    const normalized = value.trim()
     const numberValue = Number(normalized)
     return Number.isFinite(numberValue) ? numberValue : fallback
   }
