@@ -214,6 +214,21 @@ function pushPanel(panels, panel) {
   panels.push(panel)
 } // End pushPanel
 
+
+//=================
+function getCabinetSideZone(info, body) {
+  const t = body.thickness
+  const hasLeftSide = normalizeBoolean(info?.general?.leftSide)
+  const hasRightSide = normalizeBoolean(info?.general?.rightSide)
+  const leftInset = hasLeftSide ? t : 0
+  const rightInset = hasRightSide ? t : 0
+
+  return {
+    x: body.x + leftInset,
+    width: Math.max(1, body.width - leftInset - rightInset)
+  }
+} // End getCabinetSideZone
+
 //=================
 function getBackStopDepth(info, body) {
   if (!normalizeBoolean(info?.back?.enabled)) return body.depth
@@ -443,9 +458,9 @@ function buildTopStripPanels(sourceBox, info, body, panels) {
   const y = body.y + faceOffset
   const inset = normalizeBoolean(info.topStrip.inset)
   const topOverlap = normalizeBoolean(info?.general?.topOverlap)
-  const useFullWidth = !inset || faceOffset < 0
-  const x = useFullWidth ? body.x : body.x + t
-  const width = useFullWidth ? body.width : Math.max(1, body.width - (2 * t))
+  const sideZone = getCabinetSideZone(info, body)
+  const x = sideZone.x
+  const width = sideZone.width
 
   pushPanel(panels, createPanel(sourceBox, 'top_strip', 'Thanh chỉ nóc', x, y, body.z + body.height - size, width, t, size, {
     panelThickness: t,
@@ -456,7 +471,9 @@ function buildTopStripPanels(sourceBox, info, body, panels) {
       faceOffset,
       inset,
       topOverlap,
-      bodyThickness: t
+      bodyThickness: t,
+      hasLeftSide: normalizeBoolean(info?.general?.leftSide),
+      hasRightSide: normalizeBoolean(info?.general?.rightSide)
     }
   }))
 } // End buildTopStripPanels
@@ -553,6 +570,8 @@ function createHandleRailMeta(info, body, type, index, count) {
     topStripEnabled: normalizeBoolean(info?.topStrip?.enabled),
     topStripSize: normalizeBoolean(info?.topStrip?.enabled) ? toNonNegativeNumber(info.topStrip.size, 0) : 0,
     hasTop: normalizeBoolean(info?.general?.top),
+    hasLeftSide: normalizeBoolean(info?.general?.leftSide),
+    hasRightSide: normalizeBoolean(info?.general?.rightSide),
     hasBack: normalizeBoolean(info?.back?.enabled),
     backThickness: normalizeBoolean(info?.back?.enabled) ? toPositiveNumber(info.back.thickness, Math.max(1, body.thickness / 3)) : 0,
     backInset: normalizeBoolean(info?.back?.enabled) ? toNonNegativeNumber(info.back.inset, 0) : 0
@@ -569,8 +588,9 @@ function buildHandleRailPanels(sourceBox, info, body, panels) {
   const frontCount = Math.max(0, toInteger(info.handleRail.frontCount, 0))
   const rearCount = Math.max(0, toInteger(info.handleRail.rearCount, 0))
   const middleCount = getHandleRailMiddleCount(info.handleRail.middleCount)
-  const x = body.x + t
-  const width = Math.max(1, body.width - (2 * t))
+  const sideZone = getCabinetSideZone(info, body)
+  const x = sideZone.x
+  const width = sideZone.width
   const topZ = getHandleRailTopZ(info, body, size)
   const frontRailY = body.y + faceOffset
   const backLimitY = getHandleRailBackLimitY(info, body)
@@ -720,8 +740,8 @@ function buildToeKickPanels(sourceBox, info, body, panels) {
   const rearEnabled = normalizeBoolean(info.toeKick.rear)
   const middleCount = getToeKickMiddleCount(info.toeKick.middleCount)
   const zone = getCabinetInnerZone(info, body)
-  const x = detached ? body.x : zone.x
-  const width = detached ? body.width : zone.width
+  const x = zone.x
+  const width = zone.width
   const bottomZ = body.z
   const frontRailY = body.y + faceOffset
   const backLimitY = getToeKickBackLimitY(info, body)

@@ -73,6 +73,22 @@ function getPanelResizeOrder(panel) {
 } // End getPanelResizeOrder
 
 
+
+//=================
+function getCabinetInfoSideZoneForBox(newBox, meta, thickness) {
+  const boxX = toNumber(newBox?.x, 0)
+  const boxWidth = Math.max(1, toNumber(newBox?.width, 1))
+  const hasLeftSide = meta.hasLeftSide !== false
+  const hasRightSide = meta.hasRightSide !== false
+  const leftInset = hasLeftSide ? thickness : 0
+  const rightInset = hasRightSide ? thickness : 0
+
+  return {
+    x: boxX + leftInset,
+    width: Math.max(1, boxWidth - leftInset - rightInset)
+  }
+} // End getCabinetInfoSideZoneForBox
+
 //=================
 function isCabinetInfoBackPanel(panel) {
   return panel?.sourceType === 'cabinet-info' && panel?.panelSide === 'back'
@@ -312,16 +328,14 @@ function updateCabinetInfoTopStripPanelAfterBoxResize(oldPanel, newBox) {
   const rawFaceOffset = toNumber(meta.faceOffset, 0)
   const faceOffset = rawFaceOffset < 0 ? Math.max(rawFaceOffset, -t) : rawFaceOffset
   const inset = meta.inset === true
-  const useFullWidth = !inset || faceOffset < 0
-  const boxX = toNumber(newBox?.x, oldPanel?.x3d ?? oldPanel?.x ?? 0)
+  const sideZone = getCabinetInfoSideZoneForBox(newBox, meta, t)
   const boxY = toNumber(newBox?.y, oldPanel?.y3d ?? 0)
   const boxZ = toNumber(newBox?.z, oldPanel?.z3d ?? oldPanel?.z ?? 0)
-  const boxWidth = Math.max(1, toNumber(newBox?.width, oldPanel?.xSize ?? oldPanel?.width ?? 1))
   const boxHeight = Math.max(1, toNumber(newBox?.height, oldPanel?.zSize ?? oldPanel?.height ?? 1))
-  const nextX = useFullWidth ? boxX : boxX + t
+  const nextX = sideZone.x
   const nextY = boxY + faceOffset
   const nextZ = boxZ + boxHeight - size
-  const nextWidth = useFullWidth ? boxWidth : Math.max(1, boxWidth - (2 * t))
+  const nextWidth = sideZone.width
 
   return {
     ...oldPanel,
@@ -348,7 +362,9 @@ function updateCabinetInfoTopStripPanelAfterBoxResize(oldPanel, newBox) {
       size,
       faceOffset,
       inset,
-      bodyThickness: t
+      bodyThickness: t,
+      hasLeftSide: meta.hasLeftSide !== false,
+      hasRightSide: meta.hasRightSide !== false
     }
   }
 } // End updateCabinetInfoTopStripPanelAfterBoxResize
@@ -396,11 +412,10 @@ function updateCabinetInfoHandleRailPanelAfterBoxResize(oldPanel, newBox) {
   const meta = oldPanel?.cabinetInfoHandleRail || {}
   const t = Math.max(1, toNumber(meta.bodyThickness, toNumber(oldPanel?.panelThickness ?? oldPanel?.ySize, 18)))
   const size = Math.max(1, toNumber(meta.size, toNumber(oldPanel?.zSize ?? oldPanel?.height, 50)))
-  const boxX = toNumber(newBox?.x, oldPanel?.x3d ?? oldPanel?.x ?? 0)
   const boxY = toNumber(newBox?.y, oldPanel?.y3d ?? 0)
-  const boxWidth = Math.max(1, toNumber(newBox?.width, oldPanel?.xSize ?? oldPanel?.width ?? 1))
-  const x = boxX + t
-  const width = Math.max(1, boxWidth - (2 * t))
+  const sideZone = getCabinetInfoSideZoneForBox(newBox, meta, t)
+  const x = sideZone.x
+  const width = sideZone.width
   const topZ = getCabinetInfoHandleRailTopZForBox(newBox, meta, size, t)
   const faceOffset = toNumber(meta.faceOffset, 0)
   const frontCount = Math.max(0, Math.floor(toNumber(meta.frontCount, 0)))
@@ -460,7 +475,9 @@ function updateCabinetInfoHandleRailPanelAfterBoxResize(oldPanel, newBox) {
       faceOffset,
       frontCount,
       rearCount,
-      middleCount
+      middleCount,
+      hasLeftSide: meta.hasLeftSide !== false,
+      hasRightSide: meta.hasRightSide !== false
     }
   }
 } // End updateCabinetInfoHandleRailPanelAfterBoxResize
@@ -505,10 +522,9 @@ function updateCabinetInfoToeKickPanelAfterBoxResize(oldPanel, newBox) {
   const boxY = toNumber(newBox?.y, oldPanel?.y3d ?? 0)
   const boxZ = toNumber(newBox?.z, oldPanel?.z3d ?? oldPanel?.z ?? 0)
   const boxWidth = Math.max(1, toNumber(newBox?.width, oldPanel?.xSize ?? oldPanel?.width ?? 1))
-  const leftInset = meta.hasLeftSide === false ? 0 : t
-  const rightInset = meta.hasRightSide === false ? 0 : t
-  const x = detached ? boxX : boxX + leftInset
-  const width = detached ? boxWidth : Math.max(1, boxWidth - leftInset - rightInset)
+  const sideZone = getCabinetInfoSideZoneForBox(newBox, meta, t)
+  const x = sideZone.x
+  const width = sideZone.width
   const bottomZ = boxZ
   const frontRailY = boxY + faceOffset
   const backLimitY = getCabinetInfoToeKickBackLimitYForBox(newBox, meta, t)
