@@ -73,6 +73,7 @@
       </header>
       <canvas
         ref="panelEditCanvasRef"
+        tabindex="0"
         class="mn-panel-edit-canvas"
         :class="panelEditCanvasCursorClass"
         @pointerdown.stop.prevent="onPanelEditPointerDown"
@@ -983,6 +984,7 @@ function selectPanelEditFace(faceSide) {
 
 //=================
 function onPanelEditPointerDown(event) {
+  panelEditCanvasRef.value?.focus?.()
   viewportRef.value?.focus()
 
   const context = activePanelEditContext.value
@@ -2781,6 +2783,8 @@ function onKeyDown(event) {
   if (handlePanelEditTapeKey(event)) return
 
   if (activePanelEditContext.value) {
+    event.preventDefault()
+    event.stopPropagation()
     return
   }
 

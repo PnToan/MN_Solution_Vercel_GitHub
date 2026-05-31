@@ -28,7 +28,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import TopBar from '../components/layout/TopBar.vue'
 import LibraryBar from '../components/library/LibraryBar.vue'
 import LeftToolbar from '../components/layout/LeftToolbar.vue'
@@ -101,6 +101,17 @@ function toggleRightPanel() {
     window.dispatchEvent(new Event('resize'))
   })
 } // End toggleRightPanel
+
+//=================
+function hideRightPanel() {
+  if (isRightPanelHidden.value) return
+
+  isRightPanelHidden.value = true
+
+  requestAnimationFrame(() => {
+    window.dispatchEvent(new Event('resize'))
+  })
+} // End hideRightPanel
 
 //=================
 function isEditableShortcutTarget(event) {
@@ -205,6 +216,8 @@ function applyMachinePanelSettings(settings) {
 
 //=================
 function onGlobalKeyDown(event) {
+  if (drawingStore.state.panelEdit?.active) return
+
   if (isEditableShortcutTarget(event)) return
 
   const shortcutText = shortcutEventToText(event)
@@ -217,6 +230,12 @@ function onGlobalKeyDown(event) {
 
   runShortcutAction(action)
 } // End onGlobalKeyDown
+
+watch(() => drawingStore.state.panelEdit?.active, (active) => {
+  if (!active) return
+
+  hideRightPanel()
+})
 
 onMounted(() => {
   const machineSettings = loadAppSettings()
