@@ -427,6 +427,101 @@ function updateCabinetInfoHandleRailPanelAfterBoxResize(oldPanel, newBox) {
 
 
 //=================
+function getCabinetInfoToeKickBackLimitYForBox(newBox, meta, thickness) {
+  const boxY = toNumber(newBox?.y, 0)
+  const boxDepth = Math.max(1, toNumber(newBox?.depth, 1))
+
+  if (meta.hasBack === true) {
+    const backThickness = Math.max(1, toNumber(meta.backThickness, Math.max(1, thickness / 3)))
+    const backInset = Math.max(0, toNumber(meta.backInset, 0))
+
+    return boxY + boxDepth - backInset - backThickness
+  }
+
+  return boxY + boxDepth
+} // End getCabinetInfoToeKickBackLimitYForBox
+
+//=================
+function getCabinetInfoToeKickMiddleXForBox(index, count, x, width, thickness) {
+  if (count <= 1) return x
+
+  const usableWidth = Math.max(0, width - thickness)
+
+  return x + ((usableWidth * index) / (count - 1))
+} // End getCabinetInfoToeKickMiddleXForBox
+
+//=================
+function updateCabinetInfoToeKickPanelAfterBoxResize(oldPanel, newBox) {
+  const meta = oldPanel?.cabinetInfoToeKick || {}
+  const t = Math.max(1, toNumber(meta.bodyThickness, toNumber(oldPanel?.panelThickness ?? oldPanel?.ySize, 18)))
+  const height = Math.max(1, toNumber(meta.height, toNumber(oldPanel?.zSize ?? oldPanel?.height, 100)))
+  const faceOffset = toNumber(meta.faceOffset, t)
+  const detached = meta.detached === true
+  const rearEnabled = meta.rear === true
+  const middleCount = Math.max(0, Math.floor(toNumber(meta.middleCount, 0)))
+  const index = Math.max(0, Math.floor(toNumber(meta.index, 0)))
+  const type = String(meta.type || '').trim()
+  const boxX = toNumber(newBox?.x, oldPanel?.x3d ?? oldPanel?.x ?? 0)
+  const boxY = toNumber(newBox?.y, oldPanel?.y3d ?? 0)
+  const boxZ = toNumber(newBox?.z, oldPanel?.z3d ?? oldPanel?.z ?? 0)
+  const boxWidth = Math.max(1, toNumber(newBox?.width, oldPanel?.xSize ?? oldPanel?.width ?? 1))
+  const x = detached ? boxX : boxX + t
+  const width = detached ? boxWidth : Math.max(1, boxWidth - (2 * t))
+  const bottomZ = boxZ
+  const frontRailY = boxY + faceOffset
+  const backLimitY = getCabinetInfoToeKickBackLimitYForBox(newBox, meta, t)
+  const rearRailY = backLimitY - t
+  const middleStartY = frontRailY + t
+  const middleEndY = rearEnabled ? rearRailY : backLimitY
+  const middleDepth = Math.max(1, middleEndY - middleStartY)
+  let nextX = x
+  let nextY = frontRailY
+  let nextWidth = width
+  let nextDepth = t
+
+  if (type === 'rear' || oldPanel.panelSide === 'toe_kick_rear') {
+    nextY = rearRailY
+  } else if (type === 'middle' || oldPanel.panelSide === 'toe_kick_middle') {
+    nextX = getCabinetInfoToeKickMiddleXForBox(index, Math.max(2, middleCount), x, width, t)
+    nextY = middleStartY
+    nextWidth = t
+    nextDepth = middleDepth
+  }
+
+  return {
+    ...oldPanel,
+    x3d: nextX,
+    y3d: nextY,
+    z3d: bottomZ,
+    xSize: nextWidth,
+    ySize: nextDepth,
+    zSize: height,
+    x: nextX,
+    y: bottomZ,
+    z: bottomZ,
+    width: nextWidth,
+    depth: nextDepth,
+    height,
+    linkedFrameId: newBox.id,
+    frameId: newBox.id,
+    sourceBoxId: newBox.id,
+    baseObjectId: newBox.id,
+    panelThickness: t,
+    thickness: t,
+    cabinetInfoToeKick: {
+      ...meta,
+      bodyThickness: t,
+      height,
+      faceOffset,
+      detached,
+      rear: rearEnabled,
+      middleCount
+    }
+  }
+} // End updateCabinetInfoToeKickPanelAfterBoxResize
+
+
+//=================
 function parseCabinetInfoDoorStopDivisionFormula(formula, totalSize, thickness) {
   const raw = String(formula || '').trim()
   const safeTotal = Math.max(1, toNumber(totalSize, 1))
@@ -1318,6 +1413,15 @@ const store = createSimpleStore({
 
       if (oldPanel.sourceType === 'cabinet-info' && oldPanel.panelSide === 'door_stop') {
         nextPanelsInBox.push(updateCabinetInfoDoorStopPanelAfterBoxResize(oldPanel, newBox))
+        return
+      }
+
+      if (oldPanel.sourceType === 'cabinet-info' && (
+        oldPanel.panelSide === 'toe_kick_front'
+        || oldPanel.panelSide === 'toe_kick_rear'
+        || oldPanel.panelSide === 'toe_kick_middle'
+      )) {
+        nextPanelsInBox.push(updateCabinetInfoToeKickPanelAfterBoxResize(oldPanel, newBox))
         return
       }
 

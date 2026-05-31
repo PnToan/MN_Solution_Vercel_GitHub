@@ -302,6 +302,7 @@ function buildFramePanels(sourceBox, info, body, panels) {
   const topShift = topStripEnabled ? toNonNegativeNumber(info.topStrip.size, 0) : 0
   const toeHeight = normalizeBoolean(info?.toeKick?.enabled) ? toNonNegativeNumber(info.toeKick.height, 0) : 0
   const detachedToe = normalizeBoolean(info?.toeKick?.detached)
+  const keepSideFullHeightForToeKick = toeHeight > 0 && !detachedToe
   const backEnabled = normalizeBoolean(info?.back?.enabled)
   const overlayBack = backEnabled && normalizeBoolean(info?.back?.overlayBack)
   const topCoverBack = backEnabled && normalizeBoolean(info?.back?.topCoverBack)
@@ -316,7 +317,7 @@ function buildFramePanels(sourceBox, info, body, panels) {
   const bottomZ = body.z + toeHeight
   const sideBottom = hasBottom && normalizeBoolean(info?.general?.bottomOverlap) ? bottomZ + t : bottomZ
   const sideTop = hasTop && normalizeBoolean(info?.general?.topOverlap) ? sideFrameTop - t : sideFrameTop
-  const sideZ = detachedToe ? body.z + toeHeight : sideBottom
+  const sideZ = keepSideFullHeightForToeKick ? body.z : (detachedToe ? body.z + toeHeight : sideBottom)
   const sideHeight = Math.max(t, sideTop - sideZ)
   const topLeftInset = !normalizeBoolean(info?.general?.topOverlap) && hasLeftSide ? t : 0
   const topRightInset = !normalizeBoolean(info?.general?.topOverlap) && hasRightSide ? t : 0
@@ -597,51 +598,100 @@ function buildDoorStopPanels(sourceBox, info, body, panels) {
 } // End buildDoorStopPanels
 
 //=================
+function getToeKickBackLimitY(info, body) {
+  const t = body.thickness
+
+  if (normalizeBoolean(info?.back?.enabled)) {
+    const backThickness = toPositiveNumber(info.back.thickness, Math.max(1, t / 3))
+    const inset = toNonNegativeNumber(info.back.inset, 0)
+
+    return body.y + body.depth - inset - backThickness
+  }
+
+  return body.y + body.depth
+} // End getToeKickBackLimitY
+
+//=================
+function getToeKickMiddleCount(value) {
+  const rawCount = Math.max(0, toInteger(value, 0))
+
+  if (rawCount === 1) return 2
+
+  return rawCount
+} // End getToeKickMiddleCount
+
+//=================
+function getToeKickMiddleX(index, count, x, width, thickness) {
+  if (count <= 1) return x
+
+  const usableWidth = Math.max(0, width - thickness)
+
+  return x + ((usableWidth * index) / (count - 1))
+} // End getToeKickMiddleX
+
+//=================
+function createToeKickMeta(info, body, type, index, count) {
+  return {
+    type,
+    index,
+    count,
+    bodyThickness: body.thickness,
+    height: toPositiveNumber(info?.toeKick?.height, 100),
+    faceOffset: toNumber(info?.toeKick?.inset, body.thickness),
+    detached: normalizeBoolean(info?.toeKick?.detached),
+    rear: normalizeBoolean(info?.toeKick?.rear),
+    middleCount: getToeKickMiddleCount(info?.toeKick?.middleCount),
+    hasBack: normalizeBoolean(info?.back?.enabled),
+    backThickness: normalizeBoolean(info?.back?.enabled) ? toPositiveNumber(info.back.thickness, Math.max(1, body.thickness / 3)) : 0,
+    backInset: normalizeBoolean(info?.back?.enabled) ? toNonNegativeNumber(info.back.inset, 0) : 0
+  }
+} // End createToeKickMeta
+
+//=================
 function buildToeKickPanels(sourceBox, info, body, panels) {
   if (!normalizeBoolean(info?.toeKick?.enabled)) return
 
   const t = body.thickness
   const height = toPositiveNumber(info.toeKick.height, 100)
-  const inset = toNumber(info.toeKick.inset, t)
-  const frontY = body.y + body.depth
-  const y = frontY - inset - t
+  const faceOffset = toNumber(info.toeKick.inset, t)
   const detached = normalizeBoolean(info.toeKick.detached)
+  const rearEnabled = normalizeBoolean(info.toeKick.rear)
+  const middleCount = getToeKickMiddleCount(info.toeKick.middleCount)
   const x = detached ? body.x : body.x + t
   const width = detached ? body.width : Math.max(1, body.width - (2 * t))
+  const bottomZ = body.z
+  const frontRailY = body.y + faceOffset
+  const backLimitY = getToeKickBackLimitY(info, body)
+  const rearRailY = backLimitY - t
+  const middleStartY = frontRailY + t
+  const middleEndY = rearEnabled ? rearRailY : backLimitY
+  const middleDepth = Math.max(1, middleEndY - middleStartY)
 
-  pushPanel(panels, createPanel(sourceBox, 'toe_kick_front', 'Len chân trước', x, y, body.z, width, t, height, {
+  pushPanel(panels, createPanel(sourceBox, 'toe_kick_front', 'Len chân trước', x, frontRailY, bottomZ, width, t, height, {
     panelThickness: t,
     orientation: 'horizontal',
-    panelSide: 'toe_kick_front'
+    panelSide: 'toe_kick_front',
+    cabinetInfoToeKick: createToeKickMeta(info, body, 'front', 0, 1)
   }))
 
-  if (normalizeBoolean(info.toeKick.rear)) {
-    const rearY = normalizeBoolean(info?.back?.enabled)
-      ? body.y + toNumber(info.back.inset, 0) + toPositiveNumber(info.back.thickness, 1)
-      : body.y
-
-    pushPanel(panels, createPanel(sourceBox, 'toe_kick_rear', 'Thanh chân sau', x, rearY, body.z, width, t, height, {
+  if (rearEnabled) {
+    pushPanel(panels, createPanel(sourceBox, 'toe_kick_rear', 'Len chân sau', x, rearRailY, bottomZ, width, t, height, {
       panelThickness: t,
       orientation: 'horizontal',
-      panelSide: 'toe_kick_rear'
+      panelSide: 'toe_kick_rear',
+      cabinetInfoToeKick: createToeKickMeta(info, body, 'rear', 0, 1)
     }))
   }
 
-  const middleCount = Math.max(0, toInteger(info.toeKick.middleCount, 0))
-
-  if (middleCount > 0) {
-    const rearY = normalizeBoolean(info?.back?.enabled)
-      ? body.y + toNumber(info.back.inset, 0) + toPositiveNumber(info.back.thickness, 1)
-      : body.y
-    const depth = Math.max(1, y - rearY)
-
+  if (middleCount >= 2) {
     for (let index = 0; index < middleCount; index += 1) {
-      const railX = body.x + t + ((index + 1) * ((body.width - (2 * t)) / (middleCount + 1)))
+      const railX = getToeKickMiddleX(index, middleCount, x, width, t)
 
-      pushPanel(panels, createPanel(sourceBox, 'toe_kick_middle', `Thanh chân bổ sung ${index + 1}`, railX, rearY, body.z, t, depth, height, {
+      pushPanel(panels, createPanel(sourceBox, 'toe_kick_middle', `Len chân bổ sung ${index + 1}`, railX, middleStartY, bottomZ, t, middleDepth, height, {
         panelThickness: t,
         orientation: 'vertical',
-        panelSide: 'toe_kick_middle'
+        panelSide: 'toe_kick_middle',
+        cabinetInfoToeKick: createToeKickMeta(info, body, 'middle', index, middleCount)
       }))
     }
   }
