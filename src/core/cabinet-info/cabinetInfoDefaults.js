@@ -5,12 +5,12 @@ export function createDefaultCabinetInfoState() {
     general: {
       cabinetDepth: 500,
       panelThickness: 17.4,
-      leftSide: false,
-      rightSide: false,
-      top: false,
-      bottom: false,
-      topOverlap: true,
-      bottomOverlap: true
+      leftSide: true,
+      rightSide: true,
+      top: true,
+      bottom: true,
+      topOverlap: false,
+      bottomOverlap: false
     },
     back: {
       enabled: false,

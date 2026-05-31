@@ -307,19 +307,25 @@ function buildFramePanels(sourceBox, info, body, panels) {
   const topCoverBack = backEnabled && normalizeBoolean(info?.back?.topCoverBack)
   const bottomCoverBack = backEnabled && normalizeBoolean(info?.back?.bottomCoverBack)
   const backStopDepth = getBackStopDepth(info, body)
+  const hasLeftSide = normalizeBoolean(info?.general?.leftSide)
+  const hasRightSide = normalizeBoolean(info?.general?.rightSide)
+  const hasTop = normalizeBoolean(info?.general?.top)
+  const hasBottom = normalizeBoolean(info?.general?.bottom)
   const bodyTop = body.z + body.height - topShift
   const sideFrameTop = keepSideFullHeightForInsetTopStrip ? body.z + body.height : bodyTop
   const bottomZ = body.z + toeHeight
-  const sideBottom = normalizeBoolean(info?.general?.bottomOverlap) ? bottomZ + t : bottomZ
-  const sideTop = normalizeBoolean(info?.general?.topOverlap) ? sideFrameTop - t : sideFrameTop
+  const sideBottom = hasBottom && normalizeBoolean(info?.general?.bottomOverlap) ? bottomZ + t : bottomZ
+  const sideTop = hasTop && normalizeBoolean(info?.general?.topOverlap) ? sideFrameTop - t : sideFrameTop
   const sideZ = detachedToe ? body.z + toeHeight : sideBottom
   const sideHeight = Math.max(t, sideTop - sideZ)
-  const innerX = body.x + t
-  const innerWidth = Math.max(t, body.width - (2 * t))
-  const topBottomX = normalizeBoolean(info?.general?.topOverlap) ? body.x : innerX
-  const topBottomWidth = normalizeBoolean(info?.general?.topOverlap) ? body.width : innerWidth
-  const bottomX = normalizeBoolean(info?.general?.bottomOverlap) ? body.x : innerX
-  const bottomWidth = normalizeBoolean(info?.general?.bottomOverlap) ? body.width : innerWidth
+  const topLeftInset = !normalizeBoolean(info?.general?.topOverlap) && hasLeftSide ? t : 0
+  const topRightInset = !normalizeBoolean(info?.general?.topOverlap) && hasRightSide ? t : 0
+  const bottomLeftInset = !normalizeBoolean(info?.general?.bottomOverlap) && hasLeftSide ? t : 0
+  const bottomRightInset = !normalizeBoolean(info?.general?.bottomOverlap) && hasRightSide ? t : 0
+  const topBottomX = body.x + topLeftInset
+  const topBottomWidth = Math.max(t, body.width - topLeftInset - topRightInset)
+  const bottomX = body.x + bottomLeftInset
+  const bottomWidth = Math.max(t, body.width - bottomLeftInset - bottomRightInset)
   const sideDepth = overlayBack ? backStopDepth : body.depth
   const topDepth = (overlayBack || topCoverBack) ? backStopDepth : body.depth
   const bottomDepth = (overlayBack || bottomCoverBack) ? backStopDepth : body.depth
@@ -333,7 +339,7 @@ function buildFramePanels(sourceBox, info, body, panels) {
     topStripSize: topShift
   }
 
-  if (normalizeBoolean(info?.general?.leftSide)) {
+  if (hasLeftSide) {
     pushPanel(panels, createPanel(sourceBox, 'left_side', 'Hông trái', body.x, body.y, sideZ, t, sideDepth, sideHeight, {
       panelThickness: t,
       orientation: 'vertical',
@@ -343,7 +349,7 @@ function buildFramePanels(sourceBox, info, body, panels) {
     }))
   }
 
-  if (normalizeBoolean(info?.general?.rightSide)) {
+  if (hasRightSide) {
     pushPanel(panels, createPanel(sourceBox, 'right_side', 'Hông phải', body.x + body.width - t, body.y, sideZ, t, sideDepth, sideHeight, {
       panelThickness: t,
       orientation: 'vertical',
@@ -353,7 +359,7 @@ function buildFramePanels(sourceBox, info, body, panels) {
     }))
   }
 
-  if (normalizeBoolean(info?.general?.top)) {
+  if (hasTop) {
     pushPanel(panels, createPanel(sourceBox, 'top', 'Tấm nóc', topBottomX, body.y, bodyTop - t, topBottomWidth, topDepth, t, {
       panelThickness: t,
       orientation: 'horizontal',
@@ -364,7 +370,7 @@ function buildFramePanels(sourceBox, info, body, panels) {
     }))
   }
 
-  if (normalizeBoolean(info?.general?.bottom)) {
+  if (hasBottom) {
     pushPanel(panels, createPanel(sourceBox, 'bottom', 'Tấm đáy', bottomX, body.y, bottomZ, bottomWidth, bottomDepth, t, {
       panelThickness: t,
       orientation: 'horizontal',
