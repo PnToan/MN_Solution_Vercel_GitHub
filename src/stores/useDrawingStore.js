@@ -2129,7 +2129,10 @@ const store = createSimpleStore({
       end: { ...rectangle.end },
       operation: rectangle.operation || 'none',
       faceSide: payload.faceSide || state.panelEdit?.context?.faceSide || null,
-      faceKey: payload.faceKey || state.panelEdit?.context?.faceKey || null
+      faceKey: payload.faceKey || state.panelEdit?.context?.faceKey || null,
+      axisU: payload.axisU || state.panelEdit?.context?.axisU || null,
+      axisV: payload.axisV || state.panelEdit?.context?.axisV || null,
+      thicknessAxis: payload.thicknessAxis || state.panelEdit?.context?.thicknessAxis || null
     }))
 
     state.panels = state.panels.map((panel) => {

@@ -890,25 +890,29 @@ function drawPanelEditRectangle(targetContext, context, layout, rectangle, optio
 
   targetContext.save()
   const isCutout = rectangle.operation === 'cutout'
+  const editBackground = getCssVariable('--mn-bg-canvas', '#f4f4f4')
 
-  targetContext.strokeStyle = isDraft ? '#ff7a00' : (isCutout ? '#d90000' : '#111111')
-  targetContext.fillStyle = isDraft ? 'rgba(255, 122, 0, 0.12)' : (isCutout ? 'rgba(217, 0, 0, 0.12)' : 'rgba(0, 0, 0, 0.04)')
+  if (isCutout && !isDraft) {
+    targetContext.fillStyle = editBackground
+    targetContext.strokeStyle = '#111111'
+    targetContext.lineWidth = 1.6
+    targetContext.setLineDash([])
+    targetContext.beginPath()
+    targetContext.rect(start.x, start.y, rectWidth, rectHeight)
+    targetContext.fill()
+    targetContext.stroke()
+    targetContext.restore()
+    return
+  }
+
+  targetContext.strokeStyle = isDraft ? '#ff7a00' : '#111111'
+  targetContext.fillStyle = isDraft ? 'rgba(255, 122, 0, 0.12)' : 'rgba(0, 0, 0, 0.04)'
   targetContext.lineWidth = isDraft ? 2 : 1.5
   targetContext.setLineDash(isDraft ? [8, 5] : [])
   targetContext.beginPath()
   targetContext.rect(start.x, start.y, rectWidth, rectHeight)
   targetContext.fill()
   targetContext.stroke()
-
-  if (isCutout && !isDraft) {
-    targetContext.beginPath()
-    targetContext.moveTo(start.x, start.y)
-    targetContext.lineTo(start.x + rectWidth, start.y + rectHeight)
-    targetContext.moveTo(start.x + rectWidth, start.y)
-    targetContext.lineTo(start.x, start.y + rectHeight)
-    targetContext.stroke()
-  }
-
   targetContext.restore()
 } // End drawPanelEditRectangle
 
@@ -1410,6 +1414,9 @@ function applyPanelEdit() {
     panelId: context.panelId,
     faceSide: context.faceSide,
     faceKey: context.faceKey,
+    axisU: context.axisU,
+    axisV: context.axisV,
+    thicknessAxis: context.thicknessAxis,
     rectangles: panelEditRect.value.rectangles
   })
   panelEditRect.value = {

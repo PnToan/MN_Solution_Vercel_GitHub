@@ -89,6 +89,81 @@ function drawRectLocal(ctx, viewport, rect, options = {}) {
 } // End drawRectLocal
 
 //=================
+function getPanelEditCutoutFaceAxes(faceKey) {
+  if (faceKey === 'xy') return { axisU: 'x', axisV: 'y' }
+  if (faceKey === 'yz') return { axisU: 'y', axisV: 'z' }
+  if (faceKey === 'xz') return { axisU: 'x', axisV: 'z' }
+
+  return null
+} // End getPanelEditCutoutFaceAxes
+
+//=================
+function getPanelEditCutoutBounds(cutout) {
+  const x1 = Number(cutout?.start?.x || 0)
+  const y1 = Number(cutout?.start?.y || 0)
+  const x2 = Number(cutout?.end?.x ?? x1)
+  const y2 = Number(cutout?.end?.y ?? y1)
+  const width = Math.abs(x2 - x1)
+  const height = Math.abs(y2 - y1)
+
+  if (width <= 0 || height <= 0) return null
+
+  return {
+    x: Math.min(x1, x2),
+    y: Math.min(y1, y2),
+    width,
+    height
+  }
+} // End getPanelEditCutoutBounds
+
+//=================
+function getPanelEditCutoutLocalRect(panel, cutout, panelRect, currentView) {
+  if (!panel || !cutout || !panelRect) return null
+
+  const camera = getCameraConfig(currentView)
+  const axes = getPanelEditCutoutFaceAxes(cutout.faceKey)
+  const bounds = getPanelEditCutoutBounds(cutout)
+
+  if (!camera || !axes || !bounds) return null
+  if (camera.axisU !== axes.axisU || camera.axisV !== axes.axisV) return null
+
+  const uSize = getPanelAxisSize(panel, camera.axisU)
+  const vSize = getPanelAxisSize(panel, camera.axisV)
+  const x = camera.reverseU
+    ? panelRect.x + uSize - bounds.x - bounds.width
+    : panelRect.x + bounds.x
+  const y = camera.reverseV
+    ? panelRect.y + vSize - bounds.y - bounds.height
+    : panelRect.y + bounds.y
+
+  return {
+    x,
+    y,
+    width: bounds.width,
+    height: bounds.height
+  }
+} // End getPanelEditCutoutLocalRect
+
+//=================
+function drawPanelEditCutouts(ctx, viewport, panel, panelRect, currentView) {
+  const cutouts = Array.isArray(panel?.editPanelCutouts) ? panel.editPanelCutouts : []
+
+  if (!cutouts.length) return
+
+  cutouts.forEach((cutout) => {
+    const cutoutRect = getPanelEditCutoutLocalRect(panel, cutout, panelRect, currentView)
+
+    if (!cutoutRect) return
+
+    drawRectLocal(ctx, viewport, cutoutRect, {
+      fill: getCanvasBackgroundColor(),
+      stroke: '#111111',
+      lineWidth: 1.5
+    })
+  })
+} // End drawPanelEditCutouts
+
+//=================
 function drawGrid(ctx, viewport, width, height) {
   const scale = getLocalScale(viewport)
   const stepLocal = 100
@@ -402,6 +477,8 @@ function drawPanels(ctx, viewport, panels = [], selectedPanelIds = [], currentVi
       stroke: getRuntimePanelStroke(selected),
       lineWidth: selected ? 3 : 2
     })
+
+    drawPanelEditCutouts(ctx, viewport, panel, rect, currentView)
 
     if (!selected || !showIndividualGrips) return
 
