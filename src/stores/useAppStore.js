@@ -108,7 +108,12 @@ const TOOL_LABEL = {
  move: 'Di chuyển',
  offset: 'Offset',
  measure: 'Đo',
- dimensions: 'Dimensions'
+ dimensions: 'Dimensions',
+ editPanel: 'Edit Panel',
+ editPanelRect: 'Edit Panel Rectangle',
+ editPanelArc: 'Edit Panel Arc',
+ editPanelCircle: 'Edit Panel Circle',
+ editPanelTape: 'Edit Panel Tape Measure'
 }
 
 const store = createSimpleStore({
