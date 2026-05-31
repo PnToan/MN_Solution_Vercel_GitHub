@@ -124,6 +124,10 @@ const store = createSimpleStore({
 
     setNestedValue(state.info, path, nextValue)
 
+    if (state.info?.topStrip?.inset === true && state.info?.general?.topOverlap === true) {
+      useAppStore().setStatus('Chỉnh Nóc Lọt')
+    }
+
     if (path === 'general.cabinetDepth') {
       this.applyDepthToSelectedBox()
     }

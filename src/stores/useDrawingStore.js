@@ -264,6 +264,54 @@ function updateCabinetInfoFramePanelDepthAfterBoxResize(panel, newBox) {
   }
 } // End updateCabinetInfoFramePanelDepthAfterBoxResize
 
+//=================
+function updateCabinetInfoTopStripPanelAfterBoxResize(oldPanel, newBox) {
+  const meta = oldPanel?.cabinetInfoTopStrip || {}
+  const t = Math.max(1, toNumber(meta.bodyThickness, toNumber(oldPanel?.panelThickness ?? oldPanel?.ySize, 18)))
+  const size = Math.max(1, toNumber(meta.size, toNumber(oldPanel?.zSize ?? oldPanel?.height, 50)))
+  const faceOffset = toNumber(meta.faceOffset, 0)
+  const inset = meta.inset === true
+  const useFullWidth = !inset || faceOffset < 0
+  const boxX = toNumber(newBox?.x, oldPanel?.x3d ?? oldPanel?.x ?? 0)
+  const boxY = toNumber(newBox?.y, oldPanel?.y3d ?? 0)
+  const boxZ = toNumber(newBox?.z, oldPanel?.z3d ?? oldPanel?.z ?? 0)
+  const boxWidth = Math.max(1, toNumber(newBox?.width, oldPanel?.xSize ?? oldPanel?.width ?? 1))
+  const boxHeight = Math.max(1, toNumber(newBox?.height, oldPanel?.zSize ?? oldPanel?.height ?? 1))
+  const nextX = useFullWidth ? boxX : boxX + t
+  const nextY = boxY + Math.max(0, faceOffset)
+  const nextZ = boxZ + boxHeight - size
+  const nextWidth = useFullWidth ? boxWidth : Math.max(1, boxWidth - (2 * t))
+
+  return {
+    ...oldPanel,
+    x3d: nextX,
+    y3d: nextY,
+    z3d: nextZ,
+    xSize: nextWidth,
+    ySize: t,
+    zSize: size,
+    x: nextX,
+    y: nextZ,
+    z: nextZ,
+    width: nextWidth,
+    depth: t,
+    height: size,
+    linkedFrameId: newBox.id,
+    frameId: newBox.id,
+    sourceBoxId: newBox.id,
+    baseObjectId: newBox.id,
+    panelThickness: t,
+    thickness: t,
+    cabinetInfoTopStrip: {
+      ...meta,
+      size,
+      faceOffset,
+      inset,
+      bodyThickness: t
+    }
+  }
+} // End updateCabinetInfoTopStripPanelAfterBoxResize
+
 
 //=================
 function getPanelAxisMin(panel, axis) {
@@ -1037,6 +1085,11 @@ const store = createSimpleStore({
     panelsInBox.forEach((oldPanel) => {
       if (oldPanel.sourceType === 'cabinet-info' && oldPanel.panelSide === 'back') {
         nextPanelsInBox.push(updateCabinetInfoBackPanelAfterBoxResize(oldPanel, oldBox, newBox))
+        return
+      }
+
+      if (oldPanel.sourceType === 'cabinet-info' && oldPanel.panelSide === 'top_strip') {
+        nextPanelsInBox.push(updateCabinetInfoTopStripPanelAfterBoxResize(oldPanel, newBox))
         return
       }
 

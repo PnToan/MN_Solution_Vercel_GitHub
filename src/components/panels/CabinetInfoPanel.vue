@@ -47,6 +47,7 @@
     <InfoSection title="Thanh Chỉ Nóc" section-key="topStrip">
       <InfoCheck label="Tạo chỉ nóc" path="topStrip.enabled" />
       <InfoCheck label="Nóc lọt" path="topStrip.inset" />
+      <div v-if="showTopStripInsetWarning" class="mn-info-warning">Chỉnh Nóc Lọt</div>
       <InfoNumber label="Kích thước" path="topStrip.size" />
       <InfoNumber label="Âm mặt" path="topStrip.faceOffset" />
     </InfoSection>
@@ -112,6 +113,11 @@ const selectedBox = computed(() => {
 })
 
 const selectedBoxName = computed(() => selectedBox.value?.name || selectedBox.value?.id || 'Chưa chọn')
+const showTopStripInsetWarning = computed(() => {
+  return selectedBox.value
+    && info?.topStrip?.inset === true
+    && info?.general?.topOverlap === true
+})
 
 watch(() => selectedBox.value?.id, () => {
   if (!selectedBox.value) return

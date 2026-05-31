@@ -285,7 +285,11 @@ function getBackGeometry(body, meta) {
 //=================
 function buildFramePanels(sourceBox, info, body, panels) {
   const t = body.thickness
-  const topShift = normalizeBoolean(info?.topStrip?.enabled) ? toNonNegativeNumber(info.topStrip.size, 0) : 0
+  const topStripEnabled = normalizeBoolean(info?.topStrip?.enabled)
+  const topStripInset = normalizeBoolean(info?.topStrip?.inset)
+  const topOverlap = normalizeBoolean(info?.general?.topOverlap)
+  const keepSideFullHeightForInsetTopStrip = topStripEnabled && topStripInset && !topOverlap
+  const topShift = topStripEnabled && !keepSideFullHeightForInsetTopStrip ? toNonNegativeNumber(info.topStrip.size, 0) : 0
   const toeHeight = normalizeBoolean(info?.toeKick?.enabled) ? toNonNegativeNumber(info.toeKick.height, 0) : 0
   const detachedToe = normalizeBoolean(info?.toeKick?.detached)
   const backEnabled = normalizeBoolean(info?.back?.enabled)
@@ -398,17 +402,25 @@ function buildTopStripPanels(sourceBox, info, body, panels) {
 
   const t = body.thickness
   const size = toPositiveNumber(info.topStrip.size, 50)
-  const frontY = body.y + body.depth
   const faceOffset = toNumber(info.topStrip.faceOffset, 0)
-  const y = frontY - faceOffset - t
-  const useFullWidth = !normalizeBoolean(info.topStrip.inset) || faceOffset < 0
+  const y = body.y + Math.max(0, faceOffset)
+  const inset = normalizeBoolean(info.topStrip.inset)
+  const topOverlap = normalizeBoolean(info?.general?.topOverlap)
+  const useFullWidth = !inset || faceOffset < 0
   const x = useFullWidth ? body.x : body.x + t
   const width = useFullWidth ? body.width : Math.max(1, body.width - (2 * t))
 
   pushPanel(panels, createPanel(sourceBox, 'top_strip', 'Thanh chỉ nóc', x, y, body.z + body.height - size, width, t, size, {
     panelThickness: t,
     orientation: 'horizontal',
-    panelSide: 'top_strip'
+    panelSide: 'top_strip',
+    cabinetInfoTopStrip: {
+      size,
+      faceOffset,
+      inset,
+      topOverlap,
+      bodyThickness: t
+    }
   }))
 } // End buildTopStripPanels
 
