@@ -445,53 +445,118 @@ function buildTopStripPanels(sourceBox, info, body, panels) {
 } // End buildTopStripPanels
 
 //=================
+function getHandleRailTopZ(info, body, size) {
+  const t = body.thickness
+  const topStripOffset = normalizeBoolean(info?.topStrip?.enabled)
+    ? toNonNegativeNumber(info.topStrip.size, 0)
+    : 0
+  const topBottomZ = normalizeBoolean(info?.general?.top)
+    ? body.z + body.height - topStripOffset - t
+    : body.z + body.height - topStripOffset
+
+  return topBottomZ - size
+} // End getHandleRailTopZ
+
+//=================
+function getHandleRailBackLimitY(info, body) {
+  const t = body.thickness
+
+  if (normalizeBoolean(info?.back?.enabled)) {
+    const backThickness = toPositiveNumber(info.back.thickness, Math.max(1, t / 3))
+    const inset = toNonNegativeNumber(info.back.inset, 0)
+
+    return body.y + body.depth - inset - backThickness
+  }
+
+  return body.y + body.depth
+} // End getHandleRailBackLimitY
+
+//=================
+function getHandleRailMiddleCount(value) {
+  const rawCount = Math.max(0, toInteger(value, 0))
+
+  if (rawCount === 1) return 2
+
+  return rawCount
+} // End getHandleRailMiddleCount
+
+//=================
+function getHandleRailMiddleX(index, count, x, width, thickness) {
+  if (count <= 1) return x
+
+  const usableWidth = Math.max(0, width - thickness)
+
+  return x + ((usableWidth * index) / (count - 1))
+} // End getHandleRailMiddleX
+
+//=================
+function createHandleRailMeta(info, body, type, index, count) {
+  return {
+    type,
+    index,
+    count,
+    bodyThickness: body.thickness,
+    size: toPositiveNumber(info?.handleRail?.size, 50),
+    faceOffset: toNumber(info?.handleRail?.faceOffset, 0),
+    frontCount: Math.max(0, toInteger(info?.handleRail?.frontCount, 0)),
+    rearCount: Math.max(0, toInteger(info?.handleRail?.rearCount, 0)),
+    middleCount: getHandleRailMiddleCount(info?.handleRail?.middleCount),
+    topStripEnabled: normalizeBoolean(info?.topStrip?.enabled),
+    topStripSize: normalizeBoolean(info?.topStrip?.enabled) ? toNonNegativeNumber(info.topStrip.size, 0) : 0,
+    hasTop: normalizeBoolean(info?.general?.top),
+    hasBack: normalizeBoolean(info?.back?.enabled),
+    backThickness: normalizeBoolean(info?.back?.enabled) ? toPositiveNumber(info.back.thickness, Math.max(1, body.thickness / 3)) : 0,
+    backInset: normalizeBoolean(info?.back?.enabled) ? toNonNegativeNumber(info.back.inset, 0) : 0
+  }
+} // End createHandleRailMeta
+
+//=================
 function buildHandleRailPanels(sourceBox, info, body, panels) {
   if (!normalizeBoolean(info?.handleRail?.enabled)) return
 
   const t = body.thickness
   const size = toPositiveNumber(info.handleRail.size, 50)
-  const frontY = body.y + body.depth
   const faceOffset = toNumber(info.handleRail.faceOffset, 0)
   const frontCount = Math.max(0, toInteger(info.handleRail.frontCount, 0))
   const rearCount = Math.max(0, toInteger(info.handleRail.rearCount, 0))
-  const middleCount = Math.max(0, toInteger(info.handleRail.middleCount, 0))
+  const middleCount = getHandleRailMiddleCount(info.handleRail.middleCount)
   const x = body.x + t
   const width = Math.max(1, body.width - (2 * t))
-  const topZ = body.z + body.height - size
-  const frontRailY = frontY - faceOffset - t
-  const backReference = normalizeBoolean(info?.back?.enabled)
-    ? body.y + toNumber(info.back.inset, 0) + toPositiveNumber(info.back.thickness, 1)
-    : body.y
+  const topZ = getHandleRailTopZ(info, body, size)
+  const frontRailY = body.y + faceOffset
+  const backLimitY = getHandleRailBackLimitY(info, body)
+  const rearRailY = backLimitY - t
+  const middleEndY = rearCount > 0 ? rearRailY : backLimitY
+  const middleStartY = frontRailY + (frontCount > 0 ? t : 0)
+  const middleDepth = Math.max(1, middleEndY - middleStartY)
 
   for (let index = 0; index < frontCount; index += 1) {
-    pushPanel(panels, createPanel(sourceBox, 'handle_front', `Diềm tay nắm trước ${index + 1}`, x, frontRailY - (index * t), topZ - (index * size), width, t, size, {
+    pushPanel(panels, createPanel(sourceBox, 'handle_front', `Diềm tay nắm trước ${index + 1}`, x, frontRailY + (index * t), topZ - (index * size), width, t, size, {
       panelThickness: t,
       orientation: 'horizontal',
-      panelSide: 'handle_front'
+      panelSide: 'handle_front',
+      cabinetInfoHandleRail: createHandleRailMeta(info, body, 'front', index, frontCount)
     }))
   }
 
   for (let index = 0; index < rearCount; index += 1) {
-    pushPanel(panels, createPanel(sourceBox, 'handle_rear', `Diềm tay nắm sau ${index + 1}`, x, backReference, topZ - (index * size), width, t, size, {
+    pushPanel(panels, createPanel(sourceBox, 'handle_rear', `Diềm tay nắm sau ${index + 1}`, x, rearRailY - (index * t), topZ - (index * size), width, t, size, {
       panelThickness: t,
       orientation: 'horizontal',
-      panelSide: 'handle_rear'
+      panelSide: 'handle_rear',
+      cabinetInfoHandleRail: createHandleRailMeta(info, body, 'rear', index, rearCount)
     }))
   }
 
   if (middleCount >= 2) {
-    const yStart = backReference + t
-    const yEnd = frontRailY
-    const gap = Math.max(0, yEnd - yStart)
-    const step = gap / (middleCount + 1)
-
     for (let index = 0; index < middleCount; index += 1) {
-      const railX = x + ((index + 1) * (width / (middleCount + 1)))
+      const railX = getHandleRailMiddleX(index, middleCount, x, width, t)
 
-      pushPanel(panels, createPanel(sourceBox, 'handle_middle', `Diềm tay nắm bổ sung ${index + 1}`, railX, yStart + ((index + 1) * step), topZ, t, Math.max(1, gap), size, {
+      pushPanel(panels, createPanel(sourceBox, 'handle_middle', `Diềm tay nắm bổ sung ${index + 1}`, railX, middleStartY, topZ, t, middleDepth, size, {
         panelThickness: t,
         orientation: 'vertical',
-        panelSide: 'handle_middle'
+        panelSide: 'handle_middle',
+        cabinetInfoHandleRail: createHandleRailMeta(info, body, 'middle', index, middleCount)
       }))
     }
   }

@@ -129,6 +129,10 @@ const store = createSimpleStore({
       nextValue = Math.max(Number(nextValue), -panelThickness)
     }
 
+    if (path === 'handleRail.middleCount' && Number(nextValue) === 1) {
+      nextValue = 2
+    }
+
     setNestedValue(state.info, path, nextValue)
 
     if (state.info?.topStrip?.inset === true && state.info?.general?.topOverlap === true) {

@@ -313,6 +313,118 @@ function updateCabinetInfoTopStripPanelAfterBoxResize(oldPanel, newBox) {
   }
 } // End updateCabinetInfoTopStripPanelAfterBoxResize
 
+//=================
+function getCabinetInfoHandleRailTopZForBox(newBox, meta, size, thickness) {
+  const topStripOffset = meta.topStripEnabled === true
+    ? Math.max(0, toNumber(meta.topStripSize, 0))
+    : 0
+  const boxZ = toNumber(newBox?.z, 0)
+  const boxHeight = Math.max(1, toNumber(newBox?.height, 1))
+  const topBottomZ = meta.hasTop === true
+    ? boxZ + boxHeight - topStripOffset - thickness
+    : boxZ + boxHeight - topStripOffset
+
+  return topBottomZ - size
+} // End getCabinetInfoHandleRailTopZForBox
+
+//=================
+function getCabinetInfoHandleRailBackLimitYForBox(newBox, meta, thickness) {
+  const boxY = toNumber(newBox?.y, 0)
+  const boxDepth = Math.max(1, toNumber(newBox?.depth, 1))
+
+  if (meta.hasBack === true) {
+    const backThickness = Math.max(1, toNumber(meta.backThickness, Math.max(1, thickness / 3)))
+    const backInset = Math.max(0, toNumber(meta.backInset, 0))
+
+    return boxY + boxDepth - backInset - backThickness
+  }
+
+  return boxY + boxDepth
+} // End getCabinetInfoHandleRailBackLimitYForBox
+
+//=================
+function getCabinetInfoHandleRailMiddleXForBox(index, count, x, width, thickness) {
+  if (count <= 1) return x
+
+  const usableWidth = Math.max(0, width - thickness)
+
+  return x + ((usableWidth * index) / (count - 1))
+} // End getCabinetInfoHandleRailMiddleXForBox
+
+//=================
+function updateCabinetInfoHandleRailPanelAfterBoxResize(oldPanel, newBox) {
+  const meta = oldPanel?.cabinetInfoHandleRail || {}
+  const t = Math.max(1, toNumber(meta.bodyThickness, toNumber(oldPanel?.panelThickness ?? oldPanel?.ySize, 18)))
+  const size = Math.max(1, toNumber(meta.size, toNumber(oldPanel?.zSize ?? oldPanel?.height, 50)))
+  const boxX = toNumber(newBox?.x, oldPanel?.x3d ?? oldPanel?.x ?? 0)
+  const boxY = toNumber(newBox?.y, oldPanel?.y3d ?? 0)
+  const boxWidth = Math.max(1, toNumber(newBox?.width, oldPanel?.xSize ?? oldPanel?.width ?? 1))
+  const x = boxX + t
+  const width = Math.max(1, boxWidth - (2 * t))
+  const topZ = getCabinetInfoHandleRailTopZForBox(newBox, meta, size, t)
+  const faceOffset = toNumber(meta.faceOffset, 0)
+  const frontCount = Math.max(0, Math.floor(toNumber(meta.frontCount, 0)))
+  const rearCount = Math.max(0, Math.floor(toNumber(meta.rearCount, 0)))
+  const middleCount = Math.max(0, Math.floor(toNumber(meta.middleCount, 0)))
+  const index = Math.max(0, Math.floor(toNumber(meta.index, 0)))
+  const type = String(meta.type || '').trim()
+  const frontRailY = boxY + faceOffset
+  const backLimitY = getCabinetInfoHandleRailBackLimitYForBox(newBox, meta, t)
+  const rearRailY = backLimitY - t
+  const middleStartY = frontRailY + (frontCount > 0 ? t : 0)
+  const middleEndY = rearCount > 0 ? rearRailY : backLimitY
+  const middleDepth = Math.max(1, middleEndY - middleStartY)
+  let nextX = x
+  let nextY = frontRailY
+  let nextZ = topZ
+  let nextWidth = width
+  let nextDepth = t
+
+  if (type === 'front' || oldPanel.panelSide === 'handle_front') {
+    nextY = frontRailY + (index * t)
+    nextZ = topZ - (index * size)
+  } else if (type === 'rear' || oldPanel.panelSide === 'handle_rear') {
+    nextY = rearRailY - (index * t)
+    nextZ = topZ - (index * size)
+  } else {
+    nextX = getCabinetInfoHandleRailMiddleXForBox(index, Math.max(2, middleCount), x, width, t)
+    nextY = middleStartY
+    nextWidth = t
+    nextDepth = middleDepth
+  }
+
+  return {
+    ...oldPanel,
+    x3d: nextX,
+    y3d: nextY,
+    z3d: nextZ,
+    xSize: nextWidth,
+    ySize: nextDepth,
+    zSize: size,
+    x: nextX,
+    y: nextZ,
+    z: nextZ,
+    width: nextWidth,
+    depth: nextDepth,
+    height: size,
+    linkedFrameId: newBox.id,
+    frameId: newBox.id,
+    sourceBoxId: newBox.id,
+    baseObjectId: newBox.id,
+    panelThickness: t,
+    thickness: t,
+    cabinetInfoHandleRail: {
+      ...meta,
+      bodyThickness: t,
+      size,
+      faceOffset,
+      frontCount,
+      rearCount,
+      middleCount
+    }
+  }
+} // End updateCabinetInfoHandleRailPanelAfterBoxResize
+
 
 //=================
 function getPanelAxisMin(panel, axis) {
@@ -1091,6 +1203,15 @@ const store = createSimpleStore({
 
       if (oldPanel.sourceType === 'cabinet-info' && oldPanel.panelSide === 'top_strip') {
         nextPanelsInBox.push(updateCabinetInfoTopStripPanelAfterBoxResize(oldPanel, newBox))
+        return
+      }
+
+      if (oldPanel.sourceType === 'cabinet-info' && (
+        oldPanel.panelSide === 'handle_front'
+        || oldPanel.panelSide === 'handle_rear'
+        || oldPanel.panelSide === 'handle_middle'
+      )) {
+        nextPanelsInBox.push(updateCabinetInfoHandleRailPanelAfterBoxResize(oldPanel, newBox))
         return
       }
 
