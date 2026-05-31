@@ -526,8 +526,8 @@ function buildHandleRailPanels(sourceBox, info, body, panels) {
   const frontRailY = body.y + faceOffset
   const backLimitY = getHandleRailBackLimitY(info, body)
   const rearRailY = backLimitY - t
-  const middleEndY = rearCount > 0 ? rearRailY : backLimitY
-  const middleStartY = frontRailY + (frontCount > 0 ? t : 0)
+  const middleStartY = frontRailY + (frontCount * t)
+  const middleEndY = rearCount > 0 ? rearRailY - ((rearCount - 1) * t) : backLimitY
   const middleDepth = Math.max(1, middleEndY - middleStartY)
 
   for (let index = 0; index < frontCount; index += 1) {

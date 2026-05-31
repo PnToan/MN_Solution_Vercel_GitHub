@@ -371,8 +371,8 @@ function updateCabinetInfoHandleRailPanelAfterBoxResize(oldPanel, newBox) {
   const frontRailY = boxY + faceOffset
   const backLimitY = getCabinetInfoHandleRailBackLimitYForBox(newBox, meta, t)
   const rearRailY = backLimitY - t
-  const middleStartY = frontRailY + (frontCount > 0 ? t : 0)
-  const middleEndY = rearCount > 0 ? rearRailY : backLimitY
+  const middleStartY = frontRailY + (frontCount * t)
+  const middleEndY = rearCount > 0 ? rearRailY - ((rearCount - 1) * t) : backLimitY
   const middleDepth = Math.max(1, middleEndY - middleStartY)
   let nextX = x
   let nextY = frontRailY
