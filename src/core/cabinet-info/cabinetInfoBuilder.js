@@ -127,46 +127,64 @@ function createPanel(sourceBox, kind, name, x3d, y3d, z3d, xSize, ySize, zSize, 
 } // End createPanel
 
 //=================
-function parseDivisionFormula(formula, totalSize, thickness) {
+function parseBackSplitFormula(formula, totalSize, thickness) {
   const raw = String(formula || '').trim()
   const safeTotal = Math.max(0, toNumber(totalSize, 0))
   const safeThickness = Math.max(0, toNumber(thickness, 0))
 
-  if (!raw || safeTotal <= 0) return []
+  if (!raw || safeTotal <= 0) {
+    return { mode: 'none', widths: [safeTotal], offsets: [] }
+  }
 
   if (raw.startsWith('/')) {
     const count = toInteger(raw.slice(1), 0)
 
-    if (count < 2) return []
+    if (count < 2) return { mode: 'none', widths: [safeTotal], offsets: [] }
 
     const clearSize = (safeTotal - ((count - 1) * safeThickness)) / count
 
-    if (clearSize <= 0) return []
+    if (clearSize <= 0) return { mode: 'none', widths: [safeTotal], offsets: [] }
 
-    return Array.from({ length: count - 1 }, (_, index) => clearSize + index * (clearSize + safeThickness))
+    const widths = Array.from({ length: count }, () => clearSize)
+    const offsets = Array.from({ length: count - 1 }, (_, index) => clearSize + index * (clearSize + safeThickness))
+
+    return { mode: 'ratio', widths, offsets }
   }
 
-  const parts = raw
+  const fixedParts = raw
     .split(',')
     .map((item) => toNumber(item.trim(), NaN))
     .filter((item) => Number.isFinite(item) && item > 0)
 
-  if (!parts.length) return []
+  if (!fixedParts.length) return { mode: 'none', widths: [safeTotal], offsets: [] }
 
+  const widths = []
   const offsets = []
   let cursor = 0
 
-  parts.forEach((part) => {
+  fixedParts.forEach((part) => {
+    if (cursor + part >= safeTotal) return
+
+    widths.push(part)
     cursor += part
 
     if (cursor > 0 && cursor < safeTotal - safeThickness) {
       offsets.push(cursor)
+      cursor += safeThickness
     }
-
-    cursor += safeThickness
   })
 
-  return offsets
+  const restWidth = Math.max(1, safeTotal - cursor)
+  widths.push(restWidth)
+
+  if (widths.length <= 1) return { mode: 'none', widths: [safeTotal], offsets: [] }
+
+  return { mode: 'fixed', widths, offsets }
+} // End parseBackSplitFormula
+
+//=================
+function parseDivisionFormula(formula, totalSize, thickness) {
+  return parseBackSplitFormula(formula, totalSize, thickness).offsets
 } // End parseDivisionFormula
 
 //=================
@@ -197,6 +215,7 @@ function getBackBuildMeta(info, body) {
     overlayBack: normalizeBoolean(info?.back?.overlayBack),
     topCoverBack: normalizeBoolean(info?.back?.topCoverBack),
     bottomCoverBack: normalizeBoolean(info?.back?.bottomCoverBack),
+    splitFormula: String(info?.back?.splitFormula || '').trim(),
     hasLeftSide: normalizeBoolean(info?.general?.leftSide),
     hasRightSide: normalizeBoolean(info?.general?.rightSide),
     hasTop: normalizeBoolean(info?.general?.top),
@@ -344,33 +363,33 @@ function buildBackPanels(sourceBox, info, body, panels) {
 
   const meta = getBackBuildMeta(info, body)
   const backGeometry = getBackGeometry(body, meta)
-  const splitOffsets = parseDivisionFormula(info.back.splitFormula, backGeometry.width, meta.backThickness)
+  const splitInfo = parseBackSplitFormula(info.back.splitFormula, backGeometry.width, meta.backThickness)
   let startX = backGeometry.x
 
-  const createBackPanel = (name, panelX, panelWidth) => createPanel(sourceBox, 'back', name, panelX, backGeometry.y, backGeometry.z, panelWidth, backGeometry.depth, backGeometry.height, {
+  const createBackPanel = (name, panelX, panelWidth, panelIndex, panelCount) => createPanel(sourceBox, 'back', name, panelX, backGeometry.y, backGeometry.z, panelWidth, backGeometry.depth, backGeometry.height, {
     panelThickness: backGeometry.depth,
     orientation: 'vertical',
     panelSide: 'back',
     panelOffsetFrom: 'back',
     cabinetInfoBack: meta,
     backBaseX: backGeometry.x,
-    backBaseWidth: backGeometry.width
+    backBaseWidth: backGeometry.width,
+    backSplitFormula: meta.splitFormula,
+    backSplitMode: splitInfo.mode,
+    backPanelIndex: panelIndex,
+    backPanelCount: panelCount
   })
 
-  if (!splitOffsets.length) {
-    pushPanel(panels, createBackPanel('Tấm hậu', backGeometry.x, backGeometry.width))
+  if (splitInfo.widths.length <= 1) {
+    pushPanel(panels, createBackPanel('Tấm hậu', backGeometry.x, backGeometry.width, 0, 1))
     return
   }
 
-  splitOffsets.forEach((offset, index) => {
-    const panelWidth = backGeometry.x + offset - startX
+  splitInfo.widths.forEach((panelWidth, index) => {
+    pushPanel(panels, createBackPanel(`Tấm hậu ${index + 1}`, startX, panelWidth, index, splitInfo.widths.length))
 
-    pushPanel(panels, createBackPanel(`Tấm hậu ${index + 1}`, startX, panelWidth))
-
-    startX = backGeometry.x + offset
+    startX += panelWidth + meta.backThickness
   })
-
-  pushPanel(panels, createBackPanel(`Tấm hậu ${splitOffsets.length + 1}`, startX, backGeometry.x + backGeometry.width - startX))
 } // End buildBackPanels
 
 //=================

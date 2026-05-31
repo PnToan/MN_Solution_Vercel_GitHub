@@ -134,15 +134,82 @@ function getCabinetInfoBackGeometryForBox(sourceBox, panel) {
 } // End getCabinetInfoBackGeometryForBox
 
 //=================
+function parseCabinetInfoBackSplitFormula(formula, totalSize, thickness) {
+  const raw = String(formula || '').trim()
+  const safeTotal = Math.max(0, toNumber(totalSize, 0))
+  const safeThickness = Math.max(0, toNumber(thickness, 0))
+
+  if (!raw || safeTotal <= 0) {
+    return { mode: 'none', widths: [safeTotal] }
+  }
+
+  if (raw.startsWith('/')) {
+    const count = Math.floor(toNumber(raw.slice(1), 0))
+
+    if (count < 2) return { mode: 'none', widths: [safeTotal] }
+
+    const clearSize = (safeTotal - ((count - 1) * safeThickness)) / count
+
+    if (clearSize <= 0) return { mode: 'none', widths: [safeTotal] }
+
+    return { mode: 'ratio', widths: Array.from({ length: count }, () => clearSize) }
+  }
+
+  const fixedParts = raw
+    .split(',')
+    .map((item) => toNumber(item.trim(), NaN))
+    .filter((item) => Number.isFinite(item) && item > 0)
+
+  if (!fixedParts.length) return { mode: 'none', widths: [safeTotal] }
+
+  const widths = []
+  let cursor = 0
+
+  fixedParts.forEach((part) => {
+    if (cursor + part >= safeTotal) return
+
+    widths.push(part)
+    cursor += part
+
+    if (cursor < safeTotal - safeThickness) {
+      cursor += safeThickness
+    }
+  })
+
+  const restWidth = Math.max(1, safeTotal - cursor)
+  widths.push(restWidth)
+
+  if (widths.length <= 1) return { mode: 'none', widths: [safeTotal] }
+
+  return { mode: 'fixed', widths }
+} // End parseCabinetInfoBackSplitFormula
+
+//=================
+function getCabinetInfoBackPanelGeometryByIndex(newGeometry, oldPanel) {
+  const formula = oldPanel?.backSplitFormula || oldPanel?.cabinetInfoBack?.splitFormula || ''
+  const thickness = Math.max(0, toNumber(newGeometry.depth, 0))
+  const splitInfo = parseCabinetInfoBackSplitFormula(formula, newGeometry.width, thickness)
+  const index = Math.max(0, Math.floor(toNumber(oldPanel?.backPanelIndex, 0)))
+
+  if (splitInfo.widths.length <= 1 || index >= splitInfo.widths.length) {
+    return { x: newGeometry.x, width: newGeometry.width }
+  }
+
+  let x = newGeometry.x
+
+  for (let i = 0; i < index; i += 1) {
+    x += splitInfo.widths[i] + thickness
+  }
+
+  return { x, width: Math.max(1, splitInfo.widths[index]) }
+} // End getCabinetInfoBackPanelGeometryByIndex
+
+//=================
 function updateCabinetInfoBackPanelAfterBoxResize(oldPanel, oldBox, newBox) {
-  const oldGeometry = getCabinetInfoBackGeometryForBox(oldBox, oldPanel)
   const newGeometry = getCabinetInfoBackGeometryForBox(newBox, oldPanel)
-  const oldX = toNumber(oldPanel?.x3d ?? oldPanel?.x, oldGeometry.x)
-  const oldWidth = Math.max(1, toNumber(oldPanel?.xSize ?? oldPanel?.width, oldGeometry.width))
-  const startRatio = oldGeometry.width > 0 ? Math.max(0, Math.min(1, (oldX - oldGeometry.x) / oldGeometry.width)) : 0
-  const endRatio = oldGeometry.width > 0 ? Math.max(startRatio, Math.min(1, (oldX + oldWidth - oldGeometry.x) / oldGeometry.width)) : 1
-  const nextX = newGeometry.x + (startRatio * newGeometry.width)
-  const nextWidth = Math.max(1, (endRatio - startRatio) * newGeometry.width)
+  const nextPanelGeometry = getCabinetInfoBackPanelGeometryByIndex(newGeometry, oldPanel)
+  const nextX = nextPanelGeometry.x
+  const nextWidth = nextPanelGeometry.width
 
   return {
     ...oldPanel,
