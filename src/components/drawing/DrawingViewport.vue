@@ -55,6 +55,7 @@ import { screenToLocal, localToScreen } from '../../renderers/viewport-transform
 import { projectBoxToCameraRect, cameraLocalToWorldPoint } from '../../core/view/view-camera'
 import { hitTestPanel, hitTestZoneEdge } from '../../core/snap/snap-engine'
 import { handleViewportKey } from '../../commands/keyboard-controller'
+import { isEditPanelDrawTool, isEditPanelTool } from '../../core/tools/editPanelTool'
 
 const app = useAppStore()
 const cabinet = useCabinetStore()
@@ -130,6 +131,7 @@ const canvasCursorClass = computed(() => {
   if (hoverDim.value && app.state.currentTool === 'select') return 'mn-cursor-pointer'
   if (app.state.currentTool === 'box') return 'mn-cursor-box'
   if (app.state.currentTool === 'panel') return 'mn-cursor-crosshair'
+  if (isEditPanelTool(app.state.currentTool) || isEditPanelDrawTool(app.state.currentTool)) return 'mn-cursor-crosshair'
   if (app.state.currentTool === 'select') return 'mn-cursor-select'
 
   return 'mn-cursor-default'
@@ -1459,6 +1461,23 @@ function onPointerDown(event) {
     draw()
     return
   }
+
+  if (isEditPanelTool(app.state.currentTool) || isEditPanelDrawTool(app.state.currentTool)) {
+    const context = drawing.state.panelEdit?.active
+      ? drawing.getPanelEditContext()
+      : drawing.startPanelEdit(null, app.state.currentTool)
+
+    if (!context) {
+      app.setStatus('Edit Panel: chọn 1 tấm trước')
+      draw()
+      return
+    }
+
+    app.setView(context.viewKey)
+    app.setStatus(`Edit Panel: ${context.panelName} | ${context.axesText} | gốc 0,0 trái dưới`)
+    draw()
+    return
+  }
   const panelHit = hitTestPanel(getVisiblePanels(), rawLocal)
 
   if (app.state.currentTool === 'select' && panelHit) {
@@ -1581,6 +1600,13 @@ function onPointerMove(event) {
 
     drawing.setHover(null)
     hoverDim.value = null
+    draw()
+    return
+  }
+
+  if (isEditPanelTool(app.state.currentTool) || isEditPanelDrawTool(app.state.currentTool)) {
+    drawing.clearSnapPreview()
+    drawing.setHover(null)
     draw()
     return
   }
