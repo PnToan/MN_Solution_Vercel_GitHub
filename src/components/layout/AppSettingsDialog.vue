@@ -151,7 +151,87 @@
               </section>
             </template>
 
-            <template v-if="activeTabId !== 'general' && activeTabId !== 'shortcut'">
+            <template v-if="activeTabId === 'panel'">
+              <section class="mn-settings-section">
+                <h2>Panel</h2>
+
+                <div class="mn-settings-grid">
+                  <div class="mn-settings-field">
+                    <label class="mn-settings-label" for="mn_panel_default_thickness">Độ dày Tấm mặc định</label>
+                    <div class="mn-panel-input-row">
+                      <input id="mn_panel_default_thickness" v-model.number="form.panel.defaultThickness" class="mn-settings-control" type="number" min="0" step="0.1" @change="applyCurrentSettings" />
+                      <span class="mn-panel-unit">mm</span>
+                    </div>
+                  </div>
+
+                  <div class="mn-settings-field">
+                    <label class="mn-settings-label" for="mn_panel_back_thickness">Độ dày Tấm Hậu</label>
+                    <div class="mn-panel-input-row">
+                      <input id="mn_panel_back_thickness" v-model.number="form.panel.backThickness" class="mn-settings-control" type="number" min="0" step="0.1" @change="applyCurrentSettings" />
+                      <span class="mn-panel-unit">mm</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="mn-settings-section">
+                <h2>Màu sắc Panel</h2>
+
+                <div class="mn-settings-grid">
+                  <div class="mn-settings-field">
+                    <label class="mn-settings-label" for="mn_panel_color">Màu Panel</label>
+                    <div class="mn-panel-color-row">
+                      <input id="mn_panel_color" v-model="form.panel.panelColor" class="mn-panel-color" type="color" @input="applyCurrentSettings" />
+                      <input v-model="form.panel.panelColor" class="mn-settings-control" type="text" maxlength="7" @change="applyCurrentSettings" />
+                    </div>
+                  </div>
+
+                  <div class="mn-settings-field">
+                    <label class="mn-settings-label" for="mn_panel_selected_line_color">Line viền Panel</label>
+                    <div class="mn-panel-color-row">
+                      <input id="mn_panel_selected_line_color" v-model="form.panel.selectedLineColor" class="mn-panel-color" type="color" @input="applyCurrentSettings" />
+                      <input v-model="form.panel.selectedLineColor" class="mn-settings-control" type="text" maxlength="7" @change="applyCurrentSettings" />
+                    </div>
+                  </div>
+
+                  <div class="mn-settings-field">
+                    <label class="mn-settings-label" for="mn_panel_opacity">Độ Mờ Panel: {{ form.panel.opacity }}%</label>
+                    <div class="mn-panel-opacity-row">
+                      <input id="mn_panel_opacity" v-model.number="form.panel.opacity" class="mn-panel-range" type="range" min="0" max="100" step="1" @input="applyCurrentSettings" />
+                      <input v-model.number="form.panel.opacity" class="mn-settings-control mn-panel-opacity-number" type="number" min="0" max="100" step="1" @change="applyCurrentSettings" />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="mn-settings-section">
+                <h2>Quy tắc Đặt tên khi Sinh Panel</h2>
+                <p class="mn-settings-hint">Click vào từng text trên hình mẫu để đổi tên. Tên này sẽ dùng làm tên panel khi sinh chi tiết.</p>
+
+                <div class="mn-panel-name-demo">
+                  <input v-model="form.panel.names.upperReducerLeft" class="mn-panel-name-input mn-panel-name-upper-left" type="text" @change="applyCurrentSettings" />
+                  <input v-model="form.panel.names.topRail" class="mn-panel-name-input mn-panel-name-top" type="text" @change="applyCurrentSettings" />
+                  <input v-model="form.panel.names.upperReducerRight" class="mn-panel-name-input mn-panel-name-upper-right" type="text" @change="applyCurrentSettings" />
+                  <input v-model="form.panel.names.leftSide" class="mn-panel-name-input mn-panel-name-left" type="text" @change="applyCurrentSettings" />
+                  <input v-model="form.panel.names.rightSide" class="mn-panel-name-input mn-panel-name-right" type="text" @change="applyCurrentSettings" />
+                  <input v-model="form.panel.names.handleRail" class="mn-panel-name-input mn-panel-name-handle" type="text" @change="applyCurrentSettings" />
+                  <input v-model="form.panel.names.midRail" class="mn-panel-name-input mn-panel-name-mid" type="text" @change="applyCurrentSettings" />
+                  <input v-model="form.panel.names.bottom" class="mn-panel-name-input mn-panel-name-bottom" type="text" @change="applyCurrentSettings" />
+                  <input v-model="form.panel.names.toeKick" class="mn-panel-name-input mn-panel-name-toekick" type="text" @change="applyCurrentSettings" />
+
+                  <div class="mn-panel-cabinet-demo" aria-hidden="true">
+                    <div class="mn-panel-side left"></div>
+                    <div class="mn-panel-side right"></div>
+                    <div class="mn-panel-board top"></div>
+                    <div class="mn-panel-board handle"></div>
+                    <div class="mn-panel-board mid"></div>
+                    <div class="mn-panel-board bottom"></div>
+                  </div>
+                </div>
+              </section>
+            </template>
+
+            <template v-if="activeTabId !== 'general' && activeTabId !== 'shortcut' && activeTabId !== 'panel'">
               <section class="mn-settings-section">
                 <h2>{{ activeTab.label }}</h2>
                 <p>{{ activeTab.description }}</p>
@@ -242,7 +322,8 @@ function currentSettingsPayload() {
     font: form.font,
     mode: form.mode,
     canvasBackground: form.canvasBackground,
-    shortcuts: normalizeShortcutSettings(shortcutSettings)
+    shortcuts: normalizeShortcutSettings(shortcutSettings),
+    panel: form.panel
   }
 } // End currentSettingsPayload
 
@@ -251,6 +332,7 @@ function syncForm(settings) {
   form.font = settings.font
   form.mode = settings.mode
   form.canvasBackground = settings.canvasBackground
+  form.panel = settings.panel
   syncShortcutSettings(settings.shortcuts)
 } // End syncForm
 

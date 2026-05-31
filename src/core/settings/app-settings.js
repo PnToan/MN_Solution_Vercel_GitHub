@@ -6,7 +6,26 @@ export const DEFAULT_APP_SETTINGS = {
   font: 'arial',
   mode: 'dark',
   canvasBackground: 'gray',
-  shortcuts: getDefaultShortcutSettings()
+  shortcuts: getDefaultShortcutSettings(),
+  panel: {
+    defaultThickness: 17.4,
+    backThickness: 10,
+    panelColor: '#87ceff',
+    selectedLineColor: '#008cff',
+    opacity: 80,
+    names: {
+      topRail: 'Chỉ Nóc',
+      leftSide: 'Hông Trái',
+      rightSide: 'Hông Phải',
+      upperReducerLeft: 'Gia Giảm',
+      upperReducerRight: 'Gia Giảm',
+      handleRail: 'Diềm Tay Nắm',
+      midRail: 'Thanh Chặn Cánh',
+      bottom: 'Đáy',
+      toeKick: 'Len Chân',
+      back: 'Hậu'
+    }
+  }
 }
 
 const FONT_VALUE = {
@@ -21,14 +40,74 @@ const CANVAS_BACKGROUND_VALUE = {
   yellow: 'rgb(255,255,240)'
 }
 
+const DEFAULT_PANEL_NAMES = DEFAULT_APP_SETTINGS.panel.names
+
+//=================
+function cloneDefaultSettings() {
+  return JSON.parse(JSON.stringify(DEFAULT_APP_SETTINGS))
+} // End cloneDefaultSettings
+
+//=================
+function normalizeHexColor(value, fallback) {
+  let text = String(value || '').trim()
+
+  if (!text) return fallback
+  if (!text.startsWith('#')) text = `#${text}`
+
+  if (/^#[0-9a-fA-F]{3}$/.test(text)) {
+    text = `#${text[1]}${text[1]}${text[2]}${text[2]}${text[3]}${text[3]}`
+  }
+
+  if (!/^#[0-9a-fA-F]{6}$/.test(text)) return fallback
+
+  return text.toLowerCase()
+} // End normalizeHexColor
+
+//=================
+function normalizeNumber(value, fallback, min = 0, max = Number.POSITIVE_INFINITY) {
+  const numberValue = Number(value)
+
+  if (!Number.isFinite(numberValue)) return fallback
+
+  return Math.max(min, Math.min(max, numberValue))
+} // End normalizeNumber
+
+//=================
+function normalizePanelNames(names = {}) {
+  const safeNames = { ...DEFAULT_PANEL_NAMES, ...(names || {}) }
+
+  Object.keys(DEFAULT_PANEL_NAMES).forEach(key => {
+    const value = String(safeNames[key] || '').trim()
+    safeNames[key] = value || DEFAULT_PANEL_NAMES[key]
+  })
+
+  return safeNames
+} // End normalizePanelNames
+
+//=================
+function normalizePanelSettings(panel = {}) {
+  const defaultPanel = DEFAULT_APP_SETTINGS.panel
+  const safePanel = { ...defaultPanel, ...(panel || {}) }
+
+  return {
+    defaultThickness: normalizeNumber(safePanel.defaultThickness, defaultPanel.defaultThickness, 0),
+    backThickness: normalizeNumber(safePanel.backThickness, defaultPanel.backThickness, 0),
+    panelColor: normalizeHexColor(safePanel.panelColor, defaultPanel.panelColor),
+    selectedLineColor: normalizeHexColor(safePanel.selectedLineColor, defaultPanel.selectedLineColor),
+    opacity: normalizeNumber(safePanel.opacity, defaultPanel.opacity, 0, 100),
+    names: normalizePanelNames(safePanel.names)
+  }
+} // End normalizePanelSettings
+
 //=================
 function normalizeAppSettings(settings = {}) {
-  const safeSettings = { ...DEFAULT_APP_SETTINGS, ...(settings || {}) }
+  const safeSettings = { ...cloneDefaultSettings(), ...(settings || {}) }
 
   if (!FONT_VALUE[safeSettings.font]) safeSettings.font = DEFAULT_APP_SETTINGS.font
   if (!['light', 'dark'].includes(safeSettings.mode)) safeSettings.mode = DEFAULT_APP_SETTINGS.mode
   if (!CANVAS_BACKGROUND_VALUE[safeSettings.canvasBackground]) safeSettings.canvasBackground = DEFAULT_APP_SETTINGS.canvasBackground
   safeSettings.shortcuts = normalizeShortcutSettings(safeSettings.shortcuts)
+  safeSettings.panel = normalizePanelSettings(safeSettings.panel)
 
   return safeSettings
 } // End normalizeAppSettings
@@ -37,11 +116,11 @@ function normalizeAppSettings(settings = {}) {
 export function loadAppSettings() {
   try {
     const raw = localStorage.getItem(APP_SETTINGS_KEY)
-    if (!raw) return { ...DEFAULT_APP_SETTINGS }
+    if (!raw) return cloneDefaultSettings()
 
     return normalizeAppSettings(JSON.parse(raw))
   } catch (error) {
-    return { ...DEFAULT_APP_SETTINGS }
+    return cloneDefaultSettings()
   }
 } // End loadAppSettings
 
@@ -55,7 +134,7 @@ export function saveAppSettings(settings) {
 
 //=================
 export function resetAppSettings() {
-  const nextSettings = { ...DEFAULT_APP_SETTINGS }
+  const nextSettings = cloneDefaultSettings()
   localStorage.setItem(APP_SETTINGS_KEY, JSON.stringify(nextSettings))
   saveShortcutSettings(nextSettings.shortcuts)
   return nextSettings
@@ -115,6 +194,9 @@ export function applyAppSettings(settings) {
 
   root.style.setProperty('--mn-font-main', FONT_VALUE[nextSettings.font])
   root.style.setProperty('--mn-bg-canvas', CANVAS_BACKGROUND_VALUE[nextSettings.canvasBackground])
+  root.style.setProperty('--mn-panel-color', nextSettings.panel.panelColor)
+  root.style.setProperty('--mn-panel-selected-line-color', nextSettings.panel.selectedLineColor)
+  root.style.setProperty('--mn-panel-opacity', String(nextSettings.panel.opacity / 100))
   root.setAttribute('data-mn-mode', nextSettings.mode)
 
   window.dispatchEvent(new Event('resize'))
@@ -122,3 +204,10 @@ export function applyAppSettings(settings) {
 
   return nextSettings
 } // End applyAppSettings
+
+//=================
+export function getPanelPartName(partKey, settings = loadAppSettings()) {
+  const panelSettings = normalizePanelSettings(settings.panel)
+
+  return panelSettings.names[partKey] || DEFAULT_PANEL_NAMES[partKey] || partKey
+} // End getPanelPartName
