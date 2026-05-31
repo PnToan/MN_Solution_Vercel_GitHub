@@ -890,16 +890,12 @@ function drawPanelEditRectangle(targetContext, context, layout, rectangle, optio
 
   targetContext.save()
   const isCutout = rectangle.operation === 'cutout'
-  const editBackground = getCssVariable('--mn-bg-canvas', '#f4f4f4')
-
   if (isCutout && !isDraft) {
-    targetContext.fillStyle = editBackground
     targetContext.strokeStyle = '#111111'
-    targetContext.lineWidth = 1.6
+    targetContext.lineWidth = 1.8
     targetContext.setLineDash([])
     targetContext.beginPath()
     targetContext.rect(start.x, start.y, rectWidth, rectHeight)
-    targetContext.fill()
     targetContext.stroke()
     targetContext.restore()
     return
@@ -1983,6 +1979,44 @@ function getPanelLocalRect(panel) {
 } // End getPanelLocalRect
 
 //=================
+function hitTestVisiblePanel(local) {
+  if (!local) return null
+
+  const hits = []
+
+  getVisiblePanels().forEach((panel, index) => {
+    const rect = getPanelLocalRect(panel)
+
+    if (!rect || rect.width <= 0 || rect.height <= 0) return
+
+    const insideX = local.x >= rect.x && local.x <= rect.x + rect.width
+    const insideY = local.y >= rect.y && local.y <= rect.y + rect.height
+
+    if (!insideX || !insideY) return
+
+    hits.push({
+      type: 'panel',
+      panel,
+      rect,
+      index,
+      area: rect.width * rect.height,
+      isBackPanel: panel.panelSide === 'back' || panel.cabinetInfoKind === 'back'
+    })
+  })
+
+  if (!hits.length) return null
+
+  hits.sort((a, b) => {
+    if (a.isBackPanel !== b.isBackPanel) return a.isBackPanel ? 1 : -1
+    if (a.area !== b.area) return a.area - b.area
+
+    return b.index - a.index
+  })
+
+  return hits[0]
+} // End hitTestVisiblePanel
+
+//=================
 function collectDimensionSnapPoints() {
   const points = []
   const wallRect = projectBoxToCameraRect(getWallBox3D(), app.state.currentView)
@@ -2196,7 +2230,7 @@ function updateHover(local) {
     return
   }
 
-  const panelHit = hitTestPanel(getVisiblePanels(), local)
+  const panelHit = hitTestVisiblePanel(local)
 
   if (panelHit) {
     drawing.setHover(panelHit)
@@ -2713,7 +2747,7 @@ function onPointerDown(event) {
     draw()
     return
   }
-  const panelHit = hitTestPanel(getVisiblePanels(), rawLocal)
+  const panelHit = hitTestVisiblePanel(rawLocal)
 
   if (app.state.currentTool === 'select' && panelHit) {
     selectPanelOnly(panelHit.panel.id, event.shiftKey)

@@ -2,6 +2,7 @@ import { createSimpleStore } from './createStore'
 import { useCabinetStore } from './useCabinetStore'
 import { useAppStore } from './useAppStore'
 import { useBoxStore } from './useBoxStore'
+import { useWallStore } from './useWallStore'
 import { buildZones } from '../core/zone/zone-engine'
 import {
   createPanelOnZoneEdge,
@@ -1564,20 +1565,28 @@ const store = createSimpleStore({
     const panelThickness = Math.max(1, toNumber(cabinet.state.panelThickness, 17.4))
     const backThickness = 10
     const toeKickHeight = 80
+    const wallBox = useWallStore().getBox3D()
+    const baseX = toNumber(wallBox.x, 0) + (Math.max(width, toNumber(wallBox.width, width)) - width) / 2
+    const baseY = toNumber(wallBox.y, 0) - depth
+    const baseZ = 0
     const boxId = `box_default_${Date.now()}`
     const baseBox = {
       id: boxId,
       name: 'Box test 1200x2200x580',
-      x: 0,
-      y: 0,
-      z: 0,
+      x: baseX,
+      y: baseY,
+      z: baseZ,
       width,
       depth,
       height,
       panelThickness,
       unit: cabinet.state.unit || 'mm',
       color: 'rgba(0, 119, 204, 0.12)',
-      isDefaultTestBox: true
+      isDefaultTestBox: true,
+      sourceType: 'default-test-box',
+      cabinetWidth: width,
+      cabinetHeight: height,
+      cabinetDepth: depth
     }
 
     const makePanel = (panelSide, name, geometry, extra = {}) => ({
@@ -1610,45 +1619,45 @@ const store = createSimpleStore({
 
     const panels = [
       makePanel('left', 'Hông trái', {
-        x: 0,
-        y: 0,
-        z: 0,
+        x: baseX,
+        y: baseY,
+        z: baseZ,
         xSize: panelThickness,
         ySize: depth,
         zSize: height,
         thickness: panelThickness
       }),
       makePanel('right', 'Hông phải', {
-        x: width - panelThickness,
-        y: 0,
-        z: 0,
+        x: baseX + width - panelThickness,
+        y: baseY,
+        z: baseZ,
         xSize: panelThickness,
         ySize: depth,
         zSize: height,
         thickness: panelThickness
       }),
       makePanel('top', 'Nóc', {
-        x: 0,
-        y: 0,
-        z: height - panelThickness,
+        x: baseX,
+        y: baseY,
+        z: baseZ + height - panelThickness,
         xSize: width,
         ySize: depth,
         zSize: panelThickness,
         thickness: panelThickness
       }),
       makePanel('bottom', 'Đáy', {
-        x: 0,
-        y: 0,
-        z: toeKickHeight,
+        x: baseX,
+        y: baseY,
+        z: baseZ + toeKickHeight,
         xSize: width,
         ySize: depth,
         zSize: panelThickness,
         thickness: panelThickness
       }),
       makePanel('back', 'Hậu', {
-        x: 0,
-        y: depth - backThickness,
-        z: 0,
+        x: baseX,
+        y: baseY + depth - backThickness,
+        z: baseZ,
         xSize: width,
         ySize: backThickness,
         zSize: height,
@@ -1659,9 +1668,9 @@ const store = createSimpleStore({
         thickness: backThickness
       }),
       makePanel('toe_kick_front', 'Len chân', {
-        x: 0,
-        y: 0,
-        z: 0,
+        x: baseX,
+        y: baseY,
+        z: baseZ,
         xSize: width,
         ySize: panelThickness,
         zSize: toeKickHeight,
