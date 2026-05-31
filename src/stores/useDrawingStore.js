@@ -67,6 +67,37 @@ function getPanelFrameId(panel) {
 
 
 //=================
+function isCabinetInfoBackPanel(panel) {
+  return panel?.sourceType === 'cabinet-info' && panel?.panelSide === 'back'
+} // End isCabinetInfoBackPanel
+
+//=================
+function getDrawableDepthForBox(sourceBox, panels = []) {
+  const boxY = toNumber(sourceBox?.y, 0)
+  const boxDepth = Math.max(1, toNumber(sourceBox?.depth, 1))
+  const backPanel = Array.isArray(panels)
+    ? panels.find((panel) => isCabinetInfoBackPanel(panel))
+    : null
+
+  if (!backPanel) return boxDepth
+
+  const backY = toNumber(backPanel.y3d ?? backPanel.y, boxY + boxDepth)
+  const stopDepth = backY - boxY
+
+  if (!Number.isFinite(stopDepth) || stopDepth <= 0) return boxDepth
+
+  return Math.max(1, Math.min(boxDepth, stopDepth))
+} // End getDrawableDepthForBox
+
+//=================
+function getZoneBlockingPanels(panels = []) {
+  if (!Array.isArray(panels)) return []
+
+  return panels.filter((panel) => !isCabinetInfoBackPanel(panel))
+} // End getZoneBlockingPanels
+
+
+//=================
 function getCabinetInfoBackGeometryForBox(sourceBox, panel) {
   const meta = panel?.cabinetInfoBack || {}
   const bodyThickness = toNumber(meta.bodyThickness, toNumber(sourceBox?.panelThickness, 18))
@@ -1256,9 +1287,18 @@ const store = createSimpleStore({
 
   //=================
   getPanelThickness() {
-    const cabinet = useCabinetStore()
+    const boxStore = useBoxStore()
+    const activeBox = typeof boxStore.getActiveBox === 'function'
+      ? boxStore.getActiveBox()
+      : boxStore.getSelectedBox?.()
+    const boxThickness = Number(activeBox?.panelThickness)
 
-    return Number(cabinet.state.panelThickness || 18)
+    if (Number.isFinite(boxThickness) && boxThickness > 0) return boxThickness
+
+    const cabinet = useCabinetStore()
+    const cabinetThickness = Number(cabinet.state.panelThickness)
+
+    return Number.isFinite(cabinetThickness) && cabinetThickness > 0 ? cabinetThickness : 17.4
   }, // End getPanelThickness
 
   rebuildZones() {
@@ -1299,14 +1339,16 @@ const store = createSimpleStore({
           || panel.sourceBoxId === baseBox.id
           || panel.baseObjectId === baseBox.id
       })
+      const drawableDepth = getDrawableDepthForBox(baseBox, panelsInBox)
+      const zonePanels = getZoneBlockingPanels(panelsInBox)
 
-      const zones = buildZones(baseRect, panelsInBox).map((zone) => ({
+      const zones = buildZones({ ...baseRect, depth: drawableDepth }, zonePanels).map((zone) => ({
         ...zone,
         frameId: baseBox.id,
         linkedFrameId: baseBox.id,
         sourceBoxId: baseBox.id,
         baseObjectId: baseBox.id,
-        depth: baseBox.depth,
+        depth: drawableDepth,
         sourceBox: baseBox,
         baseObject: baseBox
       }))
@@ -1493,13 +1535,15 @@ const store = createSimpleStore({
         || oldPanel.panelSide === 'split_horizontal'
         || Number(oldPanel.panelDivideCount || 0) >= 2
 
-      const currentZones = buildZones(baseRect, nextPanelsInBox).map((zone) => ({
+      const currentZoneDepth = getDrawableDepthForBox(newBox, nextPanelsInBox.length ? nextPanelsInBox : panelsInBox)
+      const currentZonePanels = getZoneBlockingPanels(nextPanelsInBox)
+      const currentZones = buildZones({ ...baseRect, depth: currentZoneDepth }, currentZonePanels).map((zone) => ({
         ...zone,
         frameId: newBox.id,
         linkedFrameId: newBox.id,
         sourceBoxId: newBox.id,
         baseObjectId: newBox.id,
-        depth: newBox.depth,
+        depth: currentZoneDepth,
         sourceBox: newBox,
         baseObject: newBox
       }))
@@ -1690,13 +1734,15 @@ const store = createSimpleStore({
 
       if (!edge) return
 
-      const currentZones = buildZones(baseRect, nextPanelsInBox).map((zone) => ({
+      const currentZoneDepth = getDrawableDepthForBox(sourceBox, nextPanelsInBox.length ? nextPanelsInBox : panelsInBox)
+      const currentZonePanels = getZoneBlockingPanels(nextPanelsInBox)
+      const currentZones = buildZones({ ...baseRect, depth: currentZoneDepth }, currentZonePanels).map((zone) => ({
         ...zone,
         frameId: boxId,
         linkedFrameId: boxId,
         sourceBoxId: boxId,
         baseObjectId: boxId,
-        depth: sourceBox.depth,
+        depth: currentZoneDepth,
         sourceBox,
         baseObject: sourceBox
       }))

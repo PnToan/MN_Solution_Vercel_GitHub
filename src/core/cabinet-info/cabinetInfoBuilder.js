@@ -2,9 +2,7 @@ let cabinetInfoPanelSeed = 1
 
 //=================
 function toNumber(value, fallback = 0) {
-  const numberValue = typeof value === 'string'
-    ? Number(value.replace(',', '.'))
-    : Number(value)
+  const numberValue = Number(value)
 
   if (!Number.isFinite(numberValue)) return fallback
 

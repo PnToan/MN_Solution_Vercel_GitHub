@@ -28,7 +28,7 @@ function createBoxFromRect(rect, height) {
 
   const cabinet = useCabinetStore()
   const id = `box_${boxIdSeed++}`
-  const panelThickness = Number(cabinet.state.panelThickness || 18)
+  const panelThickness = Number(cabinet.state.panelThickness || 17.4)
   const unit = cabinet.state.unit || 'mm'
 
   return {
@@ -148,7 +148,7 @@ const store = createSimpleStore({
     const item = state.boxes.find((box) => box.id === boxId)
     if (!item) return
 
-    const rawValue = typeof value === 'string' ? Number(value.replace(',', '.')) : Number(value)
+    const rawValue = Number(value)
     if (!Number.isFinite(rawValue) || rawValue <= 0) return
 
     const oldBox = { ...item }

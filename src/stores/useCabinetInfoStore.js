@@ -12,9 +12,7 @@ function cloneValue(value) {
 
 //=================
 function toNumber(value, fallback = 0) {
-  const numberValue = typeof value === 'string'
-    ? Number(value.replace(',', '.'))
-    : Number(value)
+  const numberValue = Number(value)
 
   if (!Number.isFinite(numberValue)) return fallback
 
@@ -74,9 +72,7 @@ function normalizeInfoInputValue(path, value) {
 
   if (!Number.isFinite(numberValue)) return 0
 
-  if (path === 'topStrip.faceOffset') return numberValue
-
-  return Math.round(numberValue)
+  return numberValue
 } // End normalizeInfoInputValue
 //=================
 function removeCabinetInfoPanelsForBox(panels, boxId) {
@@ -186,7 +182,7 @@ const store = createSimpleStore({
 
     if (!selectedBox) return false
 
-    const nextDepth = Math.round(toNumber(state.info.general.cabinetDepth, selectedBox.depth))
+    const nextDepth = toNumber(state.info.general.cabinetDepth, selectedBox.depth)
 
     if (!Number.isFinite(nextDepth) || nextDepth <= 0) return false
     if (Math.abs(toNumber(selectedBox.depth, 0) - nextDepth) < 0.001) return true

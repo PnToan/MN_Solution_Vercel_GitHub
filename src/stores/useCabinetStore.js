@@ -20,7 +20,7 @@ const store = createSimpleStore({
   width: 3000,
   depth: 580,
   height: 2650,
-  panelThickness: 18,
+  panelThickness: 17.4,
   unit: 'mm'
 }, (state) => ({
   setSize(key, value) {
