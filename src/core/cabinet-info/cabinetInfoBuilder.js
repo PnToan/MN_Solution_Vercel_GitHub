@@ -568,20 +568,30 @@ function buildDoorStopPanels(sourceBox, info, body, panels) {
 
   const t = body.thickness
   const size = toPositiveNumber(info.doorStop.size, 50)
-  const frontY = body.y + body.depth
-  const y = frontY - toNumber(info.doorStop.faceOffset, 0) - (normalizeBoolean(info.doorStop.horizontal) ? size : t)
+  const horizontal = normalizeBoolean(info.doorStop.horizontal)
+  const faceOffset = toNumber(info.doorStop.faceOffset, 0)
+  const formula = String(info.doorStop.formula || '').trim()
+  const y = body.y + faceOffset
   const x = body.x + t
   const width = Math.max(1, body.width - (2 * t))
   const clearHeight = Math.max(1, body.height - (2 * t))
-  const offsets = parseDivisionFormula(info.doorStop.formula, clearHeight, t)
+  const offsets = parseDivisionFormula(formula, clearHeight, t)
 
   offsets.forEach((offset, index) => {
     const z = body.z + t + offset
 
-    pushPanel(panels, createPanel(sourceBox, 'door_stop', `Thanh chặn cánh ${index + 1}`, x, y, z, width, normalizeBoolean(info.doorStop.horizontal) ? size : t, normalizeBoolean(info.doorStop.horizontal) ? t : size, {
+    pushPanel(panels, createPanel(sourceBox, 'door_stop', `Thanh chặn cánh ${index + 1}`, x, y, z, width, horizontal ? size : t, horizontal ? t : size, {
       panelThickness: t,
       orientation: 'horizontal',
-      panelSide: 'door_stop'
+      panelSide: 'door_stop',
+      cabinetInfoDoorStop: {
+        index,
+        bodyThickness: t,
+        size,
+        horizontal,
+        faceOffset,
+        formula
+      }
     }))
   })
 } // End buildDoorStopPanels

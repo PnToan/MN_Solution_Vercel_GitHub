@@ -427,6 +427,107 @@ function updateCabinetInfoHandleRailPanelAfterBoxResize(oldPanel, newBox) {
 
 
 //=================
+function parseCabinetInfoDoorStopDivisionFormula(formula, totalSize, thickness) {
+  const raw = String(formula || '').trim()
+  const safeTotal = Math.max(1, toNumber(totalSize, 1))
+  const safeThickness = Math.max(0, toNumber(thickness, 0))
+
+  if (!raw) return []
+
+  if (raw.startsWith('/')) {
+    const count = Math.floor(toNumber(raw.slice(1), 0))
+
+    if (count < 2) return []
+
+    const clearSize = (safeTotal - ((count - 1) * safeThickness)) / count
+
+    if (clearSize <= 0) return []
+
+    return Array.from({ length: count - 1 }, (_, index) => clearSize + index * (clearSize + safeThickness))
+  }
+
+  const fixedParts = raw
+    .split(',')
+    .map((item) => toNumber(item.trim(), NaN))
+    .filter((item) => Number.isFinite(item) && item > 0)
+
+  if (!fixedParts.length) return []
+
+  const offsets = []
+  let cursor = 0
+
+  fixedParts.forEach((part) => {
+    if (cursor + part >= safeTotal) return
+
+    cursor += part
+
+    if (cursor > 0 && cursor < safeTotal - safeThickness) {
+      offsets.push(cursor)
+      cursor += safeThickness
+    }
+  })
+
+  return offsets
+} // End parseCabinetInfoDoorStopDivisionFormula
+
+//=================
+function updateCabinetInfoDoorStopPanelAfterBoxResize(oldPanel, newBox) {
+  const meta = oldPanel?.cabinetInfoDoorStop || {}
+  const t = Math.max(1, toNumber(meta.bodyThickness, toNumber(oldPanel?.panelThickness ?? oldPanel?.zSize, 18)))
+  const size = Math.max(1, toNumber(meta.size, Math.max(toNumber(oldPanel?.ySize, 50), toNumber(oldPanel?.zSize, 50))))
+  const horizontal = meta.horizontal === true
+  const faceOffset = toNumber(meta.faceOffset, 0)
+  const formula = String(meta.formula || '').trim()
+  const index = Math.max(0, Math.floor(toNumber(meta.index, 0)))
+  const boxX = toNumber(newBox?.x, oldPanel?.x3d ?? oldPanel?.x ?? 0)
+  const boxY = toNumber(newBox?.y, oldPanel?.y3d ?? 0)
+  const boxZ = toNumber(newBox?.z, oldPanel?.z3d ?? oldPanel?.z ?? 0)
+  const boxWidth = Math.max(1, toNumber(newBox?.width, oldPanel?.xSize ?? oldPanel?.width ?? 1))
+  const boxHeight = Math.max(1, toNumber(newBox?.height, oldPanel?.zSize ?? oldPanel?.height ?? 1))
+  const clearHeight = Math.max(1, boxHeight - (2 * t))
+  const offsets = parseCabinetInfoDoorStopDivisionFormula(formula, clearHeight, t)
+  const fallbackOffset = Math.max(0, Math.min(clearHeight, toNumber(oldPanel?.z3d, boxZ + t) - boxZ - t))
+  const offset = offsets[index] ?? fallbackOffset
+  const nextX = boxX + t
+  const nextY = boxY + faceOffset
+  const nextZ = boxZ + t + offset
+  const nextWidth = Math.max(1, boxWidth - (2 * t))
+  const nextDepth = horizontal ? size : t
+  const nextHeight = horizontal ? t : size
+
+  return {
+    ...oldPanel,
+    x3d: nextX,
+    y3d: nextY,
+    z3d: nextZ,
+    xSize: nextWidth,
+    ySize: nextDepth,
+    zSize: nextHeight,
+    x: nextX,
+    y: nextZ,
+    z: nextZ,
+    width: nextWidth,
+    depth: nextDepth,
+    height: nextHeight,
+    linkedFrameId: newBox.id,
+    frameId: newBox.id,
+    sourceBoxId: newBox.id,
+    baseObjectId: newBox.id,
+    panelThickness: t,
+    thickness: t,
+    cabinetInfoDoorStop: {
+      ...meta,
+      index,
+      bodyThickness: t,
+      size,
+      horizontal,
+      faceOffset,
+      formula
+    }
+  }
+} // End updateCabinetInfoDoorStopPanelAfterBoxResize
+
+//=================
 function getPanelAxisMin(panel, axis) {
   if (axis === 'x') return toNumber(panel.x3d ?? panel.x, 0)
   if (axis === 'y') return toNumber(panel.y3d ?? panel.worldY ?? panel.depthY ?? panel.y, 0)
@@ -1212,6 +1313,11 @@ const store = createSimpleStore({
         || oldPanel.panelSide === 'handle_middle'
       )) {
         nextPanelsInBox.push(updateCabinetInfoHandleRailPanelAfterBoxResize(oldPanel, newBox))
+        return
+      }
+
+      if (oldPanel.sourceType === 'cabinet-info' && oldPanel.panelSide === 'door_stop') {
+        nextPanelsInBox.push(updateCabinetInfoDoorStopPanelAfterBoxResize(oldPanel, newBox))
         return
       }
 
