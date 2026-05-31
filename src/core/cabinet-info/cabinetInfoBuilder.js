@@ -65,8 +65,11 @@ function normalizeBoolean(value) {
 //=================
 function getBodyRect(sourceBox, info) {
   const thickness = toPositiveNumber(info?.general?.panelThickness, 18)
-  const leftFiller = normalizeBoolean(info?.filler?.enabled) ? toNonNegativeNumber(info?.filler?.left, 0) : 0
-  const rightFiller = normalizeBoolean(info?.filler?.enabled) ? toNonNegativeNumber(info?.filler?.right, 0) : 0
+  const fillerEnabled = normalizeBoolean(info?.filler?.enabled)
+  const rawLeftFiller = fillerEnabled ? toNonNegativeNumber(info?.filler?.left, 0) : 0
+  const rawRightFiller = fillerEnabled ? toNonNegativeNumber(info?.filler?.right, 0) : 0
+  const leftFiller = normalizeBoolean(info?.filler?.leftRotate) && rawLeftFiller > 0 ? thickness : rawLeftFiller
+  const rightFiller = normalizeBoolean(info?.filler?.rightRotate) && rawRightFiller > 0 ? thickness : rawRightFiller
   const x = toNumber(sourceBox.x, 0) + leftFiller
   const width = Math.max(thickness * 2, toPositiveNumber(sourceBox.width, 1) - leftFiller - rightFiller)
 
@@ -698,35 +701,51 @@ function buildToeKickPanels(sourceBox, info, body, panels) {
 } // End buildToeKickPanels
 
 //=================
+function createFillerMeta(info, body, side, size, rotate, faceOffset) {
+  return {
+    side,
+    size,
+    rotate,
+    faceOffset,
+    bodyThickness: body.thickness
+  }
+} // End createFillerMeta
+
+//=================
 function buildFillerPanels(sourceBox, info, body, panels) {
   if (!normalizeBoolean(info?.filler?.enabled)) return
 
   const t = body.thickness
   const sourceX = toNumber(sourceBox.x, 0)
   const sourceY = toNumber(sourceBox.y, 0)
-  const depth = toPositiveNumber(sourceBox.depth, 1)
+  const sourceZ = toNumber(sourceBox.z, 0)
+  const boxWidth = toPositiveNumber(sourceBox.width, 1)
   const height = toPositiveNumber(sourceBox.height, 1)
   const left = toNonNegativeNumber(info.filler.left, 0)
   const right = toNonNegativeNumber(info.filler.right, 0)
+  const faceOffset = clampTopStripFaceOffset(info.filler.faceOffset, t)
+  const y = sourceY + faceOffset
 
   if (left > 0) {
     const rotate = normalizeBoolean(info.filler.leftRotate)
 
-    pushPanel(panels, createPanel(sourceBox, 'filler_left', 'Nẹp trái', sourceX, sourceY + depth - (rotate ? left : t), toNumber(sourceBox.z, 0), rotate ? t : left, rotate ? left : t, height, {
+    pushPanel(panels, createPanel(sourceBox, 'filler_left', 'Nẹp trái', sourceX, y, sourceZ, rotate ? t : left, rotate ? left : t, height, {
       panelThickness: t,
       orientation: 'vertical',
-      panelSide: 'filler_left'
+      panelSide: 'filler_left',
+      cabinetInfoFiller: createFillerMeta(info, body, 'left', left, rotate, faceOffset)
     }))
   }
 
   if (right > 0) {
     const rotate = normalizeBoolean(info.filler.rightRotate)
-    const x = sourceX + toPositiveNumber(sourceBox.width, 1) - right
+    const x = rotate ? sourceX + boxWidth - t : sourceX + boxWidth - right
 
-    pushPanel(panels, createPanel(sourceBox, 'filler_right', 'Nẹp phải', rotate ? sourceX + toPositiveNumber(sourceBox.width, 1) - t : x, sourceY + depth - (rotate ? right : t), toNumber(sourceBox.z, 0), rotate ? t : right, rotate ? right : t, height, {
+    pushPanel(panels, createPanel(sourceBox, 'filler_right', 'Nẹp phải', x, y, sourceZ, rotate ? t : right, rotate ? right : t, height, {
       panelThickness: t,
       orientation: 'vertical',
-      panelSide: 'filler_right'
+      panelSide: 'filler_right',
+      cabinetInfoFiller: createFillerMeta(info, body, 'right', right, rotate, faceOffset)
     }))
   }
 } // End buildFillerPanels

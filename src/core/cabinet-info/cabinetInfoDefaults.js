@@ -56,7 +56,8 @@ export function createDefaultCabinetInfoState() {
       left: 0,
       leftRotate: false,
       right: 0,
-      rightRotate: false
+      rightRotate: false,
+      faceOffset: 0
     },
     shelfInset: {
       enabled: false,

@@ -63,6 +63,7 @@ function normalizeInfoInputValue(path, value) {
     'toeKick.middleCount',
     'filler.left',
     'filler.right',
+    'filler.faceOffset',
     'shelfInset.vertical',
     'shelfInset.horizontal'
   ]

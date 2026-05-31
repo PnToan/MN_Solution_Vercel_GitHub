@@ -623,6 +623,58 @@ function updateCabinetInfoDoorStopPanelAfterBoxResize(oldPanel, newBox) {
 } // End updateCabinetInfoDoorStopPanelAfterBoxResize
 
 //=================
+function updateCabinetInfoFillerPanelAfterBoxResize(oldPanel, newBox) {
+  const meta = oldPanel?.cabinetInfoFiller || {}
+  const t = Math.max(1, toNumber(meta.bodyThickness, toNumber(oldPanel?.panelThickness ?? oldPanel?.ySize, 18)))
+  const size = Math.max(1, toNumber(meta.size, toNumber(oldPanel?.xSize ?? oldPanel?.width, 1)))
+  const rotate = meta.rotate === true
+  const side = String(meta.side || (oldPanel.panelSide === 'filler_right' ? 'right' : 'left'))
+  const rawFaceOffset = toNumber(meta.faceOffset, 0)
+  const faceOffset = rawFaceOffset < 0 ? Math.max(rawFaceOffset, -t) : rawFaceOffset
+  const boxX = toNumber(newBox?.x, oldPanel?.x3d ?? oldPanel?.x ?? 0)
+  const boxY = toNumber(newBox?.y, oldPanel?.y3d ?? 0)
+  const boxZ = toNumber(newBox?.z, oldPanel?.z3d ?? oldPanel?.z ?? 0)
+  const boxWidth = Math.max(1, toNumber(newBox?.width, oldPanel?.xSize ?? oldPanel?.width ?? 1))
+  const boxHeight = Math.max(1, toNumber(newBox?.height, oldPanel?.zSize ?? oldPanel?.height ?? 1))
+  const nextX = side === 'right'
+    ? boxX + boxWidth - (rotate ? t : size)
+    : boxX
+  const nextY = boxY + faceOffset
+  const nextWidth = rotate ? t : size
+  const nextDepth = rotate ? size : t
+
+  return {
+    ...oldPanel,
+    x3d: nextX,
+    y3d: nextY,
+    z3d: boxZ,
+    xSize: nextWidth,
+    ySize: nextDepth,
+    zSize: boxHeight,
+    x: nextX,
+    y: boxZ,
+    z: boxZ,
+    width: nextWidth,
+    depth: nextDepth,
+    height: boxHeight,
+    linkedFrameId: newBox.id,
+    frameId: newBox.id,
+    sourceBoxId: newBox.id,
+    baseObjectId: newBox.id,
+    panelThickness: t,
+    thickness: t,
+    cabinetInfoFiller: {
+      ...meta,
+      side,
+      size,
+      rotate,
+      faceOffset,
+      bodyThickness: t
+    }
+  }
+} // End updateCabinetInfoFillerPanelAfterBoxResize
+
+//=================
 function getPanelAxisMin(panel, axis) {
   if (axis === 'x') return toNumber(panel.x3d ?? panel.x, 0)
   if (axis === 'y') return toNumber(panel.y3d ?? panel.worldY ?? panel.depthY ?? panel.y, 0)
@@ -1422,6 +1474,14 @@ const store = createSimpleStore({
         || oldPanel.panelSide === 'toe_kick_middle'
       )) {
         nextPanelsInBox.push(updateCabinetInfoToeKickPanelAfterBoxResize(oldPanel, newBox))
+        return
+      }
+
+      if (oldPanel.sourceType === 'cabinet-info' && (
+        oldPanel.panelSide === 'filler_left'
+        || oldPanel.panelSide === 'filler_right'
+      )) {
+        nextPanelsInBox.push(updateCabinetInfoFillerPanelAfterBoxResize(oldPanel, newBox))
         return
       }
 

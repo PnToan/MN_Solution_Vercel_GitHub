@@ -81,9 +81,10 @@
     <InfoSection title="Nẹp Gia Giảm" section-key="filler">
       <InfoCheck label="Tạo nẹp" path="filler.enabled" />
       <InfoNumber label="Nẹp trái" path="filler.left" />
-      <InfoCheck label="Xoay trái" path="filler.leftRotate" />
+      <InfoCheck label="Xoay ngang" path="filler.leftRotate" />
       <InfoNumber label="Nẹp phải" path="filler.right" />
-      <InfoCheck label="Xoay phải" path="filler.rightRotate" />
+      <InfoCheck label="Xoay ngang" path="filler.rightRotate" />
+      <InfoNumber label="Âm mặt" path="filler.faceOffset" />
     </InfoSection>
 
       <InfoSection title="Lùi Đợt" section-key="shelfInset">
