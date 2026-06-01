@@ -1109,6 +1109,39 @@ function getPanelEditRectBounds(rectangle) {
 function drawPanelEditRectangle(targetContext, context, layout, rectangle, options = {}) {
   if (!rectangle) return
 
+  const isDraft = options.draft === true
+  const isCutout = rectangle.operation === 'cutout'
+
+  if (rectangle.regionKind === 'polygon' && Array.isArray(rectangle.polygon)) {
+    targetContext.save()
+
+    if (isCutout && !isDraft) {
+      targetContext.fillStyle = getCssVariable('--mn-bg-canvas', '#f4f4f4')
+      targetContext.strokeStyle = '#111111'
+      targetContext.lineWidth = 1.8
+      targetContext.setLineDash([])
+      targetContext.beginPath()
+      if (drawPanelEditPolygonPath(targetContext, context, layout, rectangle.polygon)) {
+        targetContext.fill()
+        drawPanelEditPolygonCutoutEdges(targetContext, context, layout, rectangle.polygon)
+      }
+      targetContext.restore()
+      return
+    }
+
+    targetContext.strokeStyle = isDraft ? '#ff7a00' : '#111111'
+    targetContext.fillStyle = isDraft ? 'rgba(255, 122, 0, 0.12)' : 'rgba(0, 0, 0, 0.04)'
+    targetContext.lineWidth = isDraft ? 2 : 1.5
+    targetContext.setLineDash(isDraft ? [8, 5] : [])
+    targetContext.beginPath()
+    if (drawPanelEditPolygonPath(targetContext, context, layout, rectangle.polygon)) {
+      targetContext.fill()
+      targetContext.stroke()
+    }
+    targetContext.restore()
+    return
+  }
+
   const bounds = getPanelEditRectBounds(rectangle)
 
   if (bounds.width <= 0 || bounds.height <= 0) return
@@ -1116,10 +1149,8 @@ function drawPanelEditRectangle(targetContext, context, layout, rectangle, optio
   const start = getPanelEditPoint(context, layout.left, layout.top, layout.scale, bounds.x, bounds.y + bounds.height)
   const rectWidth = bounds.width * layout.scale
   const rectHeight = bounds.height * layout.scale
-  const isDraft = options.draft === true
 
   targetContext.save()
-  const isCutout = rectangle.operation === 'cutout'
   if (isCutout && !isDraft) {
     targetContext.fillStyle = getCssVariable('--mn-bg-canvas', '#f4f4f4')
     targetContext.strokeStyle = '#111111'
@@ -1187,6 +1218,34 @@ function drawPanelEditCutoutEdges(targetContext, context, layout, bounds) {
   targetContext.stroke()
 } // End drawPanelEditCutoutEdges
 
+
+//=================
+function isPanelEditBoundarySegment(context, pointA, pointB) {
+  const edgeA = getPanelEditBoundaryEdge(context, pointA)
+  const edgeB = getPanelEditBoundaryEdge(context, pointB)
+
+  return edgeA && edgeA === edgeB
+} // End isPanelEditBoundarySegment
+
+//=================
+function drawPanelEditPolygonCutoutEdges(targetContext, context, layout, polygon) {
+  if (!Array.isArray(polygon) || polygon.length < 3) return
+
+  targetContext.beginPath()
+  polygon.forEach((point, index) => {
+    const nextPoint = polygon[(index + 1) % polygon.length]
+
+    if (isPanelEditBoundarySegment(context, point, nextPoint)) return
+
+    const p1 = getPanelEditPoint(context, layout.left, layout.top, layout.scale, point.x, point.y)
+    const p2 = getPanelEditPoint(context, layout.left, layout.top, layout.scale, nextPoint.x, nextPoint.y)
+
+    targetContext.moveTo(p1.x, p1.y)
+    targetContext.lineTo(p2.x, p2.y)
+  })
+  targetContext.stroke()
+} // End drawPanelEditPolygonCutoutEdges
+
 //=================
 function commitPanelEditRectangle() {
   const draft = panelEditRect.value.draft
@@ -1246,6 +1305,8 @@ function confirmPanelEditRectangleAction(operation) {
     start: { ...pending.start },
     end: { ...pending.end },
     source: pending.source || 'rectangle',
+    regionKind: pending.regionKind || 'rect',
+    polygon: Array.isArray(pending.polygon) ? pending.polygon.map((point) => ({ ...point })) : null,
     operation: isCutout ? 'cutout' : 'none'
   }
 
@@ -1397,10 +1458,14 @@ function normalizePanelEditLine(context, start, end, options = {}) {
 
 //=================
 function getPanelEditLineScreenPoints(context, layout, line) {
-  if (!line) return null
+  if (!line?.start) return null
+
+  const endPoint = line.end || line.current
+
+  if (!endPoint) return null
 
   const start = getPanelEditPoint(context, layout.left, layout.top, layout.scale, line.start.x, line.start.y)
-  const end = getPanelEditPoint(context, layout.left, layout.top, layout.scale, line.end.x, line.end.y)
+  const end = getPanelEditPoint(context, layout.left, layout.top, layout.scale, endPoint.x, endPoint.y)
 
   return { start, end }
 } // End getPanelEditLineScreenPoints
@@ -1462,6 +1527,109 @@ function getSortedPanelEditCuts(values, maxValue) {
 } // End getSortedPanelEditCuts
 
 //=================
+function getPanelEditBoundaryEdge(context, point) {
+  if (!context || !point) return null
+
+  const tolerance = 0.5
+  const x = Number(point.x || 0)
+  const y = Number(point.y || 0)
+
+  if (Math.abs(x) <= tolerance) return 'left'
+  if (Math.abs(x - context.width) <= tolerance) return 'right'
+  if (Math.abs(y) <= tolerance) return 'bottom'
+  if (Math.abs(y - context.height) <= tolerance) return 'top'
+
+  return null
+} // End getPanelEditBoundaryEdge
+
+//=================
+function getPanelEditCornerForEdges(context, edgeA, edgeB) {
+  const key = [edgeA, edgeB].sort().join('-')
+
+  if (key === 'left-top') return { x: 0, y: context.height }
+  if (key === 'bottom-left') return { x: 0, y: 0 }
+  if (key === 'right-top') return { x: context.width, y: context.height }
+  if (key === 'bottom-right') return { x: context.width, y: 0 }
+
+  return null
+} // End getPanelEditCornerForEdges
+
+//=================
+function getPanelEditPolygonBounds(points) {
+  const xs = points.map((point) => Number(point.x || 0))
+  const ys = points.map((point) => Number(point.y || 0))
+  const minX = Math.min(...xs)
+  const maxX = Math.max(...xs)
+  const minY = Math.min(...ys)
+  const maxY = Math.max(...ys)
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY
+  }
+} // End getPanelEditPolygonBounds
+
+//=================
+function isPointInPanelEditPolygon(point, polygon) {
+  if (!point || !Array.isArray(polygon) || polygon.length < 3) return false
+
+  let inside = false
+
+  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index, index += 1) {
+    const currentPoint = polygon[index]
+    const previousPoint = polygon[previous]
+    const intersects = ((currentPoint.y > point.y) !== (previousPoint.y > point.y))
+      && (point.x < ((previousPoint.x - currentPoint.x) * (point.y - currentPoint.y)) / ((previousPoint.y - currentPoint.y) || 0.000001) + currentPoint.x)
+
+    if (intersects) inside = !inside
+  }
+
+  return inside
+} // End isPointInPanelEditPolygon
+
+//=================
+function getPanelEditFreeLineRegions(context) {
+  if (!context) return []
+
+  return panelEditLine.value.lines
+    .filter((line) => line.axis === 'free')
+    .map((line, index) => {
+      const startEdge = getPanelEditBoundaryEdge(context, line.start)
+      const endEdge = getPanelEditBoundaryEdge(context, line.end)
+      const corner = getPanelEditCornerForEdges(context, startEdge, endEdge)
+
+      if (!startEdge || !endEdge || startEdge === endEdge || !corner) return null
+
+      const polygon = [
+        { ...line.start },
+        { ...line.end },
+        corner
+      ]
+      const bounds = getPanelEditPolygonBounds(polygon)
+
+      if (bounds.width <= 0.01 || bounds.height <= 0.01) return null
+
+      return {
+        id: `free-region-${line.id}-${index}`,
+        source: 'lineRegion',
+        regionKind: 'polygon',
+        lineId: line.id,
+        polygon,
+        start: { x: bounds.x, y: bounds.y },
+        end: { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        operation: 'none'
+      }
+    })
+    .filter(Boolean)
+} // End getPanelEditFreeLineRegions
+
+//=================
 function getPanelEditLineRegions(context) {
   if (!context || !panelEditLine.value.lines.length) return []
 
@@ -1487,6 +1655,7 @@ function getPanelEditLineRegions(context) {
       regions.push({
         id: `region-${xIndex}-${yIndex}`,
         source: 'lineRegion',
+        regionKind: 'rect',
         start: { x, y },
         end: { x: x + width, y: y + height },
         x,
@@ -1498,8 +1667,30 @@ function getPanelEditLineRegions(context) {
     }
   }
 
-  return regions
+  return [
+    ...regions,
+    ...getPanelEditFreeLineRegions(context)
+  ]
 } // End getPanelEditLineRegions
+
+//=================
+function drawPanelEditPolygonPath(targetContext, context, layout, polygon) {
+  if (!Array.isArray(polygon) || polygon.length < 3) return false
+
+  polygon.forEach((point, index) => {
+    const screenPoint = getPanelEditPoint(context, layout.left, layout.top, layout.scale, point.x, point.y)
+
+    if (index === 0) {
+      targetContext.moveTo(screenPoint.x, screenPoint.y)
+      return
+    }
+
+    targetContext.lineTo(screenPoint.x, screenPoint.y)
+  })
+  targetContext.closePath()
+
+  return true
+} // End drawPanelEditPolygonPath
 
 //=================
 function drawPanelEditLineRegions(targetContext, context, layout) {
@@ -1511,13 +1702,24 @@ function drawPanelEditLineRegions(targetContext, context, layout) {
 
     if (!isHover) return
 
-    const topLeft = getPanelEditPoint(context, layout.left, layout.top, layout.scale, region.x, region.y + region.height)
-
     targetContext.save()
     targetContext.fillStyle = 'rgba(255, 122, 0, 0.1)'
     targetContext.strokeStyle = '#ff7a00'
     targetContext.lineWidth = 1.5
     targetContext.setLineDash([6, 4])
+
+    if (region.regionKind === 'polygon') {
+      targetContext.beginPath()
+      if (drawPanelEditPolygonPath(targetContext, context, layout, region.polygon)) {
+        targetContext.fill()
+        targetContext.stroke()
+      }
+      targetContext.restore()
+      return
+    }
+
+    const topLeft = getPanelEditPoint(context, layout.left, layout.top, layout.scale, region.x, region.y + region.height)
+
     targetContext.fillRect(topLeft.x, topLeft.y, region.width * layout.scale, region.height * layout.scale)
     targetContext.strokeRect(topLeft.x, topLeft.y, region.width * layout.scale, region.height * layout.scale)
     targetContext.restore()
@@ -1534,12 +1736,16 @@ function hitPanelEditLineRegion(context, layout, event) {
   const local = getPanelEditLocalFromScreen(context, layout, event.clientX - rect.left, event.clientY - rect.top)
   const regions = getPanelEditLineRegions(context)
 
-  return regions.find((region) => (
-    local.x >= region.x
-    && local.x <= region.x + region.width
-    && local.y >= region.y
-    && local.y <= region.y + region.height
-  )) || null
+  return regions.find((region) => {
+    if (region.regionKind === 'polygon') {
+      return isPointInPanelEditPolygon(local, region.polygon)
+    }
+
+    return local.x >= region.x
+      && local.x <= region.x + region.width
+      && local.y >= region.y
+      && local.y <= region.y + region.height
+  }) || null
 } // End hitPanelEditLineRegion
 
 //=================
@@ -1579,7 +1785,7 @@ function commitPanelEditLine() {
       line
     ]
   }
-  app.setStatus('Line: đã tạo line phân vùng')
+  app.setStatus('Line: đã tạo line')
   nextTick(resizePanelEditCanvas)
 } // End commitPanelEditLine
 
@@ -1776,6 +1982,12 @@ function onPanelEditPointerDown(event) {
   const canvas = panelEditCanvasRef.value
 
   if (!canvas || !context) return
+
+  try {
+    canvas.setPointerCapture?.(event.pointerId)
+  } catch (_error) {
+    // Ignore browsers that cannot capture this pointer.
+  }
 
   if (event.button === 1 || event.button === 2 || event.shiftKey) {
     panelEditPanning = true
