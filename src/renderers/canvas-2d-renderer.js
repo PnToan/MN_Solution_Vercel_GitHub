@@ -297,9 +297,8 @@ function isLocalCutoutBoundaryOnlySegment(pointA, pointB, panelRect) {
   const edgeB = isLocalPointOnPanelRectEdge(pointB, panelRect)
 
   if (!edgeA || !edgeB) return false
-  if (edgeA === edgeB) return true
 
-  return Boolean(getLocalBoundaryCornerBetweenEdges(edgeA, edgeB, panelRect))
+  return edgeA === edgeB
 } // End isLocalCutoutBoundaryOnlySegment
 
 //=================

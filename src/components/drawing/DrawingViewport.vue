@@ -1490,9 +1490,8 @@ function isPanelEditCutoutBoundaryOnlySegment(context, pointA, pointB) {
   const edgeB = getPanelEditBoundaryEdge(context, pointB)
 
   if (!edgeA || !edgeB) return false
-  if (edgeA === edgeB) return true
 
-  return Boolean(getPanelEditBoundaryCornerBetweenEdges(context, edgeA, edgeB))
+  return edgeA === edgeB
 } // End isPanelEditCutoutBoundaryOnlySegment
 
 //=================
