@@ -116,6 +116,7 @@ import { projectBoxToCameraRect, cameraLocalToWorldPoint } from '../../core/view
 import { hitTestPanel, hitTestZoneEdge } from '../../core/snap/snap-engine'
 import { handleViewportKey } from '../../commands/keyboard-controller'
 import { createPanelEditRectangleRecord, getEditPanelToolCursorClass, isEditPanelDrawTool, isEditPanelTool } from '../../core/tools/editPanelTool'
+import { getPanelEditArcData, getPanelEditArcDefaultBulge, getPanelEditArcEndFromRadius, getPanelEditArcPoints } from '../../core/tools/editPanelArcTool'
 
 const app = useAppStore()
 const cabinet = useCabinetStore()
@@ -2398,166 +2399,6 @@ function getPanelEditArcPointFromPointer(context, layout, event) {
 } // End getPanelEditArcPointFromPointer
 
 //=================
-function getPanelEditArcDefaultBulge(start, end) {
-  if (!start || !end) return null
-
-  const dx = Number(end.x || 0) - Number(start.x || 0)
-  const dy = Number(end.y || 0) - Number(start.y || 0)
-  const length = Math.hypot(dx, dy)
-
-  if (length <= 0.01) return null
-
-  const midX = (Number(start.x || 0) + Number(end.x || 0)) / 2
-  const midY = (Number(start.y || 0) + Number(end.y || 0)) / 2
-  const sagitta = length * (1 / Math.sqrt(2) - 0.5)
-
-  return {
-    x: midX + (dy / length) * sagitta,
-    y: midY - (dx / length) * sagitta
-  }
-} // End getPanelEditArcDefaultBulge
-
-//=================
-function getPanelEditArcEndFromRadius(start, current, radius) {
-  if (!start || !current) return null
-
-  const parsedRadius = Number(radius)
-  const dx = Number(current.x || 0) - Number(start.x || 0)
-  const dy = Number(current.y || 0) - Number(start.y || 0)
-  const length = Math.hypot(dx, dy)
-
-  if (!Number.isFinite(parsedRadius) || parsedRadius <= 0 || length <= 0.01) return null
-
-  const chordLength = parsedRadius * Math.sqrt(2)
-
-  return {
-    x: Number(start.x || 0) + (dx / length) * chordLength,
-    y: Number(start.y || 0) + (dy / length) * chordLength
-  }
-} // End getPanelEditArcEndFromRadius
-
-//=================
-function getPanelEditCircleFromThreePoints(pointA, pointB, pointC) {
-  if (!pointA || !pointB || !pointC) return null
-
-  const ax = Number(pointA.x || 0)
-  const ay = Number(pointA.y || 0)
-  const bx = Number(pointB.x || 0)
-  const by = Number(pointB.y || 0)
-  const cx = Number(pointC.x || 0)
-  const cy = Number(pointC.y || 0)
-  const d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
-
-  if (Math.abs(d) <= 0.000001) return null
-
-  const ux = ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by) * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / d
-  const uy = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by) * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / d
-  const radius = Math.hypot(ax - ux, ay - uy)
-
-  if (!Number.isFinite(radius) || radius <= 0.01) return null
-
-  return { center: { x: ux, y: uy }, radius }
-} // End getPanelEditCircleFromThreePoints
-
-//=================
-function normalizePanelEditAngle(angle) {
-  const full = Math.PI * 2
-  let result = angle % full
-
-  if (result < 0) result += full
-
-  return result
-} // End normalizePanelEditAngle
-
-//=================
-function getPanelEditAngleDelta(startAngle, endAngle, clockwise = false) {
-  const full = Math.PI * 2
-  let delta = normalizePanelEditAngle(endAngle - startAngle)
-
-  if (clockwise) {
-    delta = delta === 0 ? full : delta
-    return delta - full
-  }
-
-  return delta === 0 ? full : delta
-} // End getPanelEditAngleDelta
-
-//=================
-function isPanelEditAngleBetween(startAngle, testAngle, endAngle, clockwise = false) {
-  const full = Math.PI * 2
-
-  if (clockwise) {
-    return normalizePanelEditAngle(startAngle - testAngle) <= normalizePanelEditAngle(startAngle - endAngle) + 0.000001
-  }
-
-  return normalizePanelEditAngle(testAngle - startAngle) <= normalizePanelEditAngle(endAngle - startAngle) + 0.000001
-} // End isPanelEditAngleBetween
-
-//=================
-function getPanelEditArcData(draft) {
-  if (!draft?.start) return null
-
-  const start = draft.start
-  const end = draft.end || draft.current
-  const bulge = draft.stage === 'bulge'
-    ? (draft.current || draft.bulge || getPanelEditArcDefaultBulge(start, end))
-    : getPanelEditArcDefaultBulge(start, end)
-
-  if (!end || !bulge) return null
-
-  const circle = getPanelEditCircleFromThreePoints(start, bulge, end)
-
-  if (!circle) return null
-
-  const startAngle = Math.atan2(Number(start.y || 0) - circle.center.y, Number(start.x || 0) - circle.center.x)
-  const endAngle = Math.atan2(Number(end.y || 0) - circle.center.y, Number(end.x || 0) - circle.center.x)
-  const bulgeAngle = Math.atan2(Number(bulge.y || 0) - circle.center.y, Number(bulge.x || 0) - circle.center.x)
-  const clockwiseCandidate = false
-  const clockwise = isPanelEditAngleBetween(startAngle, bulgeAngle, endAngle, clockwiseCandidate)
-    ? false
-    : true
-  const delta = getPanelEditAngleDelta(startAngle, endAngle, clockwise)
-  const sweep = Math.abs(delta)
-  const degree = sweep * 180 / Math.PI
-  const isQuarterOrHalf = Math.abs(degree - 90) <= 4 || Math.abs(degree - 180) <= 4
-
-  return {
-    ...circle,
-    start: { x: Number(start.x || 0), y: Number(start.y || 0) },
-    end: { x: Number(end.x || 0), y: Number(end.y || 0) },
-    bulge: { x: Number(bulge.x || 0), y: Number(bulge.y || 0) },
-    startAngle,
-    endAngle,
-    clockwise,
-    delta,
-    sweep,
-    isQuarterOrHalf
-  }
-} // End getPanelEditArcData
-
-//=================
-function getPanelEditArcPoints(draft, segmentCount = 24) {
-  const arcData = getPanelEditArcData(draft)
-
-  if (!arcData) return []
-
-  const count = Math.max(6, Math.ceil(Number(segmentCount || 24) * (arcData.sweep / Math.PI)))
-  const points = []
-
-  for (let index = 0; index <= count; index += 1) {
-    const ratioValue = index / count
-    const angle = arcData.startAngle + arcData.delta * ratioValue
-
-    points.push({
-      x: Math.round((arcData.center.x + Math.cos(angle) * arcData.radius) * 1000) / 1000,
-      y: Math.round((arcData.center.y + Math.sin(angle) * arcData.radius) * 1000) / 1000
-    })
-  }
-
-  return points
-} // End getPanelEditArcPoints
-
-//=================
 function drawPanelEditArcDraft(targetContext, context, layout, draft, options = {}) {
   if (!draft?.start) return
 
@@ -2566,18 +2407,7 @@ function drawPanelEditArcDraft(targetContext, context, layout, draft, options = 
 
   if (!endPoint) return
 
-  const startScreen = getPanelEditPoint(context, layout.left, layout.top, layout.scale, draft.start.x, draft.start.y)
-  const endScreen = getPanelEditPoint(context, layout.left, layout.top, layout.scale, endPoint.x, endPoint.y)
-
   targetContext.save()
-  targetContext.strokeStyle = arcData?.isQuarterOrHalf ? '#ff0000' : '#ff7a00'
-  targetContext.lineWidth = 2
-  targetContext.setLineDash([8, 5])
-  targetContext.beginPath()
-  targetContext.moveTo(startScreen.x, startScreen.y)
-  targetContext.lineTo(endScreen.x, endScreen.y)
-  targetContext.stroke()
-  targetContext.setLineDash([])
 
   if (arcData) {
     const arcPoints = getPanelEditArcPoints(draft, 36)
@@ -2659,11 +2489,6 @@ function commitPanelEditArc() {
 
   const baseId = `arc-${Date.now()}`
   const nextLines = []
-  const chordLine = normalizePanelEditLine(context, arcDraft.start, arcDraft.end || arcDraft.current, {
-    id: `${baseId}-chord`
-  })
-
-  if (chordLine) nextLines.push(chordLine)
 
   for (let index = 0; index < arcPoints.length - 1; index += 1) {
     const line = normalizePanelEditLine(context, arcPoints[index], arcPoints[index + 1], {
