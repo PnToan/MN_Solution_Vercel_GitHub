@@ -506,6 +506,49 @@ function getPanelEditTapeSnap(context, layout, screenX, screenY, options = {}) {
 
   const verticalGuides = guides.filter((guide) => guide.axis === 'vertical')
   const horizontalGuides = guides.filter((guide) => guide.axis === 'horizontal')
+  const editLines = Array.isArray(panelEditLine.value.lines) ? panelEditLine.value.lines : []
+  const verticalLines = editLines.filter((line) => line.axis === 'vertical')
+  const horizontalLines = editLines.filter((line) => line.axis === 'horizontal')
+
+  editLines.forEach((line) => {
+    ;[line.start, line.end].forEach((point, pointIndex) => {
+      candidates.push({
+        key: `line-end-${line.id}-${pointIndex}`,
+        x: Number(point.x || 0),
+        y: Number(point.y || 0),
+        axis: line.axis,
+        edge: 'line-end',
+        kind: 'circle',
+        lineId: line.id
+      })
+    })
+  })
+
+  verticalLines.forEach((verticalLine) => {
+    const verticalX = Number(verticalLine.start.x || 0)
+    const verticalYMin = Math.min(Number(verticalLine.start.y || 0), Number(verticalLine.end.y || 0))
+    const verticalYMax = Math.max(Number(verticalLine.start.y || 0), Number(verticalLine.end.y || 0))
+
+    horizontalLines.forEach((horizontalLine) => {
+      const horizontalY = Number(horizontalLine.start.y || 0)
+      const horizontalXMin = Math.min(Number(horizontalLine.start.x || 0), Number(horizontalLine.end.x || 0))
+      const horizontalXMax = Math.max(Number(horizontalLine.start.x || 0), Number(horizontalLine.end.x || 0))
+
+      if (verticalX < horizontalXMin - 0.01 || verticalX > horizontalXMax + 0.01) return
+      if (horizontalY < verticalYMin - 0.01 || horizontalY > verticalYMax + 0.01) return
+
+      candidates.push({
+        key: `line-cross-${verticalLine.id}-${horizontalLine.id}`,
+        x: verticalX,
+        y: horizontalY,
+        axis: options.preferredAxis || 'both',
+        edge: 'line-cross',
+        kind: 'circle',
+        lineId: verticalLine.id,
+        lineId2: horizontalLine.id
+      })
+    })
+  })
 
   verticalGuides.forEach((verticalGuide) => {
     horizontalGuides.forEach((horizontalGuide) => {
@@ -615,6 +658,44 @@ function getPanelEditTapeSnap(context, layout, screenX, screenY, options = {}) {
       guideId: guide.id,
       local: { x: clampedLocal.x, y: guideValue },
       screen: { x: screenX, y: point.y }
+    })
+  })
+
+  verticalLines.forEach((line) => {
+    const lineX = Number(line.start.x || 0)
+    const yMin = Math.min(Number(line.start.y || 0), Number(line.end.y || 0))
+    const yMax = Math.max(Number(line.start.y || 0), Number(line.end.y || 0))
+    const clampedY = Math.max(yMin, Math.min(yMax, clampedLocal.y))
+    const point = getPanelEditPoint(context, layout.left, layout.top, layout.scale, lineX, clampedY)
+
+    edgeCandidates.push({
+      key: `line-vertical-${line.id}`,
+      distance: Math.abs(screenX - point.x),
+      axis: 'vertical',
+      edge: 'line',
+      kind: 'square',
+      lineId: line.id,
+      local: { x: lineX, y: clampedY },
+      screen: { x: point.x, y: point.y }
+    })
+  })
+
+  horizontalLines.forEach((line) => {
+    const lineY = Number(line.start.y || 0)
+    const xMin = Math.min(Number(line.start.x || 0), Number(line.end.x || 0))
+    const xMax = Math.max(Number(line.start.x || 0), Number(line.end.x || 0))
+    const clampedX = Math.max(xMin, Math.min(xMax, clampedLocal.x))
+    const point = getPanelEditPoint(context, layout.left, layout.top, layout.scale, clampedX, lineY)
+
+    edgeCandidates.push({
+      key: `line-horizontal-${line.id}`,
+      distance: Math.abs(screenY - point.y),
+      axis: 'horizontal',
+      edge: 'line',
+      kind: 'square',
+      lineId: line.id,
+      local: { x: clampedX, y: lineY },
+      screen: { x: point.x, y: point.y }
     })
   })
 
@@ -953,7 +1034,7 @@ function drawPanelEditRectangle(targetContext, context, layout, rectangle, optio
     targetContext.beginPath()
     targetContext.rect(start.x, start.y, rectWidth, rectHeight)
     targetContext.fill()
-    targetContext.stroke()
+    drawPanelEditCutoutEdges(targetContext, context, layout, bounds)
     targetContext.restore()
     return
   }
@@ -968,6 +1049,49 @@ function drawPanelEditRectangle(targetContext, context, layout, rectangle, optio
   targetContext.stroke()
   targetContext.restore()
 } // End drawPanelEditRectangle
+
+//=================
+function drawPanelEditCutoutEdges(targetContext, context, layout, bounds) {
+  const left = Number(bounds.x || 0)
+  const bottom = Number(bounds.y || 0)
+  const right = left + Number(bounds.width || 0)
+  const top = bottom + Number(bounds.height || 0)
+  const tolerance = 0.01
+  const edges = [
+    {
+      skip: left <= tolerance,
+      start: { x: left, y: bottom },
+      end: { x: left, y: top }
+    },
+    {
+      skip: right >= context.width - tolerance,
+      start: { x: right, y: bottom },
+      end: { x: right, y: top }
+    },
+    {
+      skip: bottom <= tolerance,
+      start: { x: left, y: bottom },
+      end: { x: right, y: bottom }
+    },
+    {
+      skip: top >= context.height - tolerance,
+      start: { x: left, y: top },
+      end: { x: right, y: top }
+    }
+  ]
+
+  targetContext.beginPath()
+  edges.forEach((edge) => {
+    if (edge.skip) return
+
+    const p1 = getPanelEditPoint(context, layout.left, layout.top, layout.scale, edge.start.x, edge.start.y)
+    const p2 = getPanelEditPoint(context, layout.left, layout.top, layout.scale, edge.end.x, edge.end.y)
+
+    targetContext.moveTo(p1.x, p1.y)
+    targetContext.lineTo(p2.x, p2.y)
+  })
+  targetContext.stroke()
+} // End drawPanelEditCutoutEdges
 
 //=================
 function commitPanelEditRectangle() {
@@ -3791,7 +3915,7 @@ onBeforeUnmount(() => {
 }
 
 .mn-cursor-select {
-  cursor: default;
+  cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 2 L4 23 L9 18 L13 29 L17 27 L13 16 L21 16 Z' fill='white' stroke='%23111111' stroke-width='1.4' stroke-linejoin='round'/%3E%3Ccircle cx='23' cy='24' r='4' fill='%23ffffff' stroke='%230077CC' stroke-width='1.5'/%3E%3C/svg%3E") 4 2, default;
 }
 
 .mn-cursor-crosshair {
