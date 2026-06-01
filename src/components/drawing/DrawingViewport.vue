@@ -1238,6 +1238,7 @@ function drawPanelEditRectangle(targetContext, context, layout, rectangle, optio
       targetContext.beginPath()
       if (drawPanelEditPolygonPath(targetContext, context, layout, rectangle.polygon)) {
         targetContext.fill()
+        erasePanelEditPolygonBoundarySegments(targetContext, context, layout, rectangle.polygon)
         drawPanelEditPolygonCutoutEdges(targetContext, context, layout, rectangle.polygon)
       }
       targetContext.restore()
@@ -1274,6 +1275,7 @@ function drawPanelEditRectangle(targetContext, context, layout, rectangle, optio
     targetContext.beginPath()
     targetContext.rect(start.x, start.y, rectWidth, rectHeight)
     targetContext.fill()
+    erasePanelEditCutoutBoundarySegments(targetContext, context, layout, bounds)
     drawPanelEditCutoutEdges(targetContext, context, layout, bounds)
     targetContext.restore()
     return
@@ -1289,6 +1291,40 @@ function drawPanelEditRectangle(targetContext, context, layout, rectangle, optio
   targetContext.stroke()
   targetContext.restore()
 } // End drawPanelEditRectangle
+
+
+//=================
+function erasePanelEditCutoutBoundarySegments(targetContext, context, layout, bounds) {
+  const left = Number(bounds.x || 0)
+  const bottom = Number(bounds.y || 0)
+  const right = left + Number(bounds.width || 0)
+  const top = bottom + Number(bounds.height || 0)
+  const tolerance = 0.01
+  const edges = [
+    { draw: left <= tolerance, start: { x: left, y: bottom }, end: { x: left, y: top } },
+    { draw: right >= context.width - tolerance, start: { x: right, y: bottom }, end: { x: right, y: top } },
+    { draw: bottom <= tolerance, start: { x: left, y: bottom }, end: { x: right, y: bottom } },
+    { draw: top >= context.height - tolerance, start: { x: left, y: top }, end: { x: right, y: top } }
+  ]
+
+  targetContext.save()
+  targetContext.strokeStyle = getCssVariable('--mn-bg-canvas', '#f4f4f4')
+  targetContext.lineWidth = 5
+  targetContext.lineCap = 'square'
+  targetContext.setLineDash([])
+  targetContext.beginPath()
+  edges.forEach((edge) => {
+    if (!edge.draw) return
+
+    const p1 = getPanelEditPoint(context, layout.left, layout.top, layout.scale, edge.start.x, edge.start.y)
+    const p2 = getPanelEditPoint(context, layout.left, layout.top, layout.scale, edge.end.x, edge.end.y)
+
+    targetContext.moveTo(p1.x, p1.y)
+    targetContext.lineTo(p2.x, p2.y)
+  })
+  targetContext.stroke()
+  targetContext.restore()
+} // End erasePanelEditCutoutBoundarySegments
 
 //=================
 function drawPanelEditCutoutEdges(targetContext, context, layout, bounds) {
@@ -1341,6 +1377,32 @@ function isPanelEditBoundarySegment(context, pointA, pointB) {
 
   return edgeA && edgeA === edgeB
 } // End isPanelEditBoundarySegment
+
+
+//=================
+function erasePanelEditPolygonBoundarySegments(targetContext, context, layout, polygon) {
+  if (!Array.isArray(polygon) || polygon.length < 3) return
+
+  targetContext.save()
+  targetContext.strokeStyle = getCssVariable('--mn-bg-canvas', '#f4f4f4')
+  targetContext.lineWidth = 5
+  targetContext.lineCap = 'square'
+  targetContext.setLineDash([])
+  targetContext.beginPath()
+  polygon.forEach((point, index) => {
+    const nextPoint = polygon[(index + 1) % polygon.length]
+
+    if (!isPanelEditBoundarySegment(context, point, nextPoint)) return
+
+    const p1 = getPanelEditPoint(context, layout.left, layout.top, layout.scale, point.x, point.y)
+    const p2 = getPanelEditPoint(context, layout.left, layout.top, layout.scale, nextPoint.x, nextPoint.y)
+
+    targetContext.moveTo(p1.x, p1.y)
+    targetContext.lineTo(p2.x, p2.y)
+  })
+  targetContext.stroke()
+  targetContext.restore()
+} // End erasePanelEditPolygonBoundarySegments
 
 //=================
 function drawPanelEditPolygonCutoutEdges(targetContext, context, layout, polygon) {
@@ -2554,18 +2616,61 @@ function onPanelEditWheel(event) {
   resizePanelEditCanvas()
 } // End onPanelEditWheel
 
+
+//=================
+function clonePanelEditApplyPoint(point) {
+  return {
+    x: Number(point?.x || 0),
+    y: Number(point?.y || 0)
+  }
+} // End clonePanelEditApplyPoint
+
+//=================
+function getPanelEditSavedRectanglesForApply() {
+  return (panelEditRect.value.rectangles || []).map((rectangle) => ({
+    id: rectangle.id,
+    start: clonePanelEditApplyPoint(rectangle.start),
+    end: clonePanelEditApplyPoint(rectangle.end),
+    operation: rectangle.operation || 'none',
+    source: rectangle.source || 'rectangle',
+    regionKind: rectangle.regionKind || 'rect',
+    polygon: Array.isArray(rectangle.polygon)
+      ? rectangle.polygon.map((point) => clonePanelEditApplyPoint(point))
+      : null
+  }))
+} // End getPanelEditSavedRectanglesForApply
+
+//=================
+function getPanelEditSavedLinesForApply() {
+  return (panelEditLine.value.lines || []).map((line) => ({
+    id: line.id,
+    axis: line.axis || 'free',
+    start: clonePanelEditApplyPoint(line.start),
+    end: clonePanelEditApplyPoint(line.end)
+  }))
+} // End getPanelEditSavedLinesForApply
+
+//=================
+function getPanelEditSavedGuidesForApply() {
+  return (panelEditTape.value.guides || []).map((guide) => ({
+    id: guide.id,
+    axis: guide.axis,
+    edge: guide.edge || null,
+    baseValue: Number(guide.baseValue || 0),
+    value: Number(guide.value || 0)
+  }))
+} // End getPanelEditSavedGuidesForApply
+
 //=================
 function applyPanelEdit() {
   const context = activePanelEditContext.value
 
   if (!context) return
 
-  panelEditTape.value = {
-    hoverSnap: null,
-    draft: null,
-    guides: [],
-    inputBuffer: ''
-  }
+  const savedRectangles = getPanelEditSavedRectanglesForApply()
+  const savedLines = getPanelEditSavedLinesForApply()
+  const savedGuides = getPanelEditSavedGuidesForApply()
+
   drawing.applyPanelEditOperations({
     panelId: context.panelId,
     faceSide: context.faceSide,
@@ -2573,10 +2678,17 @@ function applyPanelEdit() {
     axisU: context.axisU,
     axisV: context.axisV,
     thicknessAxis: context.thicknessAxis,
-    rectangles: getPanelEditSavedRectanglesForApply(),
-    lines: getPanelEditSavedLinesForApply(),
-    guides: getPanelEditSavedGuidesForApply()
+    rectangles: savedRectangles,
+    lines: savedLines,
+    guides: savedGuides
   })
+
+  panelEditTape.value = {
+    hoverSnap: null,
+    draft: null,
+    guides: [],
+    inputBuffer: ''
+  }
   panelEditRect.value = {
     hoverSnap: null,
     draft: null,

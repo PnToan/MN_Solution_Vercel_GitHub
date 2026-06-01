@@ -262,6 +262,94 @@ function drawPolygonLocal(ctx, viewport, polygon, options = {}) {
   }
 } // End drawPolygonLocal
 
+
+//=================
+function isLocalPointOnPanelRectEdge(point, panelRect) {
+  if (!point || !panelRect) return null
+
+  const tolerance = 0.5
+  const x = Number(point.x || 0)
+  const y = Number(point.y || 0)
+  const left = Number(panelRect.x || 0)
+  const right = left + Number(panelRect.width || 0)
+  const bottom = Number(panelRect.y || 0)
+  const top = bottom + Number(panelRect.height || 0)
+
+  if (Math.abs(x - left) <= tolerance) return 'left'
+  if (Math.abs(x - right) <= tolerance) return 'right'
+  if (Math.abs(y - bottom) <= tolerance) return 'bottom'
+  if (Math.abs(y - top) <= tolerance) return 'top'
+
+  return null
+} // End isLocalPointOnPanelRectEdge
+
+//=================
+function isLocalBoundarySegment(pointA, pointB, panelRect) {
+  const edgeA = isLocalPointOnPanelRectEdge(pointA, panelRect)
+  const edgeB = isLocalPointOnPanelRectEdge(pointB, panelRect)
+
+  return edgeA && edgeA === edgeB
+} // End isLocalBoundarySegment
+
+//=================
+function drawPanelEditCutoutPolygonLocal(ctx, viewport, polygon, panelRect, background) {
+  if (!Array.isArray(polygon) || polygon.length < 3) return
+
+  drawPolygonLocal(ctx, viewport, polygon, {
+    fill: background
+  })
+
+  ctx.beginPath()
+  ctx.strokeStyle = '#111111'
+  ctx.lineWidth = 2
+  polygon.forEach((point, index) => {
+    const nextPoint = polygon[(index + 1) % polygon.length]
+
+    if (isLocalBoundarySegment(point, nextPoint, panelRect)) return
+
+    const p1 = localToScreen(viewport, point.x, point.y)
+    const p2 = localToScreen(viewport, nextPoint.x, nextPoint.y)
+
+    ctx.moveTo(p1.x, p1.y)
+    ctx.lineTo(p2.x, p2.y)
+  })
+  ctx.stroke()
+} // End drawPanelEditCutoutPolygonLocal
+
+//=================
+function drawPanelEditCutoutRectLocal(ctx, viewport, cutoutRect, panelRect, background) {
+  if (!cutoutRect || !panelRect) return
+
+  drawRectLocal(ctx, viewport, cutoutRect, {
+    fill: background
+  })
+
+  const left = Number(cutoutRect.x || 0)
+  const bottom = Number(cutoutRect.y || 0)
+  const right = left + Number(cutoutRect.width || 0)
+  const top = bottom + Number(cutoutRect.height || 0)
+  const edges = [
+    { start: { x: left, y: bottom }, end: { x: left, y: top } },
+    { start: { x: right, y: bottom }, end: { x: right, y: top } },
+    { start: { x: left, y: bottom }, end: { x: right, y: bottom } },
+    { start: { x: left, y: top }, end: { x: right, y: top } }
+  ]
+
+  ctx.beginPath()
+  ctx.strokeStyle = '#111111'
+  ctx.lineWidth = 2
+  edges.forEach((edge) => {
+    if (isLocalBoundarySegment(edge.start, edge.end, panelRect)) return
+
+    const p1 = localToScreen(viewport, edge.start.x, edge.start.y)
+    const p2 = localToScreen(viewport, edge.end.x, edge.end.y)
+
+    ctx.moveTo(p1.x, p1.y)
+    ctx.lineTo(p2.x, p2.y)
+  })
+  ctx.stroke()
+} // End drawPanelEditCutoutRectLocal
+
 //=================
 function drawPanelEditCutouts(ctx, viewport, panel, panelRect, currentView) {
   const cutouts = Array.isArray(panel?.editPanelCutouts) ? panel.editPanelCutouts : []
@@ -276,11 +364,7 @@ function drawPanelEditCutouts(ctx, viewport, panel, panelRect, currentView) {
 
       if (!polygon) return
 
-      drawPolygonLocal(ctx, viewport, polygon, {
-        fill: background,
-        stroke: '#111111',
-        lineWidth: 2
-      })
+      drawPanelEditCutoutPolygonLocal(ctx, viewport, polygon, panelRect, background)
       return
     }
 
@@ -288,11 +372,7 @@ function drawPanelEditCutouts(ctx, viewport, panel, panelRect, currentView) {
 
     if (!cutoutRect) return
 
-    drawRectLocal(ctx, viewport, cutoutRect, {
-      fill: background,
-      stroke: '#111111',
-      lineWidth: 2
-    })
+    drawPanelEditCutoutRectLocal(ctx, viewport, cutoutRect, panelRect, background)
   })
 } // End drawPanelEditCutouts
 
