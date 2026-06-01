@@ -2000,8 +2000,9 @@ function confirmPanelEditRectangleAction(operation) {
   if (!pending) return
 
   const isCutout = operation === 'cutout'
+  const isExistingRegion = ['lineRegion', 'rectangleRegion', 'circleRegion'].includes(pending.source)
 
-  if (pending.source === 'lineRegion' && !isCutout) {
+  if (isExistingRegion && !isCutout) {
     panelEditRect.value = {
       ...panelEditRect.value,
       pendingAction: null
@@ -2028,6 +2029,10 @@ function confirmPanelEditRectangleAction(operation) {
     polygon: Array.isArray(pending.polygon) ? pending.polygon.map((point) => ({ ...point })) : null,
     operation: isCutout ? 'cutout' : 'none'
   }
+  const nextRectangles = (panelEditRect.value.rectangles || [])
+    .filter((rectangleItem) => !(isCutout && pending.source === 'rectangleRegion' && rectangleItem.id === pending.sourceId))
+  const nextCircles = (panelEditCircle.value.circles || [])
+    .filter((circleItem) => !(isCutout && pending.source === 'circleRegion' && circleItem.id === pending.sourceId))
 
   panelEditRect.value = {
     ...panelEditRect.value,
@@ -2035,7 +2040,7 @@ function confirmPanelEditRectangleAction(operation) {
     draft: null,
     pendingAction: null,
     rectangles: [
-      ...panelEditRect.value.rectangles,
+      ...nextRectangles,
       rectangle
     ]
   }
@@ -2044,6 +2049,10 @@ function confirmPanelEditRectangleAction(operation) {
     hoverRegion: null,
     hoverLine: null,
     selectedLineId: null
+  }
+  panelEditCircle.value = {
+    ...panelEditCircle.value,
+    circles: nextCircles
   }
 
   app.setStatus(isCutout ? 'Edit Panel: đã chọn Khấu xuyên panel' : 'Vẽ hình chữ nhật: đã tạo hình chữ nhật')
@@ -2350,6 +2359,106 @@ function getPanelEditPolygonBounds(points) {
   }
 } // End getPanelEditPolygonBounds
 
+
+//=================
+function getPanelEditCircleBounds(circle) {
+  const radius = getPanelEditCircleRadius(circle)
+
+  if (!circle?.center || radius <= 0) return null
+
+  return {
+    x: Number(circle.center.x || 0) - radius,
+    y: Number(circle.center.y || 0) - radius,
+    width: radius * 2,
+    height: radius * 2
+  }
+} // End getPanelEditCircleBounds
+
+//=================
+function getPanelEditCirclePolygon(circle, segmentCount = 72) {
+  const radius = getPanelEditCircleRadius(circle)
+
+  if (!circle?.center || radius <= 0) return []
+
+  const centerX = Number(circle.center.x || 0)
+  const centerY = Number(circle.center.y || 0)
+  const count = Math.max(24, Number(segmentCount || 72))
+  const points = []
+
+  for (let index = 0; index < count; index += 1) {
+    const angle = (Math.PI * 2 * index) / count
+
+    points.push({
+      x: Math.round((centerX + Math.cos(angle) * radius) * 1000) / 1000,
+      y: Math.round((centerY + Math.sin(angle) * radius) * 1000) / 1000
+    })
+  }
+
+  return points
+} // End getPanelEditCirclePolygon
+
+//=================
+function getPanelEditRectangleRegion(rectangle, index) {
+  const bounds = getPanelEditRectBounds(rectangle)
+
+  if (bounds.width <= 0.01 || bounds.height <= 0.01) return null
+
+  return {
+    id: `rectangle-region-${rectangle.id || index}`,
+    source: 'rectangleRegion',
+    sourceId: rectangle.id || null,
+    regionKind: 'rect',
+    start: { x: bounds.x, y: bounds.y },
+    end: { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    operation: 'none'
+  }
+} // End getPanelEditRectangleRegion
+
+//=================
+function getPanelEditCircleRegion(circle, index) {
+  const bounds = getPanelEditCircleBounds(circle)
+
+  if (!bounds) return null
+
+  return {
+    id: `circle-region-${circle.id || index}`,
+    source: 'circleRegion',
+    sourceId: circle.id || null,
+    regionKind: 'polygon',
+    shapeType: 'circle',
+    polygon: getPanelEditCirclePolygon(circle),
+    start: { x: bounds.x, y: bounds.y },
+    end: { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
+    center: { x: Number(circle.center.x || 0), y: Number(circle.center.y || 0) },
+    radius: getPanelEditCircleRadius(circle),
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    operation: 'none'
+  }
+} // End getPanelEditCircleRegion
+
+//=================
+function getPanelEditClosedShapeRegions() {
+  const rectangleRegions = (panelEditRect.value.rectangles || [])
+    .filter((rectangle) => rectangle.operation !== 'cutout')
+    .map((rectangle, index) => getPanelEditRectangleRegion(rectangle, index))
+    .filter(Boolean)
+  const circleRegions = (panelEditCircle.value.circles || [])
+    .map((circle, index) => getPanelEditCircleRegion(circle, index))
+    .filter(Boolean)
+
+  return [
+    ...rectangleRegions,
+    ...circleRegions
+  ]
+} // End getPanelEditClosedShapeRegions
+
 //=================
 function isPointInPanelEditPolygon(point, polygon) {
   if (!point || !Array.isArray(polygon) || polygon.length < 3) return false
@@ -2593,7 +2702,10 @@ function getPanelEditPlanarRegions(context) {
 
 //=================
 function getPanelEditLineRegions(context) {
-  return getPanelEditPlanarRegions(context)
+  return [
+    ...getPanelEditPlanarRegions(context),
+    ...getPanelEditClosedShapeRegions(context)
+  ]
 } // End getPanelEditLineRegions
 
 //=================
