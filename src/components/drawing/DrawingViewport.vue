@@ -175,6 +175,13 @@ const panelEditRect = ref({
   rectangles: []
 })
 
+const panelEditLine = ref({
+  hoverSnap: null,
+  hoverRegion: null,
+  draft: null,
+  lines: []
+})
+
 const panelEditHistory = ref({
   undoStack: [],
   redoStack: [],
@@ -213,7 +220,36 @@ const panelEditFooterText = computed(() => {
   const shapeTool = drawing.state.panelEdit?.shapeTool
 
   if (!shapeTool || shapeTool === 'editPanelSelect') {
+    const hoverRegion = panelEditLine.value.hoverRegion
+
+    if (panelEditRect.value.pendingAction?.source === 'lineRegion') {
+      return 'Select vùng: chọn None để bỏ qua hoặc Khấu để khấu xuyên vùng đã chọn'
+    }
+
+    if (hoverRegion) {
+      return `Select: vùng ${Math.round(hoverRegion.width * 10) / 10} x ${Math.round(hoverRegion.height * 10) / 10} mm | click để chọn vùng`
+    }
+
     return `Select: ${activePanelEditContext.value.panelName} | ${activePanelEditContext.value.faceLabel} | Space để thoát lệnh hiện tại`
+  }
+
+  if (shapeTool === 'editPanelLine') {
+    const draft = panelEditLine.value.draft
+    const hoverSnap = panelEditLine.value.hoverSnap
+
+    if (draft) {
+      const end = draft.current || draft.start
+      const length = Math.hypot(Number(end.x || 0) - Number(draft.start.x || 0), Number(end.y || 0) - Number(draft.start.y || 0))
+      const snapText = hoverSnap ? ` | Snap: ${hoverSnap.kind === 'circle' ? 'điểm' : 'cạnh/guide'}` : ''
+
+      return `Line: dài ${Math.round(length * 10) / 10} mm${snapText} | click điểm cuối`
+    }
+
+    if (hoverSnap) {
+      return `Line: snap ${hoverSnap.kind === 'circle' ? 'điểm tròn' : 'cạnh/guide'} | click điểm đầu`
+    }
+
+    return 'Line: click điểm snap đầu, click điểm snap cuối để tạo line phân vùng'
   }
 
   if (shapeTool === 'editPanelTape') {
@@ -665,9 +701,20 @@ function resetPanelEditRectDraft() {
 } // End resetPanelEditRectDraft
 
 //=================
+function resetPanelEditLineDraft() {
+  panelEditLine.value = {
+    ...panelEditLine.value,
+    hoverSnap: null,
+    hoverRegion: null,
+    draft: null
+  }
+} // End resetPanelEditLineDraft
+
+//=================
 function resetPanelEditCommandDrafts() {
   resetPanelEditTapeDraft()
   resetPanelEditRectDraft()
+  resetPanelEditLineDraft()
 } // End resetPanelEditCommandDrafts
 
 //=================
@@ -679,7 +726,8 @@ function clonePanelEditHistoryData(value) {
 function createPanelEditHistorySnapshot() {
   return {
     guides: clonePanelEditHistoryData(panelEditTape.value.guides || []),
-    rectangles: clonePanelEditHistoryData(panelEditRect.value.rectangles || [])
+    rectangles: clonePanelEditHistoryData(panelEditRect.value.rectangles || []),
+    lines: clonePanelEditHistoryData(panelEditLine.value.lines || [])
   }
 } // End createPanelEditHistorySnapshot
 
@@ -698,6 +746,13 @@ function restorePanelEditHistorySnapshot(snapshot) {
     draft: null,
     pendingAction: null,
     rectangles: clonePanelEditHistoryData(snapshot?.rectangles || [])
+  }
+  panelEditLine.value = {
+    ...panelEditLine.value,
+    hoverSnap: null,
+    hoverRegion: null,
+    draft: null,
+    lines: clonePanelEditHistoryData(snapshot?.lines || [])
   }
 } // End restorePanelEditHistorySnapshot
 
@@ -948,11 +1003,30 @@ function confirmPanelEditRectangleAction(operation) {
 
   if (!pending) return
 
+  const isCutout = operation === 'cutout'
+
+  if (pending.source === 'lineRegion' && !isCutout) {
+    panelEditRect.value = {
+      ...panelEditRect.value,
+      pendingAction: null
+    }
+    panelEditLine.value = {
+      ...panelEditLine.value,
+      hoverRegion: null
+    }
+    app.setStatus('Select vùng: không thay đổi')
+    nextTick(resizePanelEditCanvas)
+    return
+  }
+
   pushPanelEditHistorySnapshot()
 
   const rectangle = {
-    ...pending,
-    operation: operation === 'cutout' ? 'cutout' : 'none'
+    id: pending.id || `rect-${Date.now()}-${panelEditRect.value.rectangles.length + 1}`,
+    start: { ...pending.start },
+    end: { ...pending.end },
+    source: pending.source || 'rectangle',
+    operation: isCutout ? 'cutout' : 'none'
   }
 
   panelEditRect.value = {
@@ -965,8 +1039,12 @@ function confirmPanelEditRectangleAction(operation) {
       rectangle
     ]
   }
+  panelEditLine.value = {
+    ...panelEditLine.value,
+    hoverRegion: null
+  }
 
-  app.setStatus(operation === 'cutout' ? 'Vẽ hình chữ nhật: đã chọn Khấu xuyên panel' : 'Vẽ hình chữ nhật: đã tạo hình chữ nhật')
+  app.setStatus(isCutout ? 'Edit Panel: đã chọn Khấu xuyên panel' : 'Vẽ hình chữ nhật: đã tạo hình chữ nhật')
   nextTick(resizePanelEditCanvas)
 } // End confirmPanelEditRectangleAction
 
@@ -1040,6 +1118,243 @@ function drawPanelEditRearEdge(targetContext, context, layout) {
   targetContext.restore()
 } // End drawPanelEditRearEdge
 
+
+//=================
+function getPanelEditLinePointFromPointer(context, layout, event) {
+  const canvas = panelEditCanvasRef.value
+
+  if (!canvas || !context || !layout) return null
+
+  const rect = canvas.getBoundingClientRect()
+  const screenX = event.clientX - rect.left
+  const screenY = event.clientY - rect.top
+  const snap = getPanelEditTapeSnap(context, layout, screenX, screenY)
+
+  if (!snap) return null
+
+  return {
+    local: { ...snap.local },
+    snap
+  }
+} // End getPanelEditLinePointFromPointer
+
+//=================
+function normalizePanelEditLine(context, start, end, options = {}) {
+  if (!context || !start || !end) return null
+
+  const dx = Number(end.x || 0) - Number(start.x || 0)
+  const dy = Number(end.y || 0) - Number(start.y || 0)
+  const axis = Math.abs(dx) >= Math.abs(dy) ? 'horizontal' : 'vertical'
+  let x1 = Number(start.x || 0)
+  let y1 = Number(start.y || 0)
+  let x2 = Number(end.x || 0)
+  let y2 = Number(end.y || 0)
+
+  if (axis === 'horizontal') {
+    y2 = y1
+  } else {
+    x2 = x1
+  }
+
+  x1 = Math.max(0, Math.min(context.width, x1))
+  x2 = Math.max(0, Math.min(context.width, x2))
+  y1 = Math.max(0, Math.min(context.height, y1))
+  y2 = Math.max(0, Math.min(context.height, y2))
+
+  const length = Math.hypot(x2 - x1, y2 - y1)
+
+  if (length <= 0.01) return null
+
+  return {
+    id: options.id || `line-${Date.now()}`,
+    axis,
+    start: { x: x1, y: y1 },
+    end: { x: x2, y: y2 }
+  }
+} // End normalizePanelEditLine
+
+//=================
+function getPanelEditLineScreenPoints(context, layout, line) {
+  if (!line) return null
+
+  const start = getPanelEditPoint(context, layout.left, layout.top, layout.scale, line.start.x, line.start.y)
+  const end = getPanelEditPoint(context, layout.left, layout.top, layout.scale, line.end.x, line.end.y)
+
+  return { start, end }
+} // End getPanelEditLineScreenPoints
+
+//=================
+function drawPanelEditLine(targetContext, context, layout, line, options = {}) {
+  const screen = getPanelEditLineScreenPoints(context, layout, line)
+
+  if (!screen) return
+
+  const isDraft = options.draft === true
+
+  targetContext.save()
+  targetContext.strokeStyle = isDraft ? '#ff7a00' : '#111111'
+  targetContext.lineWidth = isDraft ? 2 : 1.8
+  targetContext.setLineDash(isDraft ? [8, 5] : [])
+  targetContext.beginPath()
+  targetContext.moveTo(screen.start.x, screen.start.y)
+  targetContext.lineTo(screen.end.x, screen.end.y)
+  targetContext.stroke()
+  targetContext.restore()
+} // End drawPanelEditLine
+
+//=================
+function isFullPanelEditVerticalLine(context, line) {
+  if (!context || !line || line.axis !== 'vertical') return false
+
+  const yValues = [Number(line.start.y || 0), Number(line.end.y || 0)].sort((a, b) => a - b)
+
+  return yValues[0] <= 0.01 && yValues[1] >= context.height - 0.01
+} // End isFullPanelEditVerticalLine
+
+//=================
+function isFullPanelEditHorizontalLine(context, line) {
+  if (!context || !line || line.axis !== 'horizontal') return false
+
+  const xValues = [Number(line.start.x || 0), Number(line.end.x || 0)].sort((a, b) => a - b)
+
+  return xValues[0] <= 0.01 && xValues[1] >= context.width - 0.01
+} // End isFullPanelEditHorizontalLine
+
+//=================
+function getSortedPanelEditCuts(values, maxValue) {
+  const result = [0, maxValue]
+
+  values.forEach((value) => {
+    const numberValue = Number(value)
+
+    if (!Number.isFinite(numberValue)) return
+    if (numberValue <= 0.01 || numberValue >= maxValue - 0.01) return
+    if (result.some((item) => Math.abs(item - numberValue) <= 0.01)) return
+
+    result.push(numberValue)
+  })
+
+  return result.sort((a, b) => a - b)
+} // End getSortedPanelEditCuts
+
+//=================
+function getPanelEditLineRegions(context) {
+  if (!context || !panelEditLine.value.lines.length) return []
+
+  const verticalValues = panelEditLine.value.lines
+    .filter((line) => isFullPanelEditVerticalLine(context, line))
+    .map((line) => Number(line.start.x || 0))
+  const horizontalValues = panelEditLine.value.lines
+    .filter((line) => isFullPanelEditHorizontalLine(context, line))
+    .map((line) => Number(line.start.y || 0))
+  const xCuts = getSortedPanelEditCuts(verticalValues, context.width)
+  const yCuts = getSortedPanelEditCuts(horizontalValues, context.height)
+  const regions = []
+
+  for (let xIndex = 0; xIndex < xCuts.length - 1; xIndex += 1) {
+    for (let yIndex = 0; yIndex < yCuts.length - 1; yIndex += 1) {
+      const x = xCuts[xIndex]
+      const y = yCuts[yIndex]
+      const width = xCuts[xIndex + 1] - x
+      const height = yCuts[yIndex + 1] - y
+
+      if (width <= 0.01 || height <= 0.01) continue
+
+      regions.push({
+        id: `region-${xIndex}-${yIndex}`,
+        source: 'lineRegion',
+        start: { x, y },
+        end: { x: x + width, y: y + height },
+        x,
+        y,
+        width,
+        height,
+        operation: 'none'
+      })
+    }
+  }
+
+  return regions
+} // End getPanelEditLineRegions
+
+//=================
+function drawPanelEditLineRegions(targetContext, context, layout) {
+  const regions = getPanelEditLineRegions(context)
+  const hoverRegion = panelEditLine.value.hoverRegion
+
+  regions.forEach((region) => {
+    const isHover = hoverRegion?.id === region.id
+
+    if (!isHover) return
+
+    const topLeft = getPanelEditPoint(context, layout.left, layout.top, layout.scale, region.x, region.y + region.height)
+
+    targetContext.save()
+    targetContext.fillStyle = 'rgba(255, 122, 0, 0.1)'
+    targetContext.strokeStyle = '#ff7a00'
+    targetContext.lineWidth = 1.5
+    targetContext.setLineDash([6, 4])
+    targetContext.fillRect(topLeft.x, topLeft.y, region.width * layout.scale, region.height * layout.scale)
+    targetContext.strokeRect(topLeft.x, topLeft.y, region.width * layout.scale, region.height * layout.scale)
+    targetContext.restore()
+  })
+} // End drawPanelEditLineRegions
+
+//=================
+function hitPanelEditLineRegion(context, layout, event) {
+  const canvas = panelEditCanvasRef.value
+
+  if (!canvas || !context || !layout) return null
+
+  const rect = canvas.getBoundingClientRect()
+  const local = getPanelEditLocalFromScreen(context, layout, event.clientX - rect.left, event.clientY - rect.top)
+  const regions = getPanelEditLineRegions(context)
+
+  return regions.find((region) => (
+    local.x >= region.x
+    && local.x <= region.x + region.width
+    && local.y >= region.y
+    && local.y <= region.y + region.height
+  )) || null
+} // End hitPanelEditLineRegion
+
+//=================
+function commitPanelEditLine() {
+  const draft = panelEditLine.value.draft
+  const context = activePanelEditContext.value
+
+  if (!draft || !context) return
+
+  const line = normalizePanelEditLine(context, draft.start, draft.current, {
+    id: `line-${Date.now()}-${panelEditLine.value.lines.length + 1}`
+  })
+
+  if (!line) {
+    panelEditLine.value = {
+      ...panelEditLine.value,
+      hoverSnap: null,
+      draft: null
+    }
+    app.setStatus('Line: chiều dài line không hợp lệ')
+    nextTick(resizePanelEditCanvas)
+    return
+  }
+
+  pushPanelEditHistorySnapshot()
+  panelEditLine.value = {
+    ...panelEditLine.value,
+    hoverSnap: null,
+    hoverRegion: null,
+    draft: null,
+    lines: [
+      ...panelEditLine.value.lines,
+      line
+    ]
+  }
+  app.setStatus('Line: đã tạo line phân vùng')
+  nextTick(resizePanelEditCanvas)
+} // End commitPanelEditLine
+
 //=================
 function drawPanelEditCanvas(editContext = null, width = null, height = null) {
   const canvas = panelEditCanvasRef.value
@@ -1090,6 +1405,16 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
     drawPanelEditGuideLine(targetContext, context, layout, panelEditTape.value.draft, { draft: true })
   }
 
+  drawPanelEditLineRegions(targetContext, context, layout)
+
+  panelEditLine.value.lines.forEach((line) => {
+    drawPanelEditLine(targetContext, context, layout, line)
+  })
+
+  if (panelEditLine.value.draft) {
+    drawPanelEditLine(targetContext, context, layout, panelEditLine.value.draft, { draft: true })
+  }
+
   panelEditRect.value.rectangles.forEach((rectangle) => {
     drawPanelEditRectangle(targetContext, context, layout, rectangle)
   })
@@ -1108,6 +1433,10 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
 
   if (drawing.state.panelEdit?.shapeTool === 'editPanelRect') {
     drawPanelEditTapeSnap(targetContext, panelEditRect.value.hoverSnap)
+  }
+
+  if (drawing.state.panelEdit?.shapeTool === 'editPanelLine') {
+    drawPanelEditTapeSnap(targetContext, panelEditLine.value.hoverSnap)
   }
 
   targetContext.strokeStyle = dimColor
@@ -1194,6 +1523,12 @@ function selectPanelEditFace(faceSide) {
     pendingAction: null,
     rectangles: []
   }
+  panelEditLine.value = {
+    hoverSnap: null,
+    hoverRegion: null,
+    draft: null,
+    lines: []
+  }
   clearPanelEditHistory()
   app.setStatus(`Edit Panel: ${context.panelName} | ${context.faceLabel} | ${context.rearLabel}`)
   nextTick(resizePanelEditCanvas)
@@ -1224,10 +1559,74 @@ function onPanelEditPointerDown(event) {
   if (panelEditRect.value.pendingAction) return
 
   const shapeTool = drawing.state.panelEdit?.shapeTool
+  const rect = canvas.getBoundingClientRect()
+  const layout = getPanelEditLayout(context, rect.width, rect.height)
+
+  if (!shapeTool || shapeTool === 'editPanelSelect') {
+    const region = hitPanelEditLineRegion(context, layout, event)
+
+    if (!region) {
+      panelEditLine.value = {
+        ...panelEditLine.value,
+        hoverRegion: null
+      }
+      resizePanelEditCanvas()
+      return
+    }
+
+    panelEditLine.value = {
+      ...panelEditLine.value,
+      hoverRegion: region
+    }
+    panelEditRect.value = {
+      ...panelEditRect.value,
+      pendingAction: {
+        ...region,
+        id: `region-cutout-${Date.now()}`,
+        operation: 'none'
+      }
+    }
+    app.setStatus('Select vùng: chọn None hoặc Khấu')
+    resizePanelEditCanvas()
+    return
+  }
+
+  if (shapeTool === 'editPanelLine') {
+    const point = getPanelEditLinePointFromPointer(context, layout, event)
+
+    if (!point) {
+      app.setStatus('Line: rê chuột gần điểm snap để bắt điểm')
+      return
+    }
+
+    if (panelEditLine.value.draft) {
+      panelEditLine.value = {
+        ...panelEditLine.value,
+        hoverSnap: point.snap,
+        draft: {
+          ...panelEditLine.value.draft,
+          current: point.local
+        }
+      }
+      commitPanelEditLine()
+      return
+    }
+
+    panelEditLine.value = {
+      ...panelEditLine.value,
+      hoverSnap: point.snap,
+      hoverRegion: null,
+      draft: {
+        start: point.local,
+        current: point.local
+      }
+    }
+    app.setStatus('Line: chọn điểm cuối')
+    resizePanelEditCanvas()
+    return
+  }
 
   if (shapeTool === 'editPanelRect') {
-    const rect = canvas.getBoundingClientRect()
-    const layout = getPanelEditLayout(context, rect.width, rect.height)
     const point = getPanelEditRectPointFromPointer(context, layout, event)
 
     if (!point) return
@@ -1265,8 +1664,6 @@ function onPanelEditPointerDown(event) {
     return
   }
 
-  const rect = canvas.getBoundingClientRect()
-  const layout = getPanelEditLayout(context, rect.width, rect.height)
   const snap = getPanelEditTapeSnap(context, layout, event.clientX - rect.left, event.clientY - rect.top)
 
   if (!snap) {
@@ -1311,6 +1708,33 @@ function onPanelEditPointerMove(event) {
   const shapeTool = drawing.state.panelEdit?.shapeTool
 
   if (panelEditRect.value.pendingAction) {
+    resizePanelEditCanvas()
+    return
+  }
+
+  if (!shapeTool || shapeTool === 'editPanelSelect') {
+    panelEditLine.value = {
+      ...panelEditLine.value,
+      hoverRegion: hitPanelEditLineRegion(context, layout, event)
+    }
+    resizePanelEditCanvas()
+    return
+  }
+
+  if (shapeTool === 'editPanelLine') {
+    const point = getPanelEditLinePointFromPointer(context, layout, event)
+
+    panelEditLine.value = {
+      ...panelEditLine.value,
+      hoverSnap: point?.snap || null,
+      hoverRegion: null,
+      draft: panelEditLine.value.draft
+        ? {
+          ...panelEditLine.value.draft,
+          current: point?.local || panelEditLine.value.draft.current
+        }
+        : null
+    }
     resizePanelEditCanvas()
     return
   }
@@ -1422,6 +1846,12 @@ function applyPanelEdit() {
     draft: null,
     pendingAction: null,
     rectangles: []
+  }
+  panelEditLine.value = {
+    hoverSnap: null,
+    hoverRegion: null,
+    draft: null,
+    lines: []
   }
   clearPanelEditHistory()
   drawing.clearPanelEdit()
@@ -3107,6 +3537,22 @@ function handlePanelEditRectKey(event) {
   return true
 } // End handlePanelEditRectKey
 
+
+//=================
+function handlePanelEditLineKey(event) {
+  if (drawing.state.panelEdit?.shapeTool !== 'editPanelLine') return false
+
+  if (event.key !== 'Escape') return false
+
+  event.preventDefault()
+  event.stopPropagation()
+  resetPanelEditLineDraft()
+  app.setStatus('Line: đã hủy thao tác đang tạo')
+  resizePanelEditCanvas()
+
+  return true
+} // End handlePanelEditLineKey
+
 //=================
 function deleteCurrentSelection() {
   const hasPanels = Array.isArray(drawing.state.selectedPanelIds) && drawing.state.selectedPanelIds.length > 0
@@ -3141,6 +3587,8 @@ function onKeyDown(event) {
   if (handlePanelEditTapeKey(event)) return
 
   if (handlePanelEditRectKey(event)) return
+
+  if (handlePanelEditLineKey(event)) return
 
   if (activePanelEditContext.value) {
     event.preventDefault()
@@ -3227,6 +3675,10 @@ watch(() => app.state.currentTool, (tool) => {
 
   if (tool !== 'editPanelRect') {
     resetPanelEditRectDraft()
+  }
+
+  if (tool !== 'editPanelLine') {
+    resetPanelEditLineDraft()
   }
 
   if (tool !== 'move') {
@@ -3491,6 +3943,10 @@ onBeforeUnmount(() => {
 
 .mn-cursor-panel-rect {
   cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 2 L4 22 L9 17 L13 27 L17 25 L13 15 L20 15 Z' fill='white' stroke='%23111111' stroke-width='1.4' stroke-linejoin='round'/%3E%3Crect x='13' y='21' width='14' height='8' rx='1.5' fill='%23dbefff' stroke='%230077CC' stroke-width='1.5'/%3E%3C/svg%3E") 4 2, crosshair;
+}
+
+.mn-cursor-panel-line {
+  cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 2 L4 22 L9 17 L13 27 L17 25 L13 15 L20 15 Z' fill='white' stroke='%23111111' stroke-width='1.4' stroke-linejoin='round'/%3E%3Cline x1='14' y1='27' x2='28' y2='20' stroke='%230077CC' stroke-width='2.4' stroke-linecap='round'/%3E%3Ccircle cx='14' cy='27' r='2' fill='%23ffffff' stroke='%230077CC' stroke-width='1.4'/%3E%3Ccircle cx='28' cy='20' r='2' fill='%23ffffff' stroke='%230077CC' stroke-width='1.4'/%3E%3C/svg%3E") 4 2, crosshair;
 }
 
 .mn-panel-edit-action-dialog {

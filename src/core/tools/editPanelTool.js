@@ -132,6 +132,7 @@ export function isEditPanelDrawTool(toolId) {
 export function getEditPanelToolCursorClass(toolId) {
   if (toolId === 'editPanelTape') return 'mn-cursor-panel-tape'
   if (toolId === 'editPanelRect') return 'mn-cursor-panel-rect'
+  if (toolId === 'editPanelLine') return 'mn-cursor-panel-line'
   if (!toolId || toolId === 'editPanelSelect') return 'mn-cursor-pointer'
 
   return 'mn-cursor-crosshair'
