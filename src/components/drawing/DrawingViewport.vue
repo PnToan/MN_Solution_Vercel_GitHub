@@ -1826,42 +1826,29 @@ function erasePanelEditPolygonBoundarySegments(targetContext, context, layout, p
   if (!Array.isArray(polygon) || polygon.length < 3) return
 
   const backgroundColor = getCssVariable('--mn-bg-canvas', '#f4f4f4')
+  const spans = collectPanelEditPolygonBoundaryEraseSpans(context, polygon)
+  const edges = ['left', 'right', 'bottom', 'top']
 
   targetContext.save()
   targetContext.strokeStyle = backgroundColor
-  targetContext.lineWidth = 14
+  targetContext.lineWidth = 8
   targetContext.lineCap = 'square'
   targetContext.lineJoin = 'miter'
   targetContext.setLineDash([])
-
   targetContext.beginPath()
-  polygon.forEach((point, index) => {
-    const nextPoint = polygon[(index + 1) % polygon.length]
-    drawPanelEditEraseSegment(targetContext, context, layout, point, nextPoint)
-  })
-  targetContext.stroke()
 
-  targetContext.beginPath()
-  polygon.forEach((point, index) => {
-    const nextPoint = polygon[(index + 1) % polygon.length]
-    const edgeA = getPanelEditBoundaryEdge(context, point)
-    const edgeB = getPanelEditBoundaryEdge(context, nextPoint)
+  edges.forEach((edge) => {
+    const merged = mergePanelEditBoundaryEraseSpans(spans[edge] || [])
 
-    if (isPanelEditSegmentOnPanelBoundaryLine(context, point, nextPoint)) {
-      drawPanelEditEraseSegment(targetContext, context, layout, point, nextPoint)
-      return
-    }
-
-    const corner = getPanelEditBoundaryCornerBetweenEdges(context, edgeA, edgeB)
-
-    if (!corner) return
-
-    drawPanelEditEraseSegment(targetContext, context, layout, point, corner)
-    drawPanelEditEraseSegment(targetContext, context, layout, corner, nextPoint)
+    merged.forEach((span) => {
+      drawPanelEditVisibleBoundarySegment(targetContext, context, layout, edge, span.start, span.end)
+    })
   })
 
   targetContext.stroke()
   targetContext.restore()
+
+  redrawPanelEditVisiblePanelBoundary(targetContext, context, layout, polygon)
 } // End erasePanelEditPolygonBoundarySegments
 
 //=================

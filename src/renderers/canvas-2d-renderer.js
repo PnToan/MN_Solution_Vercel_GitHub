@@ -656,41 +656,29 @@ function drawLocalEraseSegment(ctx, viewport, pointA, pointB) {
 function eraseLocalPolygonBoundarySpans(ctx, viewport, polygon, panelRect, background) {
   if (!Array.isArray(polygon) || polygon.length < 3 || !panelRect) return
 
+  const spans = collectLocalPolygonBoundaryEraseSpans(polygon, panelRect)
+  const edges = ['left', 'right', 'bottom', 'top']
+
   ctx.save()
   ctx.strokeStyle = background
-  ctx.lineWidth = 14
+  ctx.lineWidth = 8
   ctx.lineCap = 'square'
   ctx.lineJoin = 'miter'
   ctx.setLineDash([])
-
   ctx.beginPath()
-  polygon.forEach((point, index) => {
-    const nextPoint = polygon[(index + 1) % polygon.length]
-    drawLocalEraseSegment(ctx, viewport, point, nextPoint)
-  })
-  ctx.stroke()
 
-  ctx.beginPath()
-  polygon.forEach((point, index) => {
-    const nextPoint = polygon[(index + 1) % polygon.length]
-    const edgeA = isLocalPointOnPanelRectEdge(point, panelRect)
-    const edgeB = isLocalPointOnPanelRectEdge(nextPoint, panelRect)
+  edges.forEach((edge) => {
+    const merged = mergeLocalBoundaryEraseSpans(spans[edge] || [])
 
-    if (isLocalSegmentOnPanelBoundaryLine(point, nextPoint, panelRect)) {
-      drawLocalEraseSegment(ctx, viewport, point, nextPoint)
-      return
-    }
-
-    const corner = getLocalBoundaryCornerBetweenEdges(edgeA, edgeB, panelRect)
-
-    if (!corner) return
-
-    drawLocalEraseSegment(ctx, viewport, point, corner)
-    drawLocalEraseSegment(ctx, viewport, corner, nextPoint)
+    merged.forEach((span) => {
+      drawLocalVisibleBoundarySegment(ctx, viewport, edge, span.start, span.end, panelRect)
+    })
   })
 
   ctx.stroke()
   ctx.restore()
+
+  redrawLocalVisiblePanelBoundary(ctx, viewport, polygon, panelRect)
 } // End eraseLocalPolygonBoundarySpans
 
 //=================
