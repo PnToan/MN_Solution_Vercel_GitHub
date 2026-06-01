@@ -250,7 +250,10 @@ function drawPanelLayerWithCutouts(ctx, viewport, panel, rect, selected, current
   })
 
   drawPanelEditSavedLines(layer.context, viewport, panel, rect, currentView)
+<<<<<<< HEAD
   drawPanelEditSavedCircles(layer.context, viewport, panel, rect, currentView)
+=======
+>>>>>>> ec82cb77590454be6ddee4c4fd1552153f4b1c32
   clearPanelLayerCutouts(layer.context, viewport, cutoutPolygons, rect)
   drawPanelEditCutouts(layer.context, viewport, panel, rect, currentView)
 
@@ -1216,7 +1219,10 @@ function drawPanels(ctx, viewport, panels = [], selectedPanelIds = [], currentVi
       })
 
       drawPanelEditSavedLines(ctx, viewport, panel, rect, currentView)
+<<<<<<< HEAD
       drawPanelEditSavedCircles(ctx, viewport, panel, rect, currentView)
+=======
+>>>>>>> ec82cb77590454be6ddee4c4fd1552153f4b1c32
     }
 
     if (!selected || !showIndividualGrips) return
