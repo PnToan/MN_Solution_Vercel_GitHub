@@ -40,7 +40,7 @@ const CAMERA_CONFIG = {
     label: 'Trái',
     axisU: 'y',
     axisV: 'z',
-    reverseU: false,
+    reverseU: true,
     reverseV: false
   },
 
