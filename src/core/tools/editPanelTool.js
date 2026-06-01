@@ -64,16 +64,16 @@ function getFaceOptions(face) {
       label: 'Mặt trước',
       viewKey: 'front',
       rearEdge: 'bottom',
-      rearLabel: 'Cạnh Sau',
-      edgeLabels: { bottom: 'Cạnh Dưới', left: 'Cạnh Trái' }
+      rearLabel: 'Cạnh Dưới',
+      edgeLabels: { side: 'Cạnh Trái', sideEdge: 'left' }
     },
     {
       id: 'back',
       label: 'Mặt sau',
       viewKey: 'back',
-      rearEdge: 'top',
-      rearLabel: 'Cạnh Sau',
-      edgeLabels: { bottom: 'Cạnh Dưới', left: 'Cạnh Phải' }
+      rearEdge: 'bottom',
+      rearLabel: 'Cạnh Dưới',
+      edgeLabels: { side: 'Cạnh Phải', sideEdge: 'left' }
     }
   ]
 } // End getFaceOptions
