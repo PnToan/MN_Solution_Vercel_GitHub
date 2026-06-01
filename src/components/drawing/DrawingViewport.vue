@@ -191,6 +191,12 @@ const panelEditCircle = ref({
   inputBuffer: ''
 })
 
+const panelEditArc = ref({
+  hoverSnap: null,
+  hoverPoint: null,
+  draft: null
+})
+
 const panelEditHistory = ref({
   undoStack: [],
   redoStack: [],
@@ -313,6 +319,32 @@ const panelEditFooterText = computed(() => {
     }
 
     return 'Vẽ hình chữ nhật: click điểm đầu, click điểm góc chéo để tạo hình chữ nhật'
+  }
+
+  if (shapeTool === 'editPanelArc') {
+    const draft = panelEditArc.value.draft
+    const hoverSnap = panelEditArc.value.hoverSnap
+
+    if (draft?.stage === 'end') {
+      const length = Math.hypot(Number(draft.current?.x || 0) - Number(draft.start?.x || 0), Number(draft.current?.y || 0) - Number(draft.start?.y || 0))
+      const snapText = hoverSnap ? ` | Snap: ${hoverSnap.kind === 'circle' ? 'điểm' : 'cạnh/guide'}` : ''
+
+      return `Arc: dây cung ${Math.round(length * 10) / 10} mm${snapText} | click điểm 2`
+    }
+
+    if (draft?.stage === 'bulge') {
+      const arcData = getPanelEditArcData(draft)
+      const angleText = arcData ? ` | góc ${Math.round(arcData.sweep * 180 / Math.PI)}°` : ''
+      const redText = arcData?.isQuarterOrHalf ? ' | đỏ = cung 1/4 hoặc 1/2' : ''
+
+      return `Arc: chọn điểm đỉnh để đổi độ cong${angleText}${redText} | Enter để OK hoặc click để vẽ`
+    }
+
+    if (hoverSnap) {
+      return `Arc: snap ${hoverSnap.kind === 'circle' ? 'điểm tròn' : 'cạnh/guide'} | click điểm 1`
+    }
+
+    return 'Arc: click điểm 1, rê chuột preview, click điểm 2, Enter để OK hoặc click điểm đỉnh'
   }
 
   if (shapeTool === 'editPanelCircle') {
@@ -1039,11 +1071,22 @@ function resetPanelEditCircleDraft() {
 } // End resetPanelEditCircleDraft
 
 //=================
+function resetPanelEditArcDraft() {
+  panelEditArc.value = {
+    ...panelEditArc.value,
+    hoverSnap: null,
+    hoverPoint: null,
+    draft: null
+  }
+} // End resetPanelEditArcDraft
+
+//=================
 function resetPanelEditCommandDrafts() {
   resetPanelEditTapeDraft()
   resetPanelEditRectDraft()
   resetPanelEditLineDraft()
   resetPanelEditCircleDraft()
+  resetPanelEditArcDraft()
 } // End resetPanelEditCommandDrafts
 
 //=================
@@ -1092,6 +1135,12 @@ function restorePanelEditHistorySnapshot(snapshot) {
     draft: null,
     inputBuffer: '',
     circles: clonePanelEditHistoryData(snapshot?.circles || [])
+  }
+  panelEditArc.value = {
+    ...panelEditArc.value,
+    hoverSnap: null,
+    hoverPoint: null,
+    draft: null
   }
 } // End restorePanelEditHistorySnapshot
 
@@ -1198,6 +1247,11 @@ function loadPanelEditSavedState(context) {
       circles: [],
       inputBuffer: ''
     }
+    panelEditArc.value = {
+      hoverSnap: null,
+      hoverPoint: null,
+      draft: null
+    }
     clearPanelEditHistory()
   }
 
@@ -1273,6 +1327,11 @@ function loadPanelEditSavedState(context) {
           radius: Number(circle.radius || 0)
         })).filter((circle) => circle.radius > 0)
       : []
+  }
+  panelEditArc.value = {
+    hoverSnap: null,
+    hoverPoint: null,
+    draft: null
   }
   clearPanelEditHistory()
 } // End loadPanelEditSavedState
@@ -2325,6 +2384,268 @@ function drawPanelEditLine(targetContext, context, layout, line, options = {}) {
 } // End drawPanelEditLine
 
 //=================
+function getPanelEditArcPointFromPointer(context, layout, event) {
+  return getPanelEditLinePointFromPointer(context, layout, event)
+} // End getPanelEditArcPointFromPointer
+
+//=================
+function getPanelEditArcDefaultBulge(start, end) {
+  if (!start || !end) return null
+
+  const dx = Number(end.x || 0) - Number(start.x || 0)
+  const dy = Number(end.y || 0) - Number(start.y || 0)
+  const length = Math.hypot(dx, dy)
+
+  if (length <= 0.01) return null
+
+  return {
+    x: (Number(start.x || 0) + Number(end.x || 0)) / 2 - (dy / length) * (length / 2),
+    y: (Number(start.y || 0) + Number(end.y || 0)) / 2 + (dx / length) * (length / 2)
+  }
+} // End getPanelEditArcDefaultBulge
+
+//=================
+function getPanelEditCircleFromThreePoints(pointA, pointB, pointC) {
+  if (!pointA || !pointB || !pointC) return null
+
+  const ax = Number(pointA.x || 0)
+  const ay = Number(pointA.y || 0)
+  const bx = Number(pointB.x || 0)
+  const by = Number(pointB.y || 0)
+  const cx = Number(pointC.x || 0)
+  const cy = Number(pointC.y || 0)
+  const d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+
+  if (Math.abs(d) <= 0.000001) return null
+
+  const ux = ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by) * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / d
+  const uy = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by) * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / d
+  const radius = Math.hypot(ax - ux, ay - uy)
+
+  if (!Number.isFinite(radius) || radius <= 0.01) return null
+
+  return { center: { x: ux, y: uy }, radius }
+} // End getPanelEditCircleFromThreePoints
+
+//=================
+function normalizePanelEditAngle(angle) {
+  const full = Math.PI * 2
+  let result = angle % full
+
+  if (result < 0) result += full
+
+  return result
+} // End normalizePanelEditAngle
+
+//=================
+function getPanelEditAngleDelta(startAngle, endAngle, clockwise = false) {
+  const full = Math.PI * 2
+  let delta = normalizePanelEditAngle(endAngle - startAngle)
+
+  if (clockwise) {
+    delta = delta === 0 ? full : delta
+    return delta - full
+  }
+
+  return delta === 0 ? full : delta
+} // End getPanelEditAngleDelta
+
+//=================
+function isPanelEditAngleBetween(startAngle, testAngle, endAngle, clockwise = false) {
+  const full = Math.PI * 2
+
+  if (clockwise) {
+    return normalizePanelEditAngle(startAngle - testAngle) <= normalizePanelEditAngle(startAngle - endAngle) + 0.000001
+  }
+
+  return normalizePanelEditAngle(testAngle - startAngle) <= normalizePanelEditAngle(endAngle - startAngle) + 0.000001
+} // End isPanelEditAngleBetween
+
+//=================
+function getPanelEditArcData(draft) {
+  if (!draft?.start) return null
+
+  const start = draft.start
+  const end = draft.end || draft.current
+  const bulge = draft.stage === 'bulge'
+    ? (draft.current || draft.bulge || getPanelEditArcDefaultBulge(start, end))
+    : getPanelEditArcDefaultBulge(start, end)
+
+  if (!end || !bulge) return null
+
+  const circle = getPanelEditCircleFromThreePoints(start, bulge, end)
+
+  if (!circle) return null
+
+  const startAngle = Math.atan2(Number(start.y || 0) - circle.center.y, Number(start.x || 0) - circle.center.x)
+  const endAngle = Math.atan2(Number(end.y || 0) - circle.center.y, Number(end.x || 0) - circle.center.x)
+  const bulgeAngle = Math.atan2(Number(bulge.y || 0) - circle.center.y, Number(bulge.x || 0) - circle.center.x)
+  const clockwiseCandidate = false
+  const clockwise = isPanelEditAngleBetween(startAngle, bulgeAngle, endAngle, clockwiseCandidate)
+    ? false
+    : true
+  const delta = getPanelEditAngleDelta(startAngle, endAngle, clockwise)
+  const sweep = Math.abs(delta)
+  const degree = sweep * 180 / Math.PI
+  const isQuarterOrHalf = Math.abs(degree - 90) <= 4 || Math.abs(degree - 180) <= 4
+
+  return {
+    ...circle,
+    start: { x: Number(start.x || 0), y: Number(start.y || 0) },
+    end: { x: Number(end.x || 0), y: Number(end.y || 0) },
+    bulge: { x: Number(bulge.x || 0), y: Number(bulge.y || 0) },
+    startAngle,
+    endAngle,
+    clockwise,
+    delta,
+    sweep,
+    isQuarterOrHalf
+  }
+} // End getPanelEditArcData
+
+//=================
+function getPanelEditArcPoints(draft, segmentCount = 24) {
+  const arcData = getPanelEditArcData(draft)
+
+  if (!arcData) return []
+
+  const count = Math.max(6, Math.ceil(Number(segmentCount || 24) * (arcData.sweep / Math.PI)))
+  const points = []
+
+  for (let index = 0; index <= count; index += 1) {
+    const ratioValue = index / count
+    const angle = arcData.startAngle + arcData.delta * ratioValue
+
+    points.push({
+      x: Math.round((arcData.center.x + Math.cos(angle) * arcData.radius) * 1000) / 1000,
+      y: Math.round((arcData.center.y + Math.sin(angle) * arcData.radius) * 1000) / 1000
+    })
+  }
+
+  return points
+} // End getPanelEditArcPoints
+
+//=================
+function drawPanelEditArcDraft(targetContext, context, layout, draft) {
+  if (!draft?.start) return
+
+  const arcData = getPanelEditArcData(draft)
+  const endPoint = draft.end || draft.current
+
+  if (!endPoint) return
+
+  const startScreen = getPanelEditPoint(context, layout.left, layout.top, layout.scale, draft.start.x, draft.start.y)
+  const endScreen = getPanelEditPoint(context, layout.left, layout.top, layout.scale, endPoint.x, endPoint.y)
+
+  targetContext.save()
+  targetContext.strokeStyle = arcData?.isQuarterOrHalf ? '#ff0000' : '#ff7a00'
+  targetContext.lineWidth = 2
+  targetContext.setLineDash([8, 5])
+  targetContext.beginPath()
+  targetContext.moveTo(startScreen.x, startScreen.y)
+  targetContext.lineTo(endScreen.x, endScreen.y)
+  targetContext.stroke()
+  targetContext.setLineDash([])
+
+  if (arcData) {
+    const centerScreen = getPanelEditPoint(context, layout.left, layout.top, layout.scale, arcData.center.x, arcData.center.y)
+
+    targetContext.strokeStyle = '#111111'
+    targetContext.lineWidth = 2
+    targetContext.beginPath()
+    targetContext.arc(centerScreen.x, centerScreen.y, arcData.radius * layout.scale, -arcData.startAngle, -arcData.endAngle, arcData.clockwise)
+    targetContext.stroke()
+  }
+
+  targetContext.restore()
+} // End drawPanelEditArcDraft
+
+//=================
+function drawPanelEditArcHoverPreview(targetContext, context, layout, point) {
+  if (!point) return
+
+  const radius = Math.min(24, Math.max(10, Math.min(context.width, context.height) * 0.04))
+  const center = getPanelEditPoint(context, layout.left, layout.top, layout.scale, point.x, point.y)
+
+  targetContext.save()
+  targetContext.strokeStyle = '#ff7a00'
+  targetContext.lineWidth = 1.5
+  targetContext.setLineDash([6, 4])
+  targetContext.beginPath()
+  targetContext.arc(center.x, center.y + radius * layout.scale * 0.2, radius * layout.scale, Math.PI * 1.1, Math.PI * 1.9)
+  targetContext.stroke()
+  targetContext.restore()
+} // End drawPanelEditArcHoverPreview
+
+//=================
+function commitPanelEditArc() {
+  const draft = panelEditArc.value.draft
+  const context = activePanelEditContext.value
+
+  if (!draft?.start || !context) return
+
+  const arcDraft = draft.stage === 'bulge'
+    ? draft
+    : {
+        ...draft,
+        stage: 'bulge',
+        end: draft.current,
+        current: getPanelEditArcDefaultBulge(draft.start, draft.current)
+      }
+  const arcPoints = getPanelEditArcPoints(arcDraft, 28)
+
+  if (arcPoints.length < 2) {
+    resetPanelEditArcDraft()
+    app.setStatus('Arc: cung không hợp lệ')
+    resizePanelEditCanvas()
+    return
+  }
+
+  const baseId = `arc-${Date.now()}`
+  const nextLines = []
+  const chordLine = normalizePanelEditLine(context, arcDraft.start, arcDraft.end || arcDraft.current, {
+    id: `${baseId}-chord`
+  })
+
+  if (chordLine) nextLines.push(chordLine)
+
+  for (let index = 0; index < arcPoints.length - 1; index += 1) {
+    const line = normalizePanelEditLine(context, arcPoints[index], arcPoints[index + 1], {
+      id: `${baseId}-seg-${index + 1}`
+    })
+
+    if (line) nextLines.push(line)
+  }
+
+  if (!nextLines.length) {
+    resetPanelEditArcDraft()
+    app.setStatus('Arc: không tạo được line cung')
+    resizePanelEditCanvas()
+    return
+  }
+
+  pushPanelEditHistorySnapshot()
+  panelEditLine.value = {
+    ...panelEditLine.value,
+    hoverRegion: null,
+    hoverLine: null,
+    selectedLineId: null,
+    lines: [
+      ...panelEditLine.value.lines,
+      ...nextLines
+    ]
+  }
+  panelEditArc.value = {
+    ...panelEditArc.value,
+    hoverSnap: null,
+    hoverPoint: null,
+    draft: null
+  }
+  app.setStatus('Arc: đã tạo cung tròn 3 điểm')
+  nextTick(resizePanelEditCanvas)
+} // End commitPanelEditArc
+
+//=================
 function isFullPanelEditVerticalLine(context, line) {
   if (!context || !line || line.axis !== 'vertical') return false
 
@@ -3007,6 +3328,12 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
     drawPanelEditLine(targetContext, context, layout, panelEditLine.value.draft, { draft: true })
   }
 
+  if (panelEditArc.value.draft) {
+    drawPanelEditArcDraft(targetContext, context, layout, panelEditArc.value.draft)
+  } else if (drawing.state.panelEdit?.shapeTool === 'editPanelArc') {
+    drawPanelEditArcHoverPreview(targetContext, context, layout, panelEditArc.value.hoverPoint)
+  }
+
   panelEditRect.value.rectangles.forEach((rectangle) => {
     drawPanelEditRectangle(targetContext, context, layout, rectangle)
   })
@@ -3042,6 +3369,10 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
 
   if (drawing.state.panelEdit?.shapeTool === 'editPanelLine') {
     drawPanelEditTapeSnap(targetContext, panelEditLine.value.hoverSnap)
+  }
+
+  if (drawing.state.panelEdit?.shapeTool === 'editPanelArc') {
+    drawPanelEditTapeSnap(targetContext, panelEditArc.value.hoverSnap)
   }
 
   if (drawing.state.panelEdit?.shapeTool === 'editPanelCircle') {
@@ -3282,6 +3613,66 @@ function onPanelEditPointerDown(event) {
     return
   }
 
+  if (shapeTool === 'editPanelArc') {
+    const point = getPanelEditArcPointFromPointer(context, layout, event)
+
+    if (!point) return
+
+    const draft = panelEditArc.value.draft
+
+    if (draft?.stage === 'bulge') {
+      panelEditArc.value = {
+        ...panelEditArc.value,
+        hoverSnap: point.snap,
+        draft: {
+          ...draft,
+          current: point.local
+        }
+      }
+      commitPanelEditArc()
+      return
+    }
+
+    if (draft?.stage === 'end') {
+      const endPoint = point.local
+      const defaultBulge = getPanelEditArcDefaultBulge(draft.start, endPoint)
+
+      if (!defaultBulge) {
+        app.setStatus('Arc: điểm 2 không hợp lệ')
+        return
+      }
+
+      panelEditArc.value = {
+        ...panelEditArc.value,
+        hoverSnap: point.snap,
+        draft: {
+          ...draft,
+          stage: 'bulge',
+          end: endPoint,
+          current: defaultBulge,
+          suggested: true
+        }
+      }
+      app.setStatus('Arc: Enter để OK cung đề xuất hoặc rê chuột chọn điểm đỉnh')
+      resizePanelEditCanvas()
+      return
+    }
+
+    panelEditArc.value = {
+      ...panelEditArc.value,
+      hoverSnap: point.snap,
+      hoverPoint: point.local,
+      draft: {
+        stage: 'end',
+        start: point.local,
+        current: point.local
+      }
+    }
+    app.setStatus('Arc: rê chuột tới điểm 2')
+    resizePanelEditCanvas()
+    return
+  }
+
   if (shapeTool === 'editPanelCircle') {
     const point = getPanelEditCirclePointFromPointer(context, layout, event)
 
@@ -3415,6 +3806,25 @@ function onPanelEditPointerMove(event) {
           current: point?.local || panelEditRect.value.draft.current
         }
         : null
+    }
+    resizePanelEditCanvas()
+    return
+  }
+
+  if (shapeTool === 'editPanelArc') {
+    const point = getPanelEditArcPointFromPointer(context, layout, event)
+    const draft = panelEditArc.value.draft
+
+    panelEditArc.value = {
+      ...panelEditArc.value,
+      hoverSnap: point?.snap || null,
+      hoverPoint: point?.local || panelEditArc.value.hoverPoint,
+      draft: draft && point?.local
+        ? {
+            ...draft,
+            current: point.local
+          }
+        : draft
     }
     resizePanelEditCanvas()
     return
@@ -5306,6 +5716,32 @@ function handlePanelEditLineKey(event) {
 } // End handlePanelEditLineKey
 
 //=================
+function handlePanelEditArcKey(event) {
+  if (drawing.state.panelEdit?.shapeTool !== 'editPanelArc') return false
+
+  const draft = panelEditArc.value.draft
+  const key = event.key
+
+  if (key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    resetPanelEditArcDraft()
+    app.setStatus('Arc: đã hủy thao tác đang tạo')
+    resizePanelEditCanvas()
+    return true
+  }
+
+  if (key === 'Enter' && draft?.stage === 'bulge') {
+    event.preventDefault()
+    event.stopPropagation()
+    commitPanelEditArc()
+    return true
+  }
+
+  return false
+} // End handlePanelEditArcKey
+
+//=================
 function handlePanelEditCircleKey(event) {
   if (drawing.state.panelEdit?.shapeTool !== 'editPanelCircle') return false
 
@@ -5439,6 +5875,8 @@ function onKeyDown(event) {
 
   if (handlePanelEditLineKey(event)) return
 
+  if (handlePanelEditArcKey(event)) return
+
   if (handlePanelEditCircleKey(event)) return
 
   if (activePanelEditContext.value) {
@@ -5530,6 +5968,10 @@ watch(() => app.state.currentTool, (tool) => {
 
   if (tool !== 'editPanelLine') {
     resetPanelEditLineDraft()
+  }
+
+  if (tool !== 'editPanelArc') {
+    resetPanelEditArcDraft()
   }
 
   if (tool !== 'editPanelCircle') {
