@@ -637,23 +637,32 @@ function drawLocalEraseSegment(ctx, viewport, pointA, pointB) {
 
 //=================
 function eraseLocalPolygonBoundarySpans(ctx, viewport, polygon, panelRect, background) {
-  if (!Array.isArray(polygon) || polygon.length < 3) return
-
-  const spans = collectLocalPolygonBoundaryEraseSpans(polygon, panelRect)
+  if (!Array.isArray(polygon) || polygon.length < 3 || !panelRect) return
 
   ctx.save()
   ctx.strokeStyle = background
   ctx.lineWidth = 10
   ctx.lineCap = 'square'
+  ctx.lineJoin = 'miter'
   ctx.setLineDash([])
   ctx.beginPath()
 
-  Object.entries(spans).forEach(([edge, edgeSpans]) => {
-    mergeLocalBoundaryEraseSpans(edgeSpans).forEach((span) => {
-      const pointA = getLocalBoundaryPointFromCoord(edge, span.start, panelRect)
-      const pointB = getLocalBoundaryPointFromCoord(edge, span.end, panelRect)
-      drawLocalEraseSegment(ctx, viewport, pointA, pointB)
-    })
+  polygon.forEach((point, index) => {
+    const nextPoint = polygon[(index + 1) % polygon.length]
+    const edgeA = isLocalPointOnPanelRectEdge(point, panelRect)
+    const edgeB = isLocalPointOnPanelRectEdge(nextPoint, panelRect)
+
+    if (edgeA && edgeA === edgeB) {
+      drawLocalEraseSegment(ctx, viewport, point, nextPoint)
+      return
+    }
+
+    const corner = getLocalBoundaryCornerBetweenEdges(edgeA, edgeB, panelRect)
+
+    if (!corner) return
+
+    drawLocalEraseSegment(ctx, viewport, point, corner)
+    drawLocalEraseSegment(ctx, viewport, corner, nextPoint)
   })
 
   ctx.stroke()
@@ -668,7 +677,6 @@ function drawPanelEditCutoutPolygonLocal(ctx, viewport, polygon, panelRect, back
     fill: background
   })
   eraseLocalPolygonBoundarySpans(ctx, viewport, polygon, panelRect, background)
-  redrawLocalVisiblePanelBoundary(ctx, viewport, polygon, panelRect)
 
   ctx.beginPath()
   ctx.strokeStyle = '#111111'

@@ -1345,7 +1345,6 @@ function drawPanelEditRectangle(targetContext, context, layout, rectangle, optio
       if (drawPanelEditPolygonPath(targetContext, context, layout, rectangle.polygon)) {
         targetContext.fill()
         erasePanelEditPolygonBoundarySegments(targetContext, context, layout, rectangle.polygon)
-        redrawPanelEditVisiblePanelBoundary(targetContext, context, layout, rectangle.polygon)
         drawPanelEditPolygonCutoutEdges(targetContext, context, layout, rectangle.polygon)
       }
       targetContext.restore()
@@ -1811,21 +1810,30 @@ function drawPanelEditEraseSegment(targetContext, context, layout, pointA, point
 function erasePanelEditPolygonBoundarySegments(targetContext, context, layout, polygon) {
   if (!Array.isArray(polygon) || polygon.length < 3) return
 
-  const spans = collectPanelEditPolygonBoundaryEraseSpans(context, polygon)
-
   targetContext.save()
   targetContext.strokeStyle = getCssVariable('--mn-bg-canvas', '#f4f4f4')
   targetContext.lineWidth = 10
   targetContext.lineCap = 'square'
+  targetContext.lineJoin = 'miter'
   targetContext.setLineDash([])
   targetContext.beginPath()
 
-  Object.entries(spans).forEach(([edge, edgeSpans]) => {
-    mergePanelEditBoundaryEraseSpans(edgeSpans).forEach((span) => {
-      const pointA = getPanelEditBoundaryPointFromCoord(context, edge, span.start)
-      const pointB = getPanelEditBoundaryPointFromCoord(context, edge, span.end)
-      drawPanelEditEraseSegment(targetContext, context, layout, pointA, pointB)
-    })
+  polygon.forEach((point, index) => {
+    const nextPoint = polygon[(index + 1) % polygon.length]
+    const edgeA = getPanelEditBoundaryEdge(context, point)
+    const edgeB = getPanelEditBoundaryEdge(context, nextPoint)
+
+    if (edgeA && edgeA === edgeB) {
+      drawPanelEditEraseSegment(targetContext, context, layout, point, nextPoint)
+      return
+    }
+
+    const corner = getPanelEditBoundaryCornerBetweenEdges(context, edgeA, edgeB)
+
+    if (!corner) return
+
+    drawPanelEditEraseSegment(targetContext, context, layout, point, corner)
+    drawPanelEditEraseSegment(targetContext, context, layout, corner, nextPoint)
   })
 
   targetContext.stroke()
