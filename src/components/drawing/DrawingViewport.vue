@@ -315,6 +315,29 @@ const panelEditFooterText = computed(() => {
     return 'Vẽ hình chữ nhật: click điểm đầu, click điểm góc chéo để tạo hình chữ nhật'
   }
 
+  if (shapeTool === 'editPanelCircle') {
+    const draft = panelEditCircle.value.draft
+    const hoverSnap = panelEditCircle.value.hoverSnap
+    const input = panelEditCircle.value.inputBuffer
+
+    if (draft) {
+      const previewRadius = input ? Number(input) : getPanelEditCircleRadius(draft)
+      const radiusText = Number.isFinite(previewRadius) && previewRadius > 0
+        ? Math.round(previewRadius * 10) / 10
+        : input
+      const inputText = input ? ` | Nhập R: ${input} mm` : ''
+      const snapText = hoverSnap ? ` | Snap: ${hoverSnap.kind === 'circle' ? 'điểm' : 'cạnh/guide'}` : ''
+
+      return `Vẽ hình tròn: R${radiusText} mm${inputText}${snapText} | click điểm bán kính hoặc Enter`
+    }
+
+    if (hoverSnap) {
+      return `Vẽ hình tròn: snap ${hoverSnap.kind === 'circle' ? 'điểm tròn' : 'cạnh/guide'} | click tâm`
+    }
+
+    return 'Vẽ hình tròn: click tâm, rê chuột preview, click điểm bán kính hoặc nhập số + Enter'
+  }
+
   const toolName = panelEditTools.find((tool) => tool.id === shapeTool)?.label || 'Edit Panel'
 
   return `${toolName}: ${activePanelEditContext.value.panelName} | ${activePanelEditContext.value.faceLabel}`
@@ -1396,6 +1419,16 @@ function drawPanelEditCircle(targetContext, context, layout, circle, options = {
   targetContext.arc(center.x, center.y, radius * layout.scale, 0, Math.PI * 2)
   targetContext.fill()
   targetContext.stroke()
+
+  if (isDraft && options.radiusLabel) {
+    targetContext.setLineDash([])
+    targetContext.font = '13px Arial'
+    targetContext.textAlign = 'left'
+    targetContext.textBaseline = 'middle'
+    targetContext.fillStyle = '#ff0000'
+    targetContext.fillText(`R = ${options.radiusLabel} mm`, center.x + radius * layout.scale + 8, center.y)
+  }
+
   targetContext.restore()
 } // End drawPanelEditCircle
 
@@ -2399,7 +2432,9 @@ function getPanelEditCirclePolygon(circle, segmentCount = 72) {
 
 //=================
 function getPanelEditRectangleRegion(rectangle, index) {
-  const bounds = getPanelEditRectBounds(rectangle)
+  const bounds = Array.isArray(rectangle?.polygon) && rectangle.polygon.length >= 3
+    ? getPanelEditPolygonBounds(rectangle.polygon)
+    : getPanelEditRectBounds(rectangle)
 
   if (bounds.width <= 0.01 || bounds.height <= 0.01) return null
 
@@ -2407,14 +2442,17 @@ function getPanelEditRectangleRegion(rectangle, index) {
     id: `rectangle-region-${rectangle.id || index}`,
     source: 'rectangleRegion',
     sourceId: rectangle.id || null,
-    regionKind: 'rect',
+    regionKind: Array.isArray(rectangle?.polygon) && rectangle.polygon.length >= 3 ? 'polygon' : 'rect',
+    polygon: Array.isArray(rectangle?.polygon) && rectangle.polygon.length >= 3
+      ? rectangle.polygon.map((point) => ({ x: Number(point.x || 0), y: Number(point.y || 0) }))
+      : null,
     start: { x: bounds.x, y: bounds.y },
     end: { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
     x: bounds.x,
     y: bounds.y,
     width: bounds.width,
     height: bounds.height,
-    operation: 'none'
+    operation: rectangle.operation || 'none'
   }
 } // End getPanelEditRectangleRegion
 
@@ -2446,7 +2484,6 @@ function getPanelEditCircleRegion(circle, index) {
 //=================
 function getPanelEditClosedShapeRegions() {
   const rectangleRegions = (panelEditRect.value.rectangles || [])
-    .filter((rectangle) => rectangle.operation !== 'cutout')
     .map((rectangle, index) => getPanelEditRectangleRegion(rectangle, index))
     .filter(Boolean)
   const circleRegions = (panelEditCircle.value.circles || [])
@@ -2703,8 +2740,8 @@ function getPanelEditPlanarRegions(context) {
 //=================
 function getPanelEditLineRegions(context) {
   return [
-    ...getPanelEditPlanarRegions(context),
-    ...getPanelEditClosedShapeRegions(context)
+    ...getPanelEditClosedShapeRegions(context),
+    ...getPanelEditPlanarRegions(context)
   ]
 } // End getPanelEditLineRegions
 
@@ -2947,7 +2984,10 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
   }
 
   if (panelEditCircle.value.draft) {
-    drawPanelEditCircle(targetContext, context, layout, panelEditCircle.value.draft, { draft: true })
+    drawPanelEditCircle(targetContext, context, layout, panelEditCircle.value.draft, {
+      draft: true,
+      radiusLabel: panelEditCircle.value.inputBuffer || `${Math.round(getPanelEditCircleRadius(panelEditCircle.value.draft) * 10) / 10}`
+    })
   }
 
   if (drawing.state.panelEdit?.shapeTool === 'editPanelTape') {
@@ -5251,6 +5291,7 @@ function handlePanelEditCircleKey(event) {
       ...panelEditCircle.value,
       inputBuffer: `${panelEditCircle.value.inputBuffer}${nextChar}`
     }
+    app.setStatus(`Vẽ hình tròn: đang nhập R${panelEditCircle.value.inputBuffer} mm`)
     resizePanelEditCanvas()
     return true
   }
@@ -5262,6 +5303,7 @@ function handlePanelEditCircleKey(event) {
       ...panelEditCircle.value,
       inputBuffer: panelEditCircle.value.inputBuffer.slice(0, -1)
     }
+    app.setStatus(panelEditCircle.value.inputBuffer ? `Vẽ hình tròn: đang nhập R${panelEditCircle.value.inputBuffer} mm` : 'Vẽ hình tròn: nhập bán kính')
     resizePanelEditCanvas()
     return true
   }
