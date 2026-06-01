@@ -292,6 +292,17 @@ function isLocalBoundarySegment(pointA, pointB, panelRect) {
 } // End isLocalBoundarySegment
 
 //=================
+function isLocalCutoutBoundaryOnlySegment(pointA, pointB, panelRect) {
+  const edgeA = isLocalPointOnPanelRectEdge(pointA, panelRect)
+  const edgeB = isLocalPointOnPanelRectEdge(pointB, panelRect)
+
+  if (!edgeA || !edgeB) return false
+  if (edgeA === edgeB) return true
+
+  return Boolean(getLocalBoundaryCornerBetweenEdges(edgeA, edgeB, panelRect))
+} // End isLocalCutoutBoundaryOnlySegment
+
+//=================
 function getLocalBoundaryCornerBetweenEdges(edgeA, edgeB, panelRect) {
   if (!edgeA || !edgeB || edgeA === edgeB || !panelRect) return null
 
@@ -324,8 +335,8 @@ function eraseLocalPolygonBoundarySpans(ctx, viewport, polygon, panelRect, backg
 
   ctx.save()
   ctx.strokeStyle = background
-  ctx.lineWidth = 6
-  ctx.lineCap = 'butt'
+  ctx.lineWidth = 10
+  ctx.lineCap = 'square'
   ctx.setLineDash([])
   ctx.beginPath()
   polygon.forEach((point, index) => {
@@ -364,7 +375,7 @@ function drawPanelEditCutoutPolygonLocal(ctx, viewport, polygon, panelRect, back
   polygon.forEach((point, index) => {
     const nextPoint = polygon[(index + 1) % polygon.length]
 
-    if (isLocalBoundarySegment(point, nextPoint, panelRect)) return
+    if (isLocalCutoutBoundaryOnlySegment(point, nextPoint, panelRect)) return
 
     const p1 = localToScreen(viewport, point.x, point.y)
     const p2 = localToScreen(viewport, nextPoint.x, nextPoint.y)
