@@ -2276,6 +2276,7 @@ const store = createSimpleStore({
       : null
     const rectangles = Array.isArray(payload.rectangles) ? payload.rectangles : []
     const lines = Array.isArray(payload.lines) ? payload.lines : []
+    const circles = Array.isArray(payload.circles) ? payload.circles : []
     const guides = Array.isArray(payload.guides) ? payload.guides : []
     const normalizedRectangles = rectangles.map((rectangle) => ({
       id: rectangle.id,
@@ -2297,6 +2298,17 @@ const store = createSimpleStore({
       start: normalizePoint(line.start),
       end: normalizePoint(line.end)
     }))
+    const normalizedCircles = circles.map((circle) => ({
+      id: circle.id,
+      shapeType: 'circle',
+      center: normalizePoint(circle.center),
+      radius: Number(circle.radius || 0),
+      faceSide,
+      faceKey,
+      axisU: payload.axisU || state.panelEdit?.context?.axisU || null,
+      axisV: payload.axisV || state.panelEdit?.context?.axisV || null,
+      thicknessAxis: payload.thicknessAxis || state.panelEdit?.context?.thicknessAxis || null
+    })).filter((circle) => circle.radius > 0)
     const normalizedGuides = guides.map((guide) => ({
       id: guide.id,
       axis: guide.axis,
@@ -2315,7 +2327,10 @@ const store = createSimpleStore({
       const otherShapes = Array.isArray(panel.editPanelShapes)
         ? panel.editPanelShapes.filter((shape) => `${shape.faceKey || 'face'}:${shape.faceSide || 'side'}` !== faceStateKey)
         : []
-      const faceShapes = normalizedRectangles.filter((rectangle) => rectangle.operation !== 'cutout')
+      const faceShapes = [
+        ...normalizedRectangles.filter((rectangle) => rectangle.operation !== 'cutout'),
+        ...normalizedCircles
+      ]
       const faceCutouts = normalizedRectangles.filter((rectangle) => rectangle.operation === 'cutout')
 
       return {
@@ -2327,6 +2342,7 @@ const store = createSimpleStore({
             faceKey,
             guides: normalizedGuides,
             lines: normalizedLines,
+            circles: normalizedCircles,
             rectangles: normalizedRectangles
           }
         },

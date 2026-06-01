@@ -59,8 +59,22 @@ function getFaceOptions(face) {
   }
 
   return [
-    { id: 'front', label: 'Mặt trước', viewKey: 'front', rearEdge: 'bottom', rearLabel: 'Cạnh Sau' },
-    { id: 'back', label: 'Mặt sau', viewKey: 'back', rearEdge: 'top', rearLabel: 'Cạnh Sau' }
+    {
+      id: 'front',
+      label: 'Mặt trước',
+      viewKey: 'front',
+      rearEdge: 'bottom',
+      rearLabel: 'Cạnh Dưới',
+      edgeLabels: { side: 'Cạnh Trái', sideEdge: 'left' }
+    },
+    {
+      id: 'back',
+      label: 'Mặt sau',
+      viewKey: 'back',
+      rearEdge: 'bottom',
+      rearLabel: 'Cạnh Dưới',
+      edgeLabels: { side: 'Cạnh Phải', sideEdge: 'left' }
+    }
   ]
 } // End getFaceOptions
 
@@ -98,6 +112,7 @@ export function buildPanelEditContext(panel, faceSide = null) {
     faceOptions: getFaceOptions(face),
     rearEdge: option.rearEdge,
     rearLabel: option.rearLabel,
+    edgeLabels: option.edgeLabels || null,
     originCorner: 'bottom-left',
     origin: { x: 0, y: 0 },
     width,
@@ -132,6 +147,7 @@ export function isEditPanelDrawTool(toolId) {
 export function getEditPanelToolCursorClass(toolId) {
   if (toolId === 'editPanelTape') return 'mn-cursor-panel-tape'
   if (toolId === 'editPanelRect') return 'mn-cursor-panel-rect'
+  if (toolId === 'editPanelCircle') return 'mn-cursor-panel-circle'
   if (toolId === 'editPanelLine') return 'mn-cursor-panel-line'
   if (!toolId || toolId === 'editPanelSelect') return 'mn-cursor-select'
 

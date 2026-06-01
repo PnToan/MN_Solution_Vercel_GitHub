@@ -184,6 +184,13 @@ const panelEditLine = ref({
   lines: []
 })
 
+const panelEditCircle = ref({
+  hoverSnap: null,
+  draft: null,
+  circles: [],
+  inputBuffer: ''
+})
+
 const panelEditHistory = ref({
   undoStack: [],
   redoStack: [],
@@ -208,7 +215,7 @@ const panelEditTools = [
   { id: 'editPanelLine', label: 'Line', icon: '/icons/toolbar/line.svg' },
   { id: 'editPanelRect', label: 'Vẽ hình chữ nhật', icon: '/icons/toolbar/rect.svg' },
   { id: 'editPanelArc', label: 'Arc', icon: '/icons/toolbar/arc.svg' },
-  { id: 'editPanelCircle', label: 'Circle', icon: '/icons/toolbar/circle.svg' },
+  { id: 'editPanelCircle', label: 'Vẽ hình tròn', icon: '/icons/toolbar/circle.svg' },
   { id: 'editPanelTape', label: 'Thước', icon: '/icons/toolbar/tape.svg' }
 ]
 const zoomLabel = computed(() => `${Math.round(app.state.viewport.zoom * 100)}%`)
@@ -999,10 +1006,21 @@ function resetPanelEditLineDraft() {
 } // End resetPanelEditLineDraft
 
 //=================
+function resetPanelEditCircleDraft() {
+  panelEditCircle.value = {
+    ...panelEditCircle.value,
+    hoverSnap: null,
+    draft: null,
+    inputBuffer: ''
+  }
+} // End resetPanelEditCircleDraft
+
+//=================
 function resetPanelEditCommandDrafts() {
   resetPanelEditTapeDraft()
   resetPanelEditRectDraft()
   resetPanelEditLineDraft()
+  resetPanelEditCircleDraft()
 } // End resetPanelEditCommandDrafts
 
 //=================
@@ -1015,7 +1033,8 @@ function createPanelEditHistorySnapshot() {
   return {
     guides: clonePanelEditHistoryData(panelEditTape.value.guides || []),
     rectangles: clonePanelEditHistoryData(panelEditRect.value.rectangles || []),
-    lines: clonePanelEditHistoryData(panelEditLine.value.lines || [])
+    lines: clonePanelEditHistoryData(panelEditLine.value.lines || []),
+    circles: clonePanelEditHistoryData(panelEditCircle.value.circles || [])
   }
 } // End createPanelEditHistorySnapshot
 
@@ -1043,6 +1062,13 @@ function restorePanelEditHistorySnapshot(snapshot) {
     selectedLineId: null,
     draft: null,
     lines: clonePanelEditHistoryData(snapshot?.lines || [])
+  }
+  panelEditCircle.value = {
+    ...panelEditCircle.value,
+    hoverSnap: null,
+    draft: null,
+    inputBuffer: '',
+    circles: clonePanelEditHistoryData(snapshot?.circles || [])
   }
 } // End restorePanelEditHistorySnapshot
 
@@ -1143,6 +1169,12 @@ function loadPanelEditSavedState(context) {
       draft: null,
       lines: []
     }
+    panelEditCircle.value = {
+      hoverSnap: null,
+      draft: null,
+      circles: [],
+      inputBuffer: ''
+    }
     clearPanelEditHistory()
   }
 
@@ -1205,6 +1237,18 @@ function loadPanelEditSavedState(context) {
           start: clonePanelEditSavedPoint(line.start),
           end: clonePanelEditSavedPoint(line.end)
         }))
+      : []
+  }
+  panelEditCircle.value = {
+    hoverSnap: null,
+    draft: null,
+    inputBuffer: '',
+    circles: Array.isArray(savedState.circles)
+      ? savedState.circles.map((circle) => ({
+          id: circle.id || `circle-${Date.now()}-${Math.random()}`,
+          center: clonePanelEditSavedPoint(circle.center),
+          radius: Number(circle.radius || 0)
+        })).filter((circle) => circle.radius > 0)
       : []
   }
   clearPanelEditHistory()
@@ -1310,6 +1354,50 @@ function getPanelEditRectPointFromPointer(context, layout, event) {
     snap: null
   }
 } // End getPanelEditRectPointFromPointer
+
+//=================
+function getPanelEditCirclePointFromPointer(context, layout, event) {
+  return getPanelEditRectPointFromPointer(context, layout, event)
+} // End getPanelEditCirclePointFromPointer
+
+//=================
+function getPanelEditCircleRadius(circle) {
+  if (!circle?.center) return 0
+
+  if (Number.isFinite(Number(circle.radius)) && Number(circle.radius) > 0) {
+    return Number(circle.radius)
+  }
+
+  const current = circle.current || circle.center
+
+  return Math.hypot(
+    Number(current.x || 0) - Number(circle.center.x || 0),
+    Number(current.y || 0) - Number(circle.center.y || 0)
+  )
+} // End getPanelEditCircleRadius
+
+//=================
+function drawPanelEditCircle(targetContext, context, layout, circle, options = {}) {
+  if (!circle?.center) return
+
+  const radius = getPanelEditCircleRadius(circle)
+
+  if (radius <= 0) return
+
+  const center = getPanelEditPoint(context, layout.left, layout.top, layout.scale, circle.center.x, circle.center.y)
+  const isDraft = options.draft === true
+
+  targetContext.save()
+  targetContext.strokeStyle = isDraft ? '#ff7a00' : '#111111'
+  targetContext.fillStyle = isDraft ? 'rgba(255, 122, 0, 0.08)' : 'rgba(0, 0, 0, 0.02)'
+  targetContext.lineWidth = isDraft ? 2 : 1.5
+  targetContext.setLineDash(isDraft ? [8, 5] : [])
+  targetContext.beginPath()
+  targetContext.arc(center.x, center.y, radius * layout.scale, 0, Math.PI * 2)
+  targetContext.fill()
+  targetContext.stroke()
+  targetContext.restore()
+} // End drawPanelEditCircle
 
 //=================
 function getPanelEditRectBounds(rectangle) {
@@ -2032,6 +2120,51 @@ function drawPanelEditRearEdge(targetContext, context, layout) {
   targetContext.restore()
 } // End drawPanelEditRearEdge
 
+//=================
+function drawPanelEditFaceEdgeLabels(targetContext, context, layout) {
+  if (!context?.edgeLabels) return
+
+  const sideLabel = context.edgeLabels.side || context.edgeLabels.left || context.edgeLabels.right
+
+  if (!sideLabel) return
+
+  const sideEdge = context.edgeLabels.sideEdge || (context.edgeLabels.right ? 'right' : 'left')
+  const labelColor = '#ff0000'
+  const sideOffset = 100 * layout.scale
+  const labelOffset = 18
+  const tickSize = 8
+  const x = sideEdge === 'right' ? layout.right + sideOffset : layout.left - sideOffset
+  const start = { x, y: layout.top }
+  const end = { x, y: layout.bottom }
+  const labelX = sideEdge === 'right' ? x + labelOffset : x - labelOffset
+  const labelRotate = sideEdge === 'right' ? Math.PI / 2 : -Math.PI / 2
+
+  targetContext.save()
+  targetContext.strokeStyle = labelColor
+  targetContext.fillStyle = labelColor
+  targetContext.lineWidth = 3
+  targetContext.beginPath()
+  targetContext.moveTo(start.x, start.y)
+  targetContext.lineTo(end.x, end.y)
+  targetContext.stroke()
+
+  targetContext.lineWidth = 1.5
+  targetContext.beginPath()
+  targetContext.moveTo(start.x - tickSize, start.y)
+  targetContext.lineTo(start.x + tickSize, start.y)
+  targetContext.moveTo(end.x - tickSize, end.y)
+  targetContext.lineTo(end.x + tickSize, end.y)
+  targetContext.stroke()
+
+  targetContext.translate(labelX, layout.top + layout.faceHeight / 2)
+  targetContext.rotate(labelRotate)
+  targetContext.font = '12px Arial, Helvetica, sans-serif'
+  targetContext.textAlign = 'center'
+  targetContext.textBaseline = 'middle'
+  targetContext.fillText(sideLabel, 0, 0)
+  targetContext.restore()
+} // End drawPanelEditFaceEdgeLabels
+
 
 //=================
 function getPanelEditLinePointFromPointer(context, layout, event) {
@@ -2580,6 +2713,48 @@ function commitPanelEditLine() {
 } // End commitPanelEditLine
 
 //=================
+function commitPanelEditCircle(radiusOverride = null) {
+  const draft = panelEditCircle.value.draft
+
+  if (!draft?.center) return
+
+  const radius = Number.isFinite(Number(radiusOverride)) && Number(radiusOverride) > 0
+    ? Number(radiusOverride)
+    : getPanelEditCircleRadius(draft)
+
+  if (radius <= 0) {
+    panelEditCircle.value = {
+      ...panelEditCircle.value,
+      hoverSnap: null,
+      draft: null,
+      inputBuffer: ''
+    }
+    app.setStatus('Vẽ hình tròn: bán kính không hợp lệ')
+    nextTick(resizePanelEditCanvas)
+    return
+  }
+
+  pushPanelEditHistorySnapshot()
+
+  panelEditCircle.value = {
+    ...panelEditCircle.value,
+    hoverSnap: null,
+    draft: null,
+    inputBuffer: '',
+    circles: [
+      ...panelEditCircle.value.circles,
+      {
+        id: `circle-${Date.now()}-${panelEditCircle.value.circles.length + 1}`,
+        center: { ...draft.center },
+        radius
+      }
+    ]
+  }
+  app.setStatus(`Vẽ hình tròn: đã tạo hình tròn R${Math.round(radius)}`)
+  nextTick(resizePanelEditCanvas)
+} // End commitPanelEditCircle
+
+//=================
 function drawPanelEditCanvas(editContext = null, width = null, height = null) {
   const canvas = panelEditCanvasRef.value
   const context = activePanelEditContext.value
@@ -2620,6 +2795,7 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
   targetContext.strokeRect(left, top, layout.faceWidth, layout.faceHeight)
 
   drawPanelEditRearEdge(targetContext, context, layout)
+  drawPanelEditFaceEdgeLabels(targetContext, context, layout)
 
   panelEditTape.value.guides.forEach((guide) => {
     drawPanelEditGuideLine(targetContext, context, layout, guide)
@@ -2646,12 +2822,20 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
     drawPanelEditRectangle(targetContext, context, layout, rectangle)
   })
 
+  panelEditCircle.value.circles.forEach((circle) => {
+    drawPanelEditCircle(targetContext, context, layout, circle)
+  })
+
   if (panelEditRect.value.pendingAction) {
     drawPanelEditRectangle(targetContext, context, layout, panelEditRect.value.pendingAction, { draft: true })
   }
 
   if (panelEditRect.value.draft) {
     drawPanelEditRectangle(targetContext, context, layout, panelEditRect.value.draft, { draft: true })
+  }
+
+  if (panelEditCircle.value.draft) {
+    drawPanelEditCircle(targetContext, context, layout, panelEditCircle.value.draft, { draft: true })
   }
 
   if (drawing.state.panelEdit?.shapeTool === 'editPanelTape') {
@@ -2664,6 +2848,10 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
 
   if (drawing.state.panelEdit?.shapeTool === 'editPanelLine') {
     drawPanelEditTapeSnap(targetContext, panelEditLine.value.hoverSnap)
+  }
+
+  if (drawing.state.panelEdit?.shapeTool === 'editPanelCircle') {
+    drawPanelEditTapeSnap(targetContext, panelEditCircle.value.hoverSnap)
   }
 
   targetContext.strokeStyle = dimColor
@@ -2900,6 +3088,38 @@ function onPanelEditPointerDown(event) {
     return
   }
 
+  if (shapeTool === 'editPanelCircle') {
+    const point = getPanelEditCirclePointFromPointer(context, layout, event)
+
+    if (!point) return
+
+    if (panelEditCircle.value.draft) {
+      panelEditCircle.value = {
+        ...panelEditCircle.value,
+        hoverSnap: point.snap,
+        draft: {
+          ...panelEditCircle.value.draft,
+          current: point.local
+        }
+      }
+      commitPanelEditCircle()
+      return
+    }
+
+    panelEditCircle.value = {
+      ...panelEditCircle.value,
+      hoverSnap: point.snap,
+      inputBuffer: '',
+      draft: {
+        center: point.local,
+        current: point.local
+      }
+    }
+    app.setStatus('Vẽ hình tròn: rê chuột preview, click điểm bán kính hoặc nhập số + Enter')
+    resizePanelEditCanvas()
+    return
+  }
+
   if (shapeTool !== 'editPanelTape') return
 
   if (panelEditTape.value.draft) {
@@ -3006,6 +3226,23 @@ function onPanelEditPointerMove(event) {
     return
   }
 
+  if (shapeTool === 'editPanelCircle') {
+    const point = getPanelEditCirclePointFromPointer(context, layout, event)
+
+    panelEditCircle.value = {
+      ...panelEditCircle.value,
+      hoverSnap: point?.snap || null,
+      draft: panelEditCircle.value.draft
+        ? {
+          ...panelEditCircle.value.draft,
+          current: point?.local || panelEditCircle.value.draft.current
+        }
+        : null
+    }
+    resizePanelEditCanvas()
+    return
+  }
+
   if (shapeTool !== 'editPanelTape') return
 
   if (panelEditTape.value.draft) {
@@ -3105,6 +3342,15 @@ function getPanelEditSavedLinesForApply() {
 } // End getPanelEditSavedLinesForApply
 
 //=================
+function getPanelEditSavedCirclesForApply() {
+  return (panelEditCircle.value.circles || []).map((circle) => ({
+    id: circle.id,
+    center: clonePanelEditApplyPoint(circle.center),
+    radius: Number(circle.radius || 0)
+  })).filter((circle) => circle.radius > 0)
+} // End getPanelEditSavedCirclesForApply
+
+//=================
 function getPanelEditSavedGuidesForApply() {
   return (panelEditTape.value.guides || []).map((guide) => ({
     id: guide.id,
@@ -3123,6 +3369,7 @@ function applyPanelEdit() {
 
   const savedRectangles = getPanelEditSavedRectanglesForApply()
   const savedLines = getPanelEditSavedLinesForApply()
+  const savedCircles = getPanelEditSavedCirclesForApply()
   const savedGuides = getPanelEditSavedGuidesForApply()
 
   drawing.applyPanelEditOperations({
@@ -3134,6 +3381,7 @@ function applyPanelEdit() {
     thicknessAxis: context.thicknessAxis,
     rectangles: savedRectangles,
     lines: savedLines,
+    circles: savedCircles,
     guides: savedGuides
   })
 
@@ -3156,6 +3404,12 @@ function applyPanelEdit() {
     selectedLineId: null,
     draft: null,
     lines: []
+  }
+  panelEditCircle.value = {
+    hoverSnap: null,
+    draft: null,
+    circles: [],
+    inputBuffer: ''
   }
   clearPanelEditHistory()
   drawing.clearPanelEdit()
@@ -4857,6 +5111,67 @@ function handlePanelEditLineKey(event) {
   return true
 } // End handlePanelEditLineKey
 
+//=================
+function handlePanelEditCircleKey(event) {
+  if (drawing.state.panelEdit?.shapeTool !== 'editPanelCircle') return false
+
+  const draft = panelEditCircle.value.draft
+  const key = event.key
+
+  if (key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    resetPanelEditCircleDraft()
+    app.setStatus('Vẽ hình tròn: đã hủy thao tác đang tạo')
+    resizePanelEditCanvas()
+    return true
+  }
+
+  if (!draft) return false
+
+  if (/^[0-9]$/.test(key) || key === '.' || key === ',') {
+    event.preventDefault()
+    event.stopPropagation()
+
+    const nextChar = key === ',' ? '.' : key
+
+    panelEditCircle.value = {
+      ...panelEditCircle.value,
+      inputBuffer: `${panelEditCircle.value.inputBuffer}${nextChar}`
+    }
+    resizePanelEditCanvas()
+    return true
+  }
+
+  if (key === 'Backspace') {
+    event.preventDefault()
+    event.stopPropagation()
+    panelEditCircle.value = {
+      ...panelEditCircle.value,
+      inputBuffer: panelEditCircle.value.inputBuffer.slice(0, -1)
+    }
+    resizePanelEditCanvas()
+    return true
+  }
+
+  if (key === 'Enter') {
+    event.preventDefault()
+    event.stopPropagation()
+
+    const radius = Number(panelEditCircle.value.inputBuffer)
+
+    if (!Number.isFinite(radius) || radius <= 0 || panelEditCircle.value.inputBuffer === '') {
+      app.setStatus('Vẽ hình tròn: nhập bán kính hợp lệ rồi Enter')
+      return true
+    }
+
+    commitPanelEditCircle(radius)
+    return true
+  }
+
+  return false
+} // End handlePanelEditCircleKey
+
 
 //=================
 function deleteSelectedPanelEditLine() {
@@ -4927,6 +5242,8 @@ function onKeyDown(event) {
   if (handlePanelEditRectKey(event)) return
 
   if (handlePanelEditLineKey(event)) return
+
+  if (handlePanelEditCircleKey(event)) return
 
   if (activePanelEditContext.value) {
     event.preventDefault()
@@ -5017,6 +5334,10 @@ watch(() => app.state.currentTool, (tool) => {
 
   if (tool !== 'editPanelLine') {
     resetPanelEditLineDraft()
+  }
+
+  if (tool !== 'editPanelCircle') {
+    resetPanelEditCircleDraft()
   }
 
   if (tool !== 'move') {
@@ -5279,6 +5600,10 @@ onBeforeUnmount(() => {
 
 .mn-cursor-panel-rect {
   cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 2 L4 22 L9 17 L13 27 L17 25 L13 15 L20 15 Z' fill='white' stroke='%23111111' stroke-width='1.4' stroke-linejoin='round'/%3E%3Crect x='13' y='21' width='14' height='8' rx='1.5' fill='%23dbefff' stroke='%230077CC' stroke-width='1.5'/%3E%3C/svg%3E") 4 2, crosshair;
+}
+
+.mn-cursor-panel-circle {
+  cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 2 L4 22 L9 17 L13 27 L17 25 L13 15 L20 15 Z' fill='white' stroke='%23111111' stroke-width='1.4' stroke-linejoin='round'/%3E%3Ccircle cx='22' cy='24' r='6' fill='%23ffffff' stroke='%230077CC' stroke-width='1.7'/%3E%3Ccircle cx='22' cy='24' r='1.5' fill='%230077CC'/%3E%3C/svg%3E") 4 2, crosshair;
 }
 
 .mn-cursor-panel-line {
