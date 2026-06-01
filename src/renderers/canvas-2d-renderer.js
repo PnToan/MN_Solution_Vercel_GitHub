@@ -536,6 +536,32 @@ function collectLocalPolygonBoundaryEraseSpans(polygon, panelRect) {
     }
   })
 
+  polygon.forEach((point, index) => {
+    const nextPoint = polygon[(index + 1) % polygon.length]
+    const edgeA = isLocalPointOnPanelRectEdge(point, panelRect)
+    const edgeB = isLocalPointOnPanelRectEdge(nextPoint, panelRect)
+
+    if (!edgeA || !edgeB || edgeA === edgeB) return
+
+    const corner = getLocalBoundaryCornerBetweenEdges(edgeA, edgeB, panelRect)
+
+    if (!corner) return
+
+    const left = Number(panelRect.x || 0)
+    const right = left + Number(panelRect.width || 0)
+    const bottom = Number(panelRect.y || 0)
+    const top = bottom + Number(panelRect.height || 0)
+    const cornerProbe = {
+      x: corner.x + (Math.abs(corner.x - left) <= 0.5 ? 0.25 : -0.25),
+      y: corner.y + (Math.abs(corner.y - bottom) <= 0.5 ? 0.25 : -0.25)
+    }
+
+    if (!isLocalPointInsidePolygon(corner, polygon) && !isLocalPointInsidePolygon(cornerProbe, polygon)) return
+
+    addLocalBoundaryEraseSpan(spans, edgeA, point, corner, panelRect)
+    addLocalBoundaryEraseSpan(spans, edgeB, nextPoint, corner, panelRect)
+  })
+
   return spans
 } // End collectLocalPolygonBoundaryEraseSpans
 

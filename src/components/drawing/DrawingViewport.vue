@@ -1711,6 +1711,28 @@ function collectPanelEditPolygonBoundaryEraseSpans(context, polygon) {
     }
   })
 
+  polygon.forEach((point, index) => {
+    const nextPoint = polygon[(index + 1) % polygon.length]
+    const edgeA = getPanelEditBoundaryEdge(context, point)
+    const edgeB = getPanelEditBoundaryEdge(context, nextPoint)
+
+    if (!edgeA || !edgeB || edgeA === edgeB) return
+
+    const corner = getPanelEditBoundaryCornerBetweenEdges(context, edgeA, edgeB)
+
+    if (!corner) return
+
+    const cornerProbe = {
+      x: corner.x + (corner.x <= 0 ? 0.25 : -0.25),
+      y: corner.y + (corner.y <= 0 ? 0.25 : -0.25)
+    }
+
+    if (!isPanelEditPointInsidePolygon(corner, polygon) && !isPanelEditPointInsidePolygon(cornerProbe, polygon)) return
+
+    addPanelEditBoundaryEraseSpan(spans, context, edgeA, point, corner)
+    addPanelEditBoundaryEraseSpan(spans, context, edgeB, nextPoint, corner)
+  })
+
   return spans
 } // End collectPanelEditPolygonBoundaryEraseSpans
 
