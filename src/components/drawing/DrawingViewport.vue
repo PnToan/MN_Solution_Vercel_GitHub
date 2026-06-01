@@ -178,6 +178,8 @@ const panelEditRect = ref({
 const panelEditLine = ref({
   hoverSnap: null,
   hoverRegion: null,
+  hoverLine: null,
+  selectedLineId: null,
   draft: null,
   lines: []
 })
@@ -221,6 +223,16 @@ const panelEditFooterText = computed(() => {
 
   if (!shapeTool || shapeTool === 'editPanelSelect') {
     const hoverRegion = panelEditLine.value.hoverRegion
+    const hoverLine = panelEditLine.value.hoverLine
+    const selectedLineId = panelEditLine.value.selectedLineId
+
+    if (selectedLineId) {
+      return 'Select: line đã chọn | Delete để xóa line'
+    }
+
+    if (hoverLine) {
+      return 'Select: đang nhận line | click để chọn line'
+    }
 
     if (panelEditRect.value.pendingAction?.source === 'lineRegion') {
       return 'Select vùng: chọn None để bỏ qua hoặc Khấu để khấu xuyên vùng đã chọn'
@@ -249,7 +261,7 @@ const panelEditFooterText = computed(() => {
       return `Line: snap ${hoverSnap.kind === 'circle' ? 'điểm tròn' : 'cạnh/guide'} | click điểm đầu`
     }
 
-    return 'Line: click điểm snap đầu, click điểm snap cuối để tạo line phân vùng'
+    return 'Line: click điểm đầu, rê chuột preview, click điểm cuối để tạo line'
   }
 
   if (shapeTool === 'editPanelTape') {
@@ -476,6 +488,62 @@ function getPanelEditLocalFromScreen(context, layout, screenX, screenY) {
   }
 } // End getPanelEditLocalFromScreen
 
+
+//=================
+function getClosestPointOnPanelEditLine(line, local) {
+  if (!line || !local) return null
+
+  const x1 = Number(line.start?.x || 0)
+  const y1 = Number(line.start?.y || 0)
+  const x2 = Number(line.end?.x || 0)
+  const y2 = Number(line.end?.y || 0)
+  const dx = x2 - x1
+  const dy = y2 - y1
+  const lengthSq = dx * dx + dy * dy
+
+  if (lengthSq <= 0.0001) return { x: x1, y: y1, distance: Math.hypot(local.x - x1, local.y - y1) }
+
+  const t = Math.max(0, Math.min(1, ((local.x - x1) * dx + (local.y - y1) * dy) / lengthSq))
+  const x = x1 + dx * t
+  const y = y1 + dy * t
+
+  return {
+    x,
+    y,
+    distance: Math.hypot(local.x - x, local.y - y)
+  }
+} // End getClosestPointOnPanelEditLine
+
+//=================
+function getPanelEditLineHit(context, layout, screenX, screenY) {
+  if (!context || !layout) return null
+
+  const tolerance = 8
+  const local = getPanelEditLocalFromScreen(context, layout, screenX, screenY)
+  let best = null
+
+  panelEditLine.value.lines.forEach((line) => {
+    const closest = getClosestPointOnPanelEditLine(line, local)
+
+    if (!closest) return
+
+    const screenPoint = getPanelEditPoint(context, layout.left, layout.top, layout.scale, closest.x, closest.y)
+    const screenDistance = Math.hypot(screenPoint.x - screenX, screenPoint.y - screenY)
+
+    if (screenDistance > tolerance) return
+    if (best && screenDistance >= best.distance) return
+
+    best = {
+      ...line,
+      distance: screenDistance,
+      local: { x: closest.x, y: closest.y },
+      screen: screenPoint
+    }
+  })
+
+  return best
+} // End getPanelEditLineHit
+
 //=================
 function getPanelEditTapeSnap(context, layout, screenX, screenY, options = {}) {
   if (!context || !layout) return null
@@ -699,6 +767,28 @@ function getPanelEditTapeSnap(context, layout, screenX, screenY, options = {}) {
     })
   })
 
+  editLines
+    .filter((line) => line.axis === 'free')
+    .forEach((line) => {
+      const closest = getClosestPointOnPanelEditLine(line, clampedLocal)
+
+      if (!closest) return
+
+      const point = getPanelEditPoint(context, layout.left, layout.top, layout.scale, closest.x, closest.y)
+      const distance = Math.hypot(point.x - screenX, point.y - screenY)
+
+      edgeCandidates.push({
+        key: `line-free-${line.id}`,
+        distance,
+        axis: 'free',
+        edge: 'line',
+        kind: 'square',
+        lineId: line.id,
+        local: { x: closest.x, y: closest.y },
+        screen: point
+      })
+    })
+
   const bestEdge = edgeCandidates
     .filter((candidate) => candidate.distance <= tolerance)
     .sort((a, b) => a.distance - b.distance)[0]
@@ -787,6 +877,8 @@ function resetPanelEditLineDraft() {
     ...panelEditLine.value,
     hoverSnap: null,
     hoverRegion: null,
+    hoverLine: null,
+    selectedLineId: null,
     draft: null
   }
 } // End resetPanelEditLineDraft
@@ -832,6 +924,8 @@ function restorePanelEditHistorySnapshot(snapshot) {
     ...panelEditLine.value,
     hoverSnap: null,
     hoverRegion: null,
+    hoverLine: null,
+    selectedLineId: null,
     draft: null,
     lines: clonePanelEditHistoryData(snapshot?.lines || [])
   }
@@ -1136,7 +1230,9 @@ function confirmPanelEditRectangleAction(operation) {
     }
     panelEditLine.value = {
       ...panelEditLine.value,
-      hoverRegion: null
+      hoverRegion: null,
+      hoverLine: null,
+      selectedLineId: null
     }
     app.setStatus('Select vùng: không thay đổi')
     nextTick(resizePanelEditCanvas)
@@ -1165,7 +1261,9 @@ function confirmPanelEditRectangleAction(operation) {
   }
   panelEditLine.value = {
     ...panelEditLine.value,
-    hoverRegion: null
+    hoverRegion: null,
+    hoverLine: null,
+    selectedLineId: null
   }
 
   app.setStatus(isCutout ? 'Edit Panel: đã chọn Khấu xuyên panel' : 'Vẽ hình chữ nhật: đã tạo hình chữ nhật')
@@ -1253,12 +1351,15 @@ function getPanelEditLinePointFromPointer(context, layout, event) {
   const screenX = event.clientX - rect.left
   const screenY = event.clientY - rect.top
   const snap = getPanelEditTapeSnap(context, layout, screenX, screenY)
-
-  if (!snap) return null
+  const rawLocal = getPanelEditLocalFromScreen(context, layout, screenX, screenY)
+  const local = snap?.local || {
+    x: Math.max(0, Math.min(context.width, rawLocal.x)),
+    y: Math.max(0, Math.min(context.height, rawLocal.y))
+  }
 
   return {
-    local: { ...snap.local },
-    snap
+    local: { ...local },
+    snap: snap || null
   }
 } // End getPanelEditLinePointFromPointer
 
@@ -1266,28 +1367,25 @@ function getPanelEditLinePointFromPointer(context, layout, event) {
 function normalizePanelEditLine(context, start, end, options = {}) {
   if (!context || !start || !end) return null
 
-  const dx = Number(end.x || 0) - Number(start.x || 0)
-  const dy = Number(end.y || 0) - Number(start.y || 0)
-  const axis = Math.abs(dx) >= Math.abs(dy) ? 'horizontal' : 'vertical'
-  let x1 = Number(start.x || 0)
-  let y1 = Number(start.y || 0)
-  let x2 = Number(end.x || 0)
-  let y2 = Number(end.y || 0)
-
-  if (axis === 'horizontal') {
-    y2 = y1
-  } else {
-    x2 = x1
-  }
-
-  x1 = Math.max(0, Math.min(context.width, x1))
-  x2 = Math.max(0, Math.min(context.width, x2))
-  y1 = Math.max(0, Math.min(context.height, y1))
-  y2 = Math.max(0, Math.min(context.height, y2))
-
-  const length = Math.hypot(x2 - x1, y2 - y1)
+  let x1 = Math.max(0, Math.min(context.width, Number(start.x || 0)))
+  let y1 = Math.max(0, Math.min(context.height, Number(start.y || 0)))
+  let x2 = Math.max(0, Math.min(context.width, Number(end.x || 0)))
+  let y2 = Math.max(0, Math.min(context.height, Number(end.y || 0)))
+  const dx = x2 - x1
+  const dy = y2 - y1
+  const length = Math.hypot(dx, dy)
 
   if (length <= 0.01) return null
+
+  let axis = 'free'
+
+  if (Math.abs(dx) <= 0.01) {
+    axis = 'vertical'
+    x2 = x1
+  } else if (Math.abs(dy) <= 0.01) {
+    axis = 'horizontal'
+    y2 = y1
+  }
 
   return {
     id: options.id || `line-${Date.now()}`,
@@ -1314,10 +1412,12 @@ function drawPanelEditLine(targetContext, context, layout, line, options = {}) {
   if (!screen) return
 
   const isDraft = options.draft === true
+  const isSelected = options.selected === true
+  const isHover = options.hover === true
 
   targetContext.save()
-  targetContext.strokeStyle = isDraft ? '#ff7a00' : '#111111'
-  targetContext.lineWidth = isDraft ? 2 : 1.8
+  targetContext.strokeStyle = isDraft ? '#ff7a00' : (isSelected ? '#ff0000' : (isHover ? '#ff7a00' : '#111111'))
+  targetContext.lineWidth = isDraft ? 2 : (isSelected || isHover ? 3 : 1.8)
   targetContext.setLineDash(isDraft ? [8, 5] : [])
   targetContext.beginPath()
   targetContext.moveTo(screen.start.x, screen.start.y)
@@ -1457,6 +1557,8 @@ function commitPanelEditLine() {
     panelEditLine.value = {
       ...panelEditLine.value,
       hoverSnap: null,
+      hoverLine: null,
+      selectedLineId: null,
       draft: null
     }
     app.setStatus('Line: chiều dài line không hợp lệ')
@@ -1469,6 +1571,8 @@ function commitPanelEditLine() {
     ...panelEditLine.value,
     hoverSnap: null,
     hoverRegion: null,
+    hoverLine: null,
+    selectedLineId: null,
     draft: null,
     lines: [
       ...panelEditLine.value.lines,
@@ -1532,7 +1636,10 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
   drawPanelEditLineRegions(targetContext, context, layout)
 
   panelEditLine.value.lines.forEach((line) => {
-    drawPanelEditLine(targetContext, context, layout, line)
+    drawPanelEditLine(targetContext, context, layout, line, {
+      hover: panelEditLine.value.hoverLine?.id === line.id,
+      selected: panelEditLine.value.selectedLineId === line.id
+    })
   })
 
   if (panelEditLine.value.draft) {
@@ -1650,6 +1757,8 @@ function selectPanelEditFace(faceSide) {
   panelEditLine.value = {
     hoverSnap: null,
     hoverRegion: null,
+    hoverLine: null,
+    selectedLineId: null,
     draft: null,
     lines: []
   }
@@ -1687,12 +1796,28 @@ function onPanelEditPointerDown(event) {
   const layout = getPanelEditLayout(context, rect.width, rect.height)
 
   if (!shapeTool || shapeTool === 'editPanelSelect') {
+    const lineHit = getPanelEditLineHit(context, layout, event.clientX - rect.left, event.clientY - rect.top)
+
+    if (lineHit) {
+      panelEditLine.value = {
+        ...panelEditLine.value,
+        hoverLine: lineHit,
+        hoverRegion: null,
+        selectedLineId: lineHit.id
+      }
+      app.setStatus('Select: đã chọn line | Delete để xóa')
+      resizePanelEditCanvas()
+      return
+    }
+
     const region = hitPanelEditLineRegion(context, layout, event)
 
     if (!region) {
       panelEditLine.value = {
         ...panelEditLine.value,
-        hoverRegion: null
+        hoverLine: null,
+        hoverRegion: null,
+        selectedLineId: null
       }
       resizePanelEditCanvas()
       return
@@ -1700,6 +1825,8 @@ function onPanelEditPointerDown(event) {
 
     panelEditLine.value = {
       ...panelEditLine.value,
+      hoverLine: null,
+      selectedLineId: null,
       hoverRegion: region
     }
     panelEditRect.value = {
@@ -1719,7 +1846,7 @@ function onPanelEditPointerDown(event) {
     const point = getPanelEditLinePointFromPointer(context, layout, event)
 
     if (!point) {
-      app.setStatus('Line: rê chuột gần điểm snap để bắt điểm')
+      app.setStatus('Line: click điểm đầu để bắt đầu vẽ')
       return
     }
 
@@ -1727,6 +1854,8 @@ function onPanelEditPointerDown(event) {
       panelEditLine.value = {
         ...panelEditLine.value,
         hoverSnap: point.snap,
+        hoverLine: null,
+        selectedLineId: null,
         draft: {
           ...panelEditLine.value.draft,
           current: point.local
@@ -1740,6 +1869,8 @@ function onPanelEditPointerDown(event) {
       ...panelEditLine.value,
       hoverSnap: point.snap,
       hoverRegion: null,
+      hoverLine: null,
+      selectedLineId: null,
       draft: {
         start: point.local,
         current: point.local
@@ -1771,6 +1902,8 @@ function onPanelEditPointerDown(event) {
     panelEditRect.value = {
       ...panelEditRect.value,
       hoverSnap: point.snap,
+      hoverLine: null,
+      selectedLineId: null,
       draft: {
         start: point.local,
         current: point.local
@@ -1837,9 +1970,12 @@ function onPanelEditPointerMove(event) {
   }
 
   if (!shapeTool || shapeTool === 'editPanelSelect') {
+    const lineHit = getPanelEditLineHit(context, layout, event.clientX - rect.left, event.clientY - rect.top)
+
     panelEditLine.value = {
       ...panelEditLine.value,
-      hoverRegion: hitPanelEditLineRegion(context, layout, event)
+      hoverLine: lineHit,
+      hoverRegion: lineHit ? null : hitPanelEditLineRegion(context, layout, event)
     }
     resizePanelEditCanvas()
     return
@@ -1852,6 +1988,7 @@ function onPanelEditPointerMove(event) {
       ...panelEditLine.value,
       hoverSnap: point?.snap || null,
       hoverRegion: null,
+      hoverLine: null,
       draft: panelEditLine.value.draft
         ? {
           ...panelEditLine.value.draft,
@@ -1974,6 +2111,8 @@ function applyPanelEdit() {
   panelEditLine.value = {
     hoverSnap: null,
     hoverRegion: null,
+    hoverLine: null,
+    selectedLineId: null,
     draft: null,
     lines: []
   }
@@ -3677,6 +3816,33 @@ function handlePanelEditLineKey(event) {
   return true
 } // End handlePanelEditLineKey
 
+
+//=================
+function deleteSelectedPanelEditLine() {
+  const selectedLineId = panelEditLine.value.selectedLineId
+
+  if (!activePanelEditContext.value || !selectedLineId) return false
+
+  const nextLines = panelEditLine.value.lines.filter((line) => line.id !== selectedLineId)
+
+  if (nextLines.length === panelEditLine.value.lines.length) return false
+
+  pushPanelEditHistorySnapshot()
+  panelEditLine.value = {
+    ...panelEditLine.value,
+    hoverSnap: null,
+    hoverRegion: null,
+    hoverLine: null,
+    selectedLineId: null,
+    draft: null,
+    lines: nextLines
+  }
+  app.setStatus('Select: đã xóa line')
+  resizePanelEditCanvas()
+
+  return true
+} // End deleteSelectedPanelEditLine
+
 //=================
 function deleteCurrentSelection() {
   const hasPanels = Array.isArray(drawing.state.selectedPanelIds) && drawing.state.selectedPanelIds.length > 0
@@ -3703,6 +3869,13 @@ function onKeyDown(event) {
     event.preventDefault()
     event.stopPropagation()
     exitPanelEditCommandToSelect()
+    return
+  }
+
+  if (activePanelEditContext.value && event.key === 'Delete') {
+    event.preventDefault()
+    event.stopPropagation()
+    deleteSelectedPanelEditLine()
     return
   }
 
@@ -4125,6 +4298,10 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.mn-panel-edit-canvas.mn-cursor-select {
+  cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 2 L4 23 L9 18 L13 29 L17 27 L13 16 L21 16 Z' fill='white' stroke='%23111111' stroke-width='1.4' stroke-linejoin='round'/%3E%3Ccircle cx='23' cy='24' r='4' fill='%23ffffff' stroke='%230077CC' stroke-width='1.5'/%3E%3C/svg%3E") 4 2, default;
 }
 
 </style>
