@@ -292,12 +292,71 @@ function isLocalBoundarySegment(pointA, pointB, panelRect) {
 } // End isLocalBoundarySegment
 
 //=================
+function getLocalBoundaryCornerBetweenEdges(edgeA, edgeB, panelRect) {
+  if (!edgeA || !edgeB || edgeA === edgeB || !panelRect) return null
+
+  const left = Number(panelRect.x || 0)
+  const right = left + Number(panelRect.width || 0)
+  const bottom = Number(panelRect.y || 0)
+  const top = bottom + Number(panelRect.height || 0)
+  const key = [edgeA, edgeB].sort().join('-')
+
+  if (key === 'left-top') return { x: left, y: top }
+  if (key === 'bottom-left') return { x: left, y: bottom }
+  if (key === 'right-top') return { x: right, y: top }
+  if (key === 'bottom-right') return { x: right, y: bottom }
+
+  return null
+} // End getLocalBoundaryCornerBetweenEdges
+
+//=================
+function drawLocalEraseSegment(ctx, viewport, pointA, pointB) {
+  const p1 = localToScreen(viewport, pointA.x, pointA.y)
+  const p2 = localToScreen(viewport, pointB.x, pointB.y)
+
+  ctx.moveTo(p1.x, p1.y)
+  ctx.lineTo(p2.x, p2.y)
+} // End drawLocalEraseSegment
+
+//=================
+function eraseLocalPolygonBoundarySpans(ctx, viewport, polygon, panelRect, background) {
+  if (!Array.isArray(polygon) || polygon.length < 3) return
+
+  ctx.save()
+  ctx.strokeStyle = background
+  ctx.lineWidth = 6
+  ctx.lineCap = 'butt'
+  ctx.setLineDash([])
+  ctx.beginPath()
+  polygon.forEach((point, index) => {
+    const nextPoint = polygon[(index + 1) % polygon.length]
+    const edgeA = isLocalPointOnPanelRectEdge(point, panelRect)
+    const edgeB = isLocalPointOnPanelRectEdge(nextPoint, panelRect)
+
+    if (edgeA && edgeA === edgeB) {
+      drawLocalEraseSegment(ctx, viewport, point, nextPoint)
+      return
+    }
+
+    const corner = getLocalBoundaryCornerBetweenEdges(edgeA, edgeB, panelRect)
+
+    if (!corner) return
+
+    drawLocalEraseSegment(ctx, viewport, point, corner)
+    drawLocalEraseSegment(ctx, viewport, corner, nextPoint)
+  })
+  ctx.stroke()
+  ctx.restore()
+} // End eraseLocalPolygonBoundarySpans
+
+//=================
 function drawPanelEditCutoutPolygonLocal(ctx, viewport, polygon, panelRect, background) {
   if (!Array.isArray(polygon) || polygon.length < 3) return
 
   drawPolygonLocal(ctx, viewport, polygon, {
     fill: background
   })
+  eraseLocalPolygonBoundarySpans(ctx, viewport, polygon, panelRect, background)
 
   ctx.beginPath()
   ctx.strokeStyle = '#111111'

@@ -1104,6 +1104,112 @@ function redoPanelEditHistory() {
   return true
 } // End redoPanelEditHistory
 
+
+//=================
+function getPanelEditSavedStateKey(context) {
+  if (!context) return null
+
+  return `${context.faceKey || 'face'}:${context.faceSide || 'side'}`
+} // End getPanelEditSavedStateKey
+
+//=================
+function clonePanelEditSavedPoint(point) {
+  return {
+    x: Number(point?.x || 0),
+    y: Number(point?.y || 0)
+  }
+} // End clonePanelEditSavedPoint
+
+//=================
+function loadPanelEditSavedState(context) {
+  const resetState = () => {
+    panelEditTape.value = {
+      hoverSnap: null,
+      draft: null,
+      guides: [],
+      inputBuffer: ''
+    }
+    panelEditRect.value = {
+      hoverSnap: null,
+      draft: null,
+      pendingAction: null,
+      rectangles: []
+    }
+    panelEditLine.value = {
+      hoverSnap: null,
+      hoverRegion: null,
+      hoverLine: null,
+      selectedLineId: null,
+      draft: null,
+      lines: []
+    }
+    clearPanelEditHistory()
+  }
+
+  if (!context) {
+    resetState()
+    return
+  }
+
+  const panel = drawing.state.panels.find((item) => item.id === context.panelId) || null
+  const stateKey = getPanelEditSavedStateKey(context)
+  const savedState = stateKey ? panel?.editPanelData?.[stateKey] : null
+
+  if (!savedState) {
+    resetState()
+    return
+  }
+
+  panelEditTape.value = {
+    hoverSnap: null,
+    draft: null,
+    inputBuffer: '',
+    guides: Array.isArray(savedState.guides)
+      ? savedState.guides.map((guide) => ({
+          id: guide.id || `guide-${Date.now()}-${Math.random()}`,
+          axis: guide.axis,
+          edge: guide.edge || null,
+          baseValue: Number(guide.baseValue || 0),
+          value: Number(guide.value || 0)
+        }))
+      : []
+  }
+  panelEditRect.value = {
+    hoverSnap: null,
+    draft: null,
+    pendingAction: null,
+    rectangles: Array.isArray(savedState.rectangles)
+      ? savedState.rectangles.map((rectangle) => ({
+          id: rectangle.id || `rect-${Date.now()}-${Math.random()}`,
+          start: clonePanelEditSavedPoint(rectangle.start),
+          end: clonePanelEditSavedPoint(rectangle.end),
+          operation: rectangle.operation || 'none',
+          source: rectangle.source || 'rectangle',
+          regionKind: rectangle.regionKind || 'rect',
+          polygon: Array.isArray(rectangle.polygon)
+            ? rectangle.polygon.map((point) => clonePanelEditSavedPoint(point))
+            : null
+        }))
+      : []
+  }
+  panelEditLine.value = {
+    hoverSnap: null,
+    hoverRegion: null,
+    hoverLine: null,
+    selectedLineId: null,
+    draft: null,
+    lines: Array.isArray(savedState.lines)
+      ? savedState.lines.map((line) => ({
+          id: line.id || `line-${Date.now()}-${Math.random()}`,
+          axis: line.axis || 'free',
+          start: clonePanelEditSavedPoint(line.start),
+          end: clonePanelEditSavedPoint(line.end)
+        }))
+      : []
+  }
+  clearPanelEditHistory()
+} // End loadPanelEditSavedState
+
 //=================
 function exitPanelEditCommandToSelect() {
   const context = activePanelEditContext.value
@@ -1310,7 +1416,7 @@ function erasePanelEditCutoutBoundarySegments(targetContext, context, layout, bo
   targetContext.save()
   targetContext.strokeStyle = getCssVariable('--mn-bg-canvas', '#f4f4f4')
   targetContext.lineWidth = 5
-  targetContext.lineCap = 'square'
+  targetContext.lineCap = 'butt'
   targetContext.setLineDash([])
   targetContext.beginPath()
   edges.forEach((edge) => {
@@ -1378,6 +1484,29 @@ function isPanelEditBoundarySegment(context, pointA, pointB) {
   return edgeA && edgeA === edgeB
 } // End isPanelEditBoundarySegment
 
+//=================
+function getPanelEditBoundaryCornerBetweenEdges(context, edgeA, edgeB) {
+  if (!context || !edgeA || !edgeB || edgeA === edgeB) return null
+
+  const key = [edgeA, edgeB].sort().join('-')
+
+  if (key === 'left-top') return { x: 0, y: context.height }
+  if (key === 'bottom-left') return { x: 0, y: 0 }
+  if (key === 'right-top') return { x: context.width, y: context.height }
+  if (key === 'bottom-right') return { x: context.width, y: 0 }
+
+  return null
+} // End getPanelEditBoundaryCornerBetweenEdges
+
+//=================
+function drawPanelEditEraseSegment(targetContext, context, layout, pointA, pointB) {
+  const p1 = getPanelEditPoint(context, layout.left, layout.top, layout.scale, pointA.x, pointA.y)
+  const p2 = getPanelEditPoint(context, layout.left, layout.top, layout.scale, pointB.x, pointB.y)
+
+  targetContext.moveTo(p1.x, p1.y)
+  targetContext.lineTo(p2.x, p2.y)
+} // End drawPanelEditEraseSegment
+
 
 //=================
 function erasePanelEditPolygonBoundarySegments(targetContext, context, layout, polygon) {
@@ -1385,20 +1514,26 @@ function erasePanelEditPolygonBoundarySegments(targetContext, context, layout, p
 
   targetContext.save()
   targetContext.strokeStyle = getCssVariable('--mn-bg-canvas', '#f4f4f4')
-  targetContext.lineWidth = 5
-  targetContext.lineCap = 'square'
+  targetContext.lineWidth = 6
+  targetContext.lineCap = 'butt'
   targetContext.setLineDash([])
   targetContext.beginPath()
   polygon.forEach((point, index) => {
     const nextPoint = polygon[(index + 1) % polygon.length]
+    const edgeA = getPanelEditBoundaryEdge(context, point)
+    const edgeB = getPanelEditBoundaryEdge(context, nextPoint)
 
-    if (!isPanelEditBoundarySegment(context, point, nextPoint)) return
+    if (edgeA && edgeA === edgeB) {
+      drawPanelEditEraseSegment(targetContext, context, layout, point, nextPoint)
+      return
+    }
 
-    const p1 = getPanelEditPoint(context, layout.left, layout.top, layout.scale, point.x, point.y)
-    const p2 = getPanelEditPoint(context, layout.left, layout.top, layout.scale, nextPoint.x, nextPoint.y)
+    const corner = getPanelEditBoundaryCornerBetweenEdges(context, edgeA, edgeB)
 
-    targetContext.moveTo(p1.x, p1.y)
-    targetContext.lineTo(p2.x, p2.y)
+    if (!corner) return
+
+    drawPanelEditEraseSegment(targetContext, context, layout, point, corner)
+    drawPanelEditEraseSegment(targetContext, context, layout, corner, nextPoint)
   })
   targetContext.stroke()
   targetContext.restore()
