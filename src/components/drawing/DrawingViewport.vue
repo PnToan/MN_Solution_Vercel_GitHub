@@ -2032,6 +2032,51 @@ function drawPanelEditRearEdge(targetContext, context, layout) {
   targetContext.restore()
 } // End drawPanelEditRearEdge
 
+//=================
+function drawPanelEditFaceEdgeLabels(targetContext, context, layout) {
+  if (!context?.edgeLabels) return
+
+  const sideLabel = context.edgeLabels.side || context.edgeLabels.left || context.edgeLabels.right
+
+  if (!sideLabel) return
+
+  const sideEdge = context.edgeLabels.sideEdge || (context.edgeLabels.right ? 'right' : 'left')
+  const labelColor = '#ff0000'
+  const sideOffset = 100 * layout.scale
+  const labelOffset = 18
+  const tickSize = 8
+  const x = sideEdge === 'right' ? layout.right + sideOffset : layout.left - sideOffset
+  const start = { x, y: layout.top }
+  const end = { x, y: layout.bottom }
+  const labelX = sideEdge === 'right' ? x + labelOffset : x - labelOffset
+  const labelRotate = sideEdge === 'right' ? Math.PI / 2 : -Math.PI / 2
+
+  targetContext.save()
+  targetContext.strokeStyle = labelColor
+  targetContext.fillStyle = labelColor
+  targetContext.lineWidth = 3
+  targetContext.beginPath()
+  targetContext.moveTo(start.x, start.y)
+  targetContext.lineTo(end.x, end.y)
+  targetContext.stroke()
+
+  targetContext.lineWidth = 1.5
+  targetContext.beginPath()
+  targetContext.moveTo(start.x - tickSize, start.y)
+  targetContext.lineTo(start.x + tickSize, start.y)
+  targetContext.moveTo(end.x - tickSize, end.y)
+  targetContext.lineTo(end.x + tickSize, end.y)
+  targetContext.stroke()
+
+  targetContext.translate(labelX, layout.top + layout.faceHeight / 2)
+  targetContext.rotate(labelRotate)
+  targetContext.font = '12px Arial, Helvetica, sans-serif'
+  targetContext.textAlign = 'center'
+  targetContext.textBaseline = 'middle'
+  targetContext.fillText(sideLabel, 0, 0)
+  targetContext.restore()
+} // End drawPanelEditFaceEdgeLabels
+
 
 //=================
 function getPanelEditLinePointFromPointer(context, layout, event) {
@@ -2620,6 +2665,7 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
   targetContext.strokeRect(left, top, layout.faceWidth, layout.faceHeight)
 
   drawPanelEditRearEdge(targetContext, context, layout)
+  drawPanelEditFaceEdgeLabels(targetContext, context, layout)
 
   panelEditTape.value.guides.forEach((guide) => {
     drawPanelEditGuideLine(targetContext, context, layout, guide)

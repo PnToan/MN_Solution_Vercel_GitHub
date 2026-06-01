@@ -164,6 +164,101 @@ function getPanelEditCutoutLocalPolygon(panel, cutout, panelRect, currentView) {
 } // End getPanelEditCutoutLocalPolygon
 
 //=================
+function getLocalRectPolygon(rect) {
+  if (!rect) return []
+
+  const left = Number(rect.x || 0)
+  const bottom = Number(rect.y || 0)
+  const right = left + Number(rect.width || 0)
+  const top = bottom + Number(rect.height || 0)
+
+  return [
+    { x: left, y: bottom },
+    { x: right, y: bottom },
+    { x: right, y: top },
+    { x: left, y: top }
+  ]
+} // End getLocalRectPolygon
+
+//=================
+function getPanelEditCutoutLocalPolygons(panel, panelRect, currentView) {
+  const cutouts = Array.isArray(panel?.editPanelCutouts) ? panel.editPanelCutouts : []
+
+  return cutouts
+    .map((cutout) => {
+      if (cutout.regionKind === 'polygon' && Array.isArray(cutout.polygon)) {
+        return getPanelEditCutoutLocalPolygon(panel, cutout, panelRect, currentView)
+      }
+
+      const rect = getPanelEditCutoutLocalRect(panel, cutout, panelRect, currentView)
+
+      return rect ? getLocalRectPolygon(rect) : null
+    })
+    .filter((polygon) => Array.isArray(polygon) && polygon.length >= 3)
+} // End getPanelEditCutoutLocalPolygons
+
+//=================
+function clearPanelLayerCutouts(ctx, viewport, cutoutPolygons, panelRect) {
+  if (!Array.isArray(cutoutPolygons) || !cutoutPolygons.length) return
+
+  ctx.save()
+  ctx.globalCompositeOperation = 'destination-out'
+  cutoutPolygons.forEach((polygon) => {
+    drawPolygonLocal(ctx, viewport, polygon, { fill: '#000000' })
+    eraseLocalPolygonBoundarySpans(ctx, viewport, polygon, panelRect, '#000000')
+  })
+  ctx.restore()
+} // End clearPanelLayerCutouts
+
+//=================
+function getLayerCanvasSize(ctx, width, height) {
+  const ratio = Number(ctx.getTransform?.().a || 1)
+
+  return {
+    ratio: Number.isFinite(ratio) && ratio > 0 ? ratio : 1,
+    width: Math.max(1, Number(width || ctx.canvas?.clientWidth || ctx.canvas?.width || 1)),
+    height: Math.max(1, Number(height || ctx.canvas?.clientHeight || ctx.canvas?.height || 1))
+  }
+} // End getLayerCanvasSize
+
+//=================
+function createPanelLayerContext(ctx, width, height) {
+  const size = getLayerCanvasSize(ctx, width, height)
+  const canvas = document.createElement('canvas')
+
+  canvas.width = Math.max(1, Math.ceil(size.width * size.ratio))
+  canvas.height = Math.max(1, Math.ceil(size.height * size.ratio))
+
+  const layerContext = canvas.getContext('2d')
+  layerContext.setTransform(size.ratio, 0, 0, size.ratio, 0, 0)
+
+  return { canvas, context: layerContext, width: size.width, height: size.height }
+} // End createPanelLayerContext
+
+//=================
+function drawPanelLayerWithCutouts(ctx, viewport, panel, rect, selected, currentView, width, height) {
+  const cutoutPolygons = getPanelEditCutoutLocalPolygons(panel, rect, currentView)
+
+  if (!cutoutPolygons.length) return false
+
+  const layer = createPanelLayerContext(ctx, width, height)
+
+  drawRectLocal(layer.context, viewport, rect, {
+    fill: getRuntimePanelFill(panel),
+    stroke: getRuntimePanelStroke(selected),
+    lineWidth: selected ? 3 : 2
+  })
+
+  drawPanelEditSavedLines(layer.context, viewport, panel, rect, currentView)
+  clearPanelLayerCutouts(layer.context, viewport, cutoutPolygons, rect)
+  drawPanelEditCutouts(layer.context, viewport, panel, rect, currentView)
+
+  ctx.drawImage(layer.canvas, 0, 0, layer.width, layer.height)
+
+  return true
+} // End drawPanelLayerWithCutouts
+
+//=================
 function getPanelEditLocalPoint(panel, point, faceKey, panelRect, currentView) {
   if (!panel || !point || !panelRect) return null
 
@@ -682,13 +777,8 @@ function eraseLocalPolygonBoundarySpans(ctx, viewport, polygon, panelRect, backg
 } // End eraseLocalPolygonBoundarySpans
 
 //=================
-function drawPanelEditCutoutPolygonLocal(ctx, viewport, polygon, panelRect, background) {
+function drawPanelEditCutoutPolygonLocal(ctx, viewport, polygon, panelRect) {
   if (!Array.isArray(polygon) || polygon.length < 3) return
-
-  drawPolygonLocal(ctx, viewport, polygon, {
-    fill: background
-  })
-  eraseLocalPolygonBoundarySpans(ctx, viewport, polygon, panelRect, background)
 
   ctx.beginPath()
   ctx.strokeStyle = '#111111'
@@ -707,20 +797,18 @@ function drawPanelEditCutoutPolygonLocal(ctx, viewport, polygon, panelRect, back
     ctx.lineTo(p2.x, p2.y)
   })
   ctx.stroke()
+  redrawLocalVisiblePanelBoundary(ctx, viewport, polygon, panelRect)
 } // End drawPanelEditCutoutPolygonLocal
 
 //=================
-function drawPanelEditCutoutRectLocal(ctx, viewport, cutoutRect, panelRect, background) {
+function drawPanelEditCutoutRectLocal(ctx, viewport, cutoutRect, panelRect) {
   if (!cutoutRect || !panelRect) return
-
-  drawRectLocal(ctx, viewport, cutoutRect, {
-    fill: background
-  })
 
   const left = Number(cutoutRect.x || 0)
   const bottom = Number(cutoutRect.y || 0)
   const right = left + Number(cutoutRect.width || 0)
   const top = bottom + Number(cutoutRect.height || 0)
+  const polygon = getLocalRectPolygon(cutoutRect)
   const edges = [
     { start: { x: left, y: bottom }, end: { x: left, y: top } },
     { start: { x: right, y: bottom }, end: { x: right, y: top } },
@@ -741,6 +829,7 @@ function drawPanelEditCutoutRectLocal(ctx, viewport, cutoutRect, panelRect, back
     ctx.lineTo(p2.x, p2.y)
   })
   ctx.stroke()
+  redrawLocalVisiblePanelBoundary(ctx, viewport, polygon, panelRect)
 } // End drawPanelEditCutoutRectLocal
 
 //=================
@@ -749,15 +838,13 @@ function drawPanelEditCutouts(ctx, viewport, panel, panelRect, currentView) {
 
   if (!cutouts.length) return
 
-  const background = getCanvasBackgroundColor()
-
   cutouts.forEach((cutout) => {
     if (cutout.regionKind === 'polygon' && Array.isArray(cutout.polygon)) {
       const polygon = getPanelEditCutoutLocalPolygon(panel, cutout, panelRect, currentView)
 
       if (!polygon) return
 
-      drawPanelEditCutoutPolygonLocal(ctx, viewport, polygon, panelRect, background)
+      drawPanelEditCutoutPolygonLocal(ctx, viewport, polygon, panelRect)
       return
     }
 
@@ -765,7 +852,7 @@ function drawPanelEditCutouts(ctx, viewport, panel, panelRect, currentView) {
 
     if (!cutoutRect) return
 
-    drawPanelEditCutoutRectLocal(ctx, viewport, cutoutRect, panelRect, background)
+    drawPanelEditCutoutRectLocal(ctx, viewport, cutoutRect, panelRect)
   })
 } // End drawPanelEditCutouts
 
@@ -1068,7 +1155,7 @@ function getPanelRect(panel, currentView = 'front') {
 } // End getPanelRect
 
 //=================
-function drawPanels(ctx, viewport, panels = [], selectedPanelIds = [], currentView = 'front', showIndividualGrips = true) {
+function drawPanels(ctx, viewport, panels = [], selectedPanelIds = [], currentView = 'front', showIndividualGrips = true, width = null, height = null) {
   const selectedIds = Array.isArray(selectedPanelIds) ? selectedPanelIds : []
 
   panels.forEach((panel) => {
@@ -1077,15 +1164,17 @@ function drawPanels(ctx, viewport, panels = [], selectedPanelIds = [], currentVi
     if (!rect) return
 
     const selected = selectedIds.includes(panel.id)
+    const drewCutoutLayer = drawPanelLayerWithCutouts(ctx, viewport, panel, rect, selected, currentView, width, height)
 
-    drawRectLocal(ctx, viewport, rect, {
-      fill: getRuntimePanelFill(panel),
-      stroke: getRuntimePanelStroke(selected),
-      lineWidth: selected ? 3 : 2
-    })
+    if (!drewCutoutLayer) {
+      drawRectLocal(ctx, viewport, rect, {
+        fill: getRuntimePanelFill(panel),
+        stroke: getRuntimePanelStroke(selected),
+        lineWidth: selected ? 3 : 2
+      })
 
-    drawPanelEditSavedLines(ctx, viewport, panel, rect, currentView)
-    drawPanelEditCutouts(ctx, viewport, panel, rect, currentView)
+      drawPanelEditSavedLines(ctx, viewport, panel, rect, currentView)
+    }
 
     if (!selected || !showIndividualGrips) return
 
@@ -1970,7 +2059,7 @@ export function renderCanvas2D(ctx, payload) {
   drawBoxes(ctx, viewport, boxes, activeSelectedBoxIds, boxEditingDim, currentView)
   drawBoxDraft(ctx, viewport, boxDraftRect, currentView)
   drawZoneOverlay(ctx, viewport, zones, hover)
-  drawPanels(ctx, viewport, panels, activeSelectedPanelIds, currentView, selectedCount <= 1)
+  drawPanels(ctx, viewport, panels, activeSelectedPanelIds, currentView, selectedCount <= 1, width, height)
 
   if (selectedCount > 1) {
     drawSelectionOuterGrips(ctx, viewport, panels, activeSelectedPanelIds, boxes, activeSelectedBoxIds, currentView)
