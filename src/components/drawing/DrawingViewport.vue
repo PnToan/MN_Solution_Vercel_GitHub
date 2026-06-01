@@ -1345,6 +1345,7 @@ function drawPanelEditRectangle(targetContext, context, layout, rectangle, optio
       if (drawPanelEditPolygonPath(targetContext, context, layout, rectangle.polygon)) {
         targetContext.fill()
         erasePanelEditPolygonBoundarySegments(targetContext, context, layout, rectangle.polygon)
+        redrawPanelEditVisiblePanelBoundary(targetContext, context, layout, rectangle.polygon)
         drawPanelEditPolygonCutoutEdges(targetContext, context, layout, rectangle.polygon)
       }
       targetContext.restore()
@@ -1509,6 +1510,144 @@ function getPanelEditBoundaryCornerBetweenEdges(context, edgeA, edgeB) {
 } // End getPanelEditBoundaryCornerBetweenEdges
 
 //=================
+function getPanelEditBoundaryPointCoord(edge, point) {
+  if (!edge || !point) return 0
+
+  if (edge === 'left' || edge === 'right') return Number(point.y || 0)
+
+  return Number(point.x || 0)
+} // End getPanelEditBoundaryPointCoord
+
+//=================
+function getPanelEditBoundaryEdgeLength(context, edge) {
+  if (!context || !edge) return 0
+
+  if (edge === 'left' || edge === 'right') return Number(context.height || 0)
+
+  return Number(context.width || 0)
+} // End getPanelEditBoundaryEdgeLength
+
+//=================
+function getPanelEditBoundaryPointFromCoord(context, edge, coord) {
+  const value = Number(coord || 0)
+
+  if (edge === 'left') return { x: 0, y: value }
+  if (edge === 'right') return { x: context.width, y: value }
+  if (edge === 'bottom') return { x: value, y: 0 }
+  if (edge === 'top') return { x: value, y: context.height }
+
+  return { x: 0, y: 0 }
+} // End getPanelEditBoundaryPointFromCoord
+
+//=================
+function addPanelEditBoundaryEraseSpan(spans, context, edge, pointA, pointB) {
+  if (!spans || !context || !edge || !pointA || !pointB) return
+
+  const length = getPanelEditBoundaryEdgeLength(context, edge)
+  const coordA = Math.max(0, Math.min(length, getPanelEditBoundaryPointCoord(edge, pointA)))
+  const coordB = Math.max(0, Math.min(length, getPanelEditBoundaryPointCoord(edge, pointB)))
+  const start = Math.min(coordA, coordB)
+  const end = Math.max(coordA, coordB)
+
+  if (end - start <= 0.01) return
+
+  spans[edge].push({ start, end })
+} // End addPanelEditBoundaryEraseSpan
+
+//=================
+function collectPanelEditPolygonBoundaryEraseSpans(context, polygon) {
+  const spans = {
+    left: [],
+    right: [],
+    bottom: [],
+    top: []
+  }
+
+  if (!context || !Array.isArray(polygon) || polygon.length < 3) return spans
+
+  polygon.forEach((point, index) => {
+    const nextPoint = polygon[(index + 1) % polygon.length]
+    const edgeA = getPanelEditBoundaryEdge(context, point)
+    const edgeB = getPanelEditBoundaryEdge(context, nextPoint)
+
+    if (edgeA && edgeA === edgeB) {
+      addPanelEditBoundaryEraseSpan(spans, context, edgeA, point, nextPoint)
+      return
+    }
+
+    const corner = getPanelEditBoundaryCornerBetweenEdges(context, edgeA, edgeB)
+
+    if (!corner) return
+
+    addPanelEditBoundaryEraseSpan(spans, context, edgeA, point, corner)
+    addPanelEditBoundaryEraseSpan(spans, context, edgeB, corner, nextPoint)
+  })
+
+  return spans
+} // End collectPanelEditPolygonBoundaryEraseSpans
+
+//=================
+function mergePanelEditBoundaryEraseSpans(spans) {
+  return spans
+    .filter((span) => span && Number.isFinite(span.start) && Number.isFinite(span.end) && span.end - span.start > 0.01)
+    .sort((a, b) => a.start - b.start)
+    .reduce((merged, span) => {
+      const last = merged[merged.length - 1]
+
+      if (!last || span.start > last.end + 0.01) {
+        merged.push({ start: span.start, end: span.end })
+        return merged
+      }
+
+      last.end = Math.max(last.end, span.end)
+      return merged
+    }, [])
+} // End mergePanelEditBoundaryEraseSpans
+
+//=================
+function drawPanelEditVisibleBoundarySegment(targetContext, context, layout, edge, startCoord, endCoord) {
+  if (endCoord - startCoord <= 0.01) return
+
+  const startPoint = getPanelEditBoundaryPointFromCoord(context, edge, startCoord)
+  const endPoint = getPanelEditBoundaryPointFromCoord(context, edge, endCoord)
+  const p1 = getPanelEditPoint(context, layout.left, layout.top, layout.scale, startPoint.x, startPoint.y)
+  const p2 = getPanelEditPoint(context, layout.left, layout.top, layout.scale, endPoint.x, endPoint.y)
+
+  targetContext.moveTo(p1.x, p1.y)
+  targetContext.lineTo(p2.x, p2.y)
+} // End drawPanelEditVisibleBoundarySegment
+
+//=================
+function redrawPanelEditVisiblePanelBoundary(targetContext, context, layout, polygon) {
+  const spans = collectPanelEditPolygonBoundaryEraseSpans(context, polygon)
+  const edges = ['left', 'right', 'bottom', 'top']
+
+  targetContext.save()
+  targetContext.strokeStyle = '#111111'
+  targetContext.lineWidth = 2
+  targetContext.lineCap = 'square'
+  targetContext.lineJoin = 'miter'
+  targetContext.setLineDash([])
+  targetContext.beginPath()
+
+  edges.forEach((edge) => {
+    const length = getPanelEditBoundaryEdgeLength(context, edge)
+    const merged = mergePanelEditBoundaryEraseSpans(spans[edge] || [])
+    let cursor = 0
+
+    merged.forEach((span) => {
+      drawPanelEditVisibleBoundarySegment(targetContext, context, layout, edge, cursor, span.start)
+      cursor = Math.max(cursor, span.end)
+    })
+
+    drawPanelEditVisibleBoundarySegment(targetContext, context, layout, edge, cursor, length)
+  })
+
+  targetContext.stroke()
+  targetContext.restore()
+} // End redrawPanelEditVisiblePanelBoundary
+
+//=================
 function drawPanelEditEraseSegment(targetContext, context, layout, pointA, pointB) {
   const p1 = getPanelEditPoint(context, layout.left, layout.top, layout.scale, pointA.x, pointA.y)
   const p2 = getPanelEditPoint(context, layout.left, layout.top, layout.scale, pointB.x, pointB.y)
@@ -1522,29 +1661,23 @@ function drawPanelEditEraseSegment(targetContext, context, layout, pointA, point
 function erasePanelEditPolygonBoundarySegments(targetContext, context, layout, polygon) {
   if (!Array.isArray(polygon) || polygon.length < 3) return
 
+  const spans = collectPanelEditPolygonBoundaryEraseSpans(context, polygon)
+
   targetContext.save()
   targetContext.strokeStyle = getCssVariable('--mn-bg-canvas', '#f4f4f4')
   targetContext.lineWidth = 10
   targetContext.lineCap = 'square'
   targetContext.setLineDash([])
   targetContext.beginPath()
-  polygon.forEach((point, index) => {
-    const nextPoint = polygon[(index + 1) % polygon.length]
-    const edgeA = getPanelEditBoundaryEdge(context, point)
-    const edgeB = getPanelEditBoundaryEdge(context, nextPoint)
 
-    if (edgeA && edgeA === edgeB) {
-      drawPanelEditEraseSegment(targetContext, context, layout, point, nextPoint)
-      return
-    }
-
-    const corner = getPanelEditBoundaryCornerBetweenEdges(context, edgeA, edgeB)
-
-    if (!corner) return
-
-    drawPanelEditEraseSegment(targetContext, context, layout, point, corner)
-    drawPanelEditEraseSegment(targetContext, context, layout, corner, nextPoint)
+  Object.entries(spans).forEach(([edge, edgeSpans]) => {
+    mergePanelEditBoundaryEraseSpans(edgeSpans).forEach((span) => {
+      const pointA = getPanelEditBoundaryPointFromCoord(context, edge, span.start)
+      const pointB = getPanelEditBoundaryPointFromCoord(context, edge, span.end)
+      drawPanelEditEraseSegment(targetContext, context, layout, pointA, pointB)
+    })
   })
+
   targetContext.stroke()
   targetContext.restore()
 } // End erasePanelEditPolygonBoundarySegments
@@ -1553,6 +1686,12 @@ function erasePanelEditPolygonBoundarySegments(targetContext, context, layout, p
 function drawPanelEditPolygonCutoutEdges(targetContext, context, layout, polygon) {
   if (!Array.isArray(polygon) || polygon.length < 3) return
 
+  targetContext.save()
+  targetContext.strokeStyle = '#111111'
+  targetContext.lineWidth = 2
+  targetContext.lineCap = 'square'
+  targetContext.lineJoin = 'miter'
+  targetContext.setLineDash([])
   targetContext.beginPath()
   polygon.forEach((point, index) => {
     const nextPoint = polygon[(index + 1) % polygon.length]
@@ -1566,6 +1705,7 @@ function drawPanelEditPolygonCutoutEdges(targetContext, context, layout, polygon
     targetContext.lineTo(p2.x, p2.y)
   })
   targetContext.stroke()
+  targetContext.restore()
 } // End drawPanelEditPolygonCutoutEdges
 
 //=================
