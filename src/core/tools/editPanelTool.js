@@ -59,8 +59,22 @@ function getFaceOptions(face) {
   }
 
   return [
-    { id: 'front', label: 'Mặt trước', viewKey: 'front', rearEdge: 'bottom', rearLabel: 'Cạnh Sau' },
-    { id: 'back', label: 'Mặt sau', viewKey: 'back', rearEdge: 'top', rearLabel: 'Cạnh Sau' }
+    {
+      id: 'front',
+      label: 'Mặt trước',
+      viewKey: 'front',
+      rearEdge: 'bottom',
+      rearLabel: 'Cạnh Sau',
+      edgeLabels: { bottom: 'Cạnh Dưới', left: 'Cạnh Trái' }
+    },
+    {
+      id: 'back',
+      label: 'Mặt sau',
+      viewKey: 'back',
+      rearEdge: 'top',
+      rearLabel: 'Cạnh Sau',
+      edgeLabels: { bottom: 'Cạnh Dưới', left: 'Cạnh Phải' }
+    }
   ]
 } // End getFaceOptions
 
@@ -98,6 +112,7 @@ export function buildPanelEditContext(panel, faceSide = null) {
     faceOptions: getFaceOptions(face),
     rearEdge: option.rearEdge,
     rearLabel: option.rearLabel,
+    edgeLabels: option.edgeLabels || null,
     originCorner: 'bottom-left',
     origin: { x: 0, y: 0 },
     width,

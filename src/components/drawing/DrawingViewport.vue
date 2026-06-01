@@ -2032,6 +2032,36 @@ function drawPanelEditRearEdge(targetContext, context, layout) {
   targetContext.restore()
 } // End drawPanelEditRearEdge
 
+//=================
+function drawPanelEditFaceEdgeLabels(targetContext, context, layout) {
+  if (!context?.edgeLabels) return
+
+  const labelColor = '#111111'
+  const labelOffset = 18
+
+  targetContext.save()
+  targetContext.fillStyle = labelColor
+  targetContext.font = '12px Arial, Helvetica, sans-serif'
+  targetContext.textAlign = 'center'
+  targetContext.textBaseline = 'middle'
+
+  if (context.edgeLabels.bottom) {
+    targetContext.fillText(
+      context.edgeLabels.bottom,
+      layout.left + layout.faceWidth / 2,
+      layout.bottom + labelOffset
+    )
+  }
+
+  if (context.edgeLabels.left) {
+    targetContext.translate(layout.left - labelOffset, layout.top + layout.faceHeight / 2)
+    targetContext.rotate(-Math.PI / 2)
+    targetContext.fillText(context.edgeLabels.left, 0, 0)
+  }
+
+  targetContext.restore()
+} // End drawPanelEditFaceEdgeLabels
+
 
 //=================
 function getPanelEditLinePointFromPointer(context, layout, event) {
@@ -2620,6 +2650,7 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
   targetContext.strokeRect(left, top, layout.faceWidth, layout.faceHeight)
 
   drawPanelEditRearEdge(targetContext, context, layout)
+  drawPanelEditFaceEdgeLabels(targetContext, context, layout)
 
   panelEditTape.value.guides.forEach((guide) => {
     drawPanelEditGuideLine(targetContext, context, layout, guide)
