@@ -2264,31 +2264,79 @@ const store = createSimpleStore({
 
     if (!panelId) return null
 
+    const faceSide = payload.faceSide || state.panelEdit?.context?.faceSide || null
+    const faceKey = payload.faceKey || state.panelEdit?.context?.faceKey || null
+    const faceStateKey = `${faceKey || 'face'}:${faceSide || 'side'}`
+    const normalizePoint = (point) => ({
+      x: Number(point?.x || 0),
+      y: Number(point?.y || 0)
+    })
+    const normalizePolygon = (polygon) => Array.isArray(polygon)
+      ? polygon.map((point) => normalizePoint(point))
+      : null
     const rectangles = Array.isArray(payload.rectangles) ? payload.rectangles : []
+    const lines = Array.isArray(payload.lines) ? payload.lines : []
+    const guides = Array.isArray(payload.guides) ? payload.guides : []
     const normalizedRectangles = rectangles.map((rectangle) => ({
       id: rectangle.id,
-      start: { ...rectangle.start },
-      end: { ...rectangle.end },
+      start: normalizePoint(rectangle.start),
+      end: normalizePoint(rectangle.end),
       operation: rectangle.operation || 'none',
-      faceSide: payload.faceSide || state.panelEdit?.context?.faceSide || null,
-      faceKey: payload.faceKey || state.panelEdit?.context?.faceKey || null,
+      source: rectangle.source || 'rectangle',
+      regionKind: rectangle.regionKind || 'rect',
+      polygon: normalizePolygon(rectangle.polygon),
+      faceSide,
+      faceKey,
       axisU: payload.axisU || state.panelEdit?.context?.axisU || null,
       axisV: payload.axisV || state.panelEdit?.context?.axisV || null,
       thicknessAxis: payload.thicknessAxis || state.panelEdit?.context?.thicknessAxis || null
+    }))
+    const normalizedLines = lines.map((line) => ({
+      id: line.id,
+      axis: line.axis || 'free',
+      start: normalizePoint(line.start),
+      end: normalizePoint(line.end)
+    }))
+    const normalizedGuides = guides.map((guide) => ({
+      id: guide.id,
+      axis: guide.axis,
+      edge: guide.edge || null,
+      baseValue: Number(guide.baseValue || 0),
+      value: Number(guide.value || 0)
     }))
 
     state.panels = state.panels.map((panel) => {
       if (panel.id !== panelId) return panel
 
+      const oldData = panel.editPanelData || {}
+      const otherCutouts = Array.isArray(panel.editPanelCutouts)
+        ? panel.editPanelCutouts.filter((cutout) => `${cutout.faceKey || 'face'}:${cutout.faceSide || 'side'}` !== faceStateKey)
+        : []
+      const otherShapes = Array.isArray(panel.editPanelShapes)
+        ? panel.editPanelShapes.filter((shape) => `${shape.faceKey || 'face'}:${shape.faceSide || 'side'}` !== faceStateKey)
+        : []
+      const faceShapes = normalizedRectangles.filter((rectangle) => rectangle.operation !== 'cutout')
+      const faceCutouts = normalizedRectangles.filter((rectangle) => rectangle.operation === 'cutout')
+
       return {
         ...panel,
+        editPanelData: {
+          ...oldData,
+          [faceStateKey]: {
+            faceSide,
+            faceKey,
+            guides: normalizedGuides,
+            lines: normalizedLines,
+            rectangles: normalizedRectangles
+          }
+        },
         editPanelShapes: [
-          ...(Array.isArray(panel.editPanelShapes) ? panel.editPanelShapes : []),
-          ...normalizedRectangles.filter((rectangle) => rectangle.operation !== 'cutout')
+          ...otherShapes,
+          ...faceShapes
         ],
         editPanelCutouts: [
-          ...(Array.isArray(panel.editPanelCutouts) ? panel.editPanelCutouts : []),
-          ...normalizedRectangles.filter((rectangle) => rectangle.operation === 'cutout')
+          ...otherCutouts,
+          ...faceCutouts
         ]
       }
     })

@@ -145,17 +145,151 @@ function getPanelEditCutoutLocalRect(panel, cutout, panelRect, currentView) {
 } // End getPanelEditCutoutLocalRect
 
 //=================
+function getPanelEditCutoutLocalPolygon(panel, cutout, panelRect, currentView) {
+  if (!panel || !cutout || !panelRect || !Array.isArray(cutout.polygon)) return null
+
+  const camera = getCameraConfig(currentView)
+  const axes = getPanelEditCutoutFaceAxes(cutout.faceKey)
+
+  if (!camera || !axes) return null
+  if (camera.axisU !== axes.axisU || camera.axisV !== axes.axisV) return null
+
+  const uSize = getPanelAxisSize(panel, camera.axisU)
+  const vSize = getPanelAxisSize(panel, camera.axisV)
+
+  return cutout.polygon.map((point) => ({
+    x: camera.reverseU ? panelRect.x + uSize - Number(point.x || 0) : panelRect.x + Number(point.x || 0),
+    y: camera.reverseV ? panelRect.y + vSize - Number(point.y || 0) : panelRect.y + Number(point.y || 0)
+  }))
+} // End getPanelEditCutoutLocalPolygon
+
+//=================
+function getPanelEditLocalPoint(panel, point, faceKey, panelRect, currentView) {
+  if (!panel || !point || !panelRect) return null
+
+  const camera = getCameraConfig(currentView)
+  const axes = getPanelEditCutoutFaceAxes(faceKey)
+
+  if (!camera || !axes) return null
+  if (camera.axisU !== axes.axisU || camera.axisV !== axes.axisV) return null
+
+  const uSize = getPanelAxisSize(panel, camera.axisU)
+  const vSize = getPanelAxisSize(panel, camera.axisV)
+
+  return {
+    x: camera.reverseU ? panelRect.x + uSize - Number(point.x || 0) : panelRect.x + Number(point.x || 0),
+    y: camera.reverseV ? panelRect.y + vSize - Number(point.y || 0) : panelRect.y + Number(point.y || 0)
+  }
+} // End getPanelEditLocalPoint
+
+//=================
+function getPanelEditFaceSideForView(currentView) {
+  if (currentView === 'left') return 'left'
+  if (currentView === 'right') return 'right'
+  if (currentView === 'top') return 'top'
+  if (currentView === 'bottom') return 'bottom'
+  if (currentView === 'front') return 'front'
+  if (currentView === 'back') return 'back'
+
+  return null
+} // End getPanelEditFaceSideForView
+
+//=================
+function drawLineLocal(ctx, viewport, pointA, pointB, options = {}) {
+  if (!pointA || !pointB) return
+
+  const a = localToScreen(viewport, pointA.x, pointA.y)
+  const b = localToScreen(viewport, pointB.x, pointB.y)
+
+  ctx.save()
+  ctx.strokeStyle = options.stroke || '#111111'
+  ctx.lineWidth = options.lineWidth || 1.5
+  ctx.beginPath()
+  ctx.moveTo(a.x, a.y)
+  ctx.lineTo(b.x, b.y)
+  ctx.stroke()
+  ctx.restore()
+} // End drawLineLocal
+
+//=================
+function drawPanelEditSavedLines(ctx, viewport, panel, panelRect, currentView) {
+  const data = panel?.editPanelData || {}
+  const targetFaceSide = getPanelEditFaceSideForView(currentView)
+
+  Object.values(data).forEach((faceData) => {
+    if (!faceData || faceData.faceSide !== targetFaceSide) return
+
+    const lines = Array.isArray(faceData.lines) ? faceData.lines : []
+
+    lines.forEach((line) => {
+      const start = getPanelEditLocalPoint(panel, line.start, faceData.faceKey, panelRect, currentView)
+      const end = getPanelEditLocalPoint(panel, line.end, faceData.faceKey, panelRect, currentView)
+
+      drawLineLocal(ctx, viewport, start, end, {
+        stroke: '#111111',
+        lineWidth: 1.5
+      })
+    })
+  })
+} // End drawPanelEditSavedLines
+
+//=================
+function drawPolygonLocal(ctx, viewport, polygon, options = {}) {
+  if (!Array.isArray(polygon) || polygon.length < 3) return
+
+  ctx.beginPath()
+  polygon.forEach((point, index) => {
+    const screen = localToScreen(viewport, point.x, point.y)
+
+    if (index === 0) {
+      ctx.moveTo(screen.x, screen.y)
+      return
+    }
+
+    ctx.lineTo(screen.x, screen.y)
+  })
+  ctx.closePath()
+
+  if (options.fill) {
+    ctx.fillStyle = options.fill
+    ctx.fill()
+  }
+
+  if (options.stroke) {
+    ctx.strokeStyle = options.stroke
+    ctx.lineWidth = options.lineWidth || 1
+    ctx.stroke()
+  }
+} // End drawPolygonLocal
+
+//=================
 function drawPanelEditCutouts(ctx, viewport, panel, panelRect, currentView) {
   const cutouts = Array.isArray(panel?.editPanelCutouts) ? panel.editPanelCutouts : []
 
   if (!cutouts.length) return
 
+  const background = getCanvasBackgroundColor()
+
   cutouts.forEach((cutout) => {
+    if (cutout.regionKind === 'polygon' && Array.isArray(cutout.polygon)) {
+      const polygon = getPanelEditCutoutLocalPolygon(panel, cutout, panelRect, currentView)
+
+      if (!polygon) return
+
+      drawPolygonLocal(ctx, viewport, polygon, {
+        fill: background,
+        stroke: '#111111',
+        lineWidth: 2
+      })
+      return
+    }
+
     const cutoutRect = getPanelEditCutoutLocalRect(panel, cutout, panelRect, currentView)
 
     if (!cutoutRect) return
 
     drawRectLocal(ctx, viewport, cutoutRect, {
+      fill: background,
       stroke: '#111111',
       lineWidth: 2
     })
@@ -477,6 +611,7 @@ function drawPanels(ctx, viewport, panels = [], selectedPanelIds = [], currentVi
       lineWidth: selected ? 3 : 2
     })
 
+    drawPanelEditSavedLines(ctx, viewport, panel, rect, currentView)
     drawPanelEditCutouts(ctx, viewport, panel, rect, currentView)
 
     if (!selected || !showIndividualGrips) return

@@ -606,6 +606,18 @@ function getPanelEditGuideSegments(context) {
 } // End getPanelEditGuideSegments
 
 //=================
+function getPanelEditPanelBoundarySegments(context) {
+  if (!context) return []
+
+  return [
+    { id: 'panel-edge-left', type: 'panelEdge', axis: 'vertical', edge: 'left', start: { x: 0, y: 0 }, end: { x: 0, y: context.height } },
+    { id: 'panel-edge-right', type: 'panelEdge', axis: 'vertical', edge: 'right', start: { x: context.width, y: 0 }, end: { x: context.width, y: context.height } },
+    { id: 'panel-edge-bottom', type: 'panelEdge', axis: 'horizontal', edge: 'bottom', start: { x: 0, y: 0 }, end: { x: context.width, y: 0 } },
+    { id: 'panel-edge-top', type: 'panelEdge', axis: 'horizontal', edge: 'top', start: { x: 0, y: context.height }, end: { x: context.width, y: context.height } }
+  ]
+} // End getPanelEditPanelBoundarySegments
+
+//=================
 function getPanelEditLineSegmentsForSnap(context) {
   if (!context) return []
 
@@ -668,7 +680,8 @@ function getPanelEditTapeSnap(context, layout, screenX, screenY, options = {}) {
 
   const snapSegments = [
     ...getPanelEditLineSegmentsForSnap(context),
-    ...getPanelEditGuideSegments(context)
+    ...getPanelEditGuideSegments(context),
+    ...getPanelEditPanelBoundarySegments(context)
   ]
 
   for (let firstIndex = 0; firstIndex < snapSegments.length; firstIndex += 1) {
@@ -2209,27 +2222,7 @@ function selectPanelEditFace(faceSide) {
     panX: 0,
     panY: 0
   }
-  panelEditTape.value = {
-    hoverSnap: null,
-    draft: null,
-    guides: [],
-    inputBuffer: ''
-  }
-  panelEditRect.value = {
-    hoverSnap: null,
-    draft: null,
-    pendingAction: null,
-    rectangles: []
-  }
-  panelEditLine.value = {
-    hoverSnap: null,
-    hoverRegion: null,
-    hoverLine: null,
-    selectedLineId: null,
-    draft: null,
-    lines: []
-  }
-  clearPanelEditHistory()
+  loadPanelEditSavedState(context)
   app.setStatus(`Edit Panel: ${context.panelName} | ${context.faceLabel} | ${context.rearLabel}`)
   nextTick(resizePanelEditCanvas)
 } // End selectPanelEditFace
@@ -2580,7 +2573,9 @@ function applyPanelEdit() {
     axisU: context.axisU,
     axisV: context.axisV,
     thicknessAxis: context.thicknessAxis,
-    rectangles: panelEditRect.value.rectangles
+    rectangles: getPanelEditSavedRectanglesForApply(),
+    lines: getPanelEditSavedLinesForApply(),
+    guides: getPanelEditSavedGuidesForApply()
   })
   panelEditRect.value = {
     hoverSnap: null,
@@ -4519,22 +4514,20 @@ watch(() => [
     panelEditRect.value = {
       hoverSnap: null,
       draft: null,
+      pendingAction: null,
       rectangles: []
     }
-    clearPanelEditHistory()
-  } else if (oldValue && (nextValue[2] !== oldValue[2] || nextValue[3] !== oldValue[3])) {
-    panelEditTape.value = {
+    panelEditLine.value = {
       hoverSnap: null,
+      hoverRegion: null,
+      hoverLine: null,
+      selectedLineId: null,
       draft: null,
-      guides: [],
-      inputBuffer: ''
-    }
-    panelEditRect.value = {
-      hoverSnap: null,
-      draft: null,
-      rectangles: []
+      lines: []
     }
     clearPanelEditHistory()
+  } else if (!oldValue || nextValue[2] !== oldValue[2] || nextValue[3] !== oldValue[3]) {
+    loadPanelEditSavedState(drawing.state.panelEdit?.context)
   }
 
   nextTick(resizePanelEditCanvas)
