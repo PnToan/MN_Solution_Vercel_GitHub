@@ -293,13 +293,30 @@ function isLocalBoundarySegment(pointA, pointB, panelRect) {
 
 //=================
 function isLocalCutoutBoundaryOnlySegment(pointA, pointB, panelRect) {
-  const edgeA = isLocalPointOnPanelRectEdge(pointA, panelRect)
-  const edgeB = isLocalPointOnPanelRectEdge(pointB, panelRect)
-
-  if (!edgeA || !edgeB) return false
-
-  return edgeA === edgeB
+  return isLocalSegmentOnPanelBoundaryLine(pointA, pointB, panelRect)
 } // End isLocalCutoutBoundaryOnlySegment
+
+//=================
+function isLocalSegmentOnPanelBoundaryLine(pointA, pointB, panelRect) {
+  if (!pointA || !pointB || !panelRect) return false
+
+  const tolerance = 0.75
+  const x1 = Number(pointA.x || 0)
+  const y1 = Number(pointA.y || 0)
+  const x2 = Number(pointB.x || 0)
+  const y2 = Number(pointB.y || 0)
+  const left = Number(panelRect.x || 0)
+  const right = left + Number(panelRect.width || 0)
+  const bottom = Number(panelRect.y || 0)
+  const top = bottom + Number(panelRect.height || 0)
+
+  if (Math.abs(x1 - left) <= tolerance && Math.abs(x2 - left) <= tolerance) return true
+  if (Math.abs(x1 - right) <= tolerance && Math.abs(x2 - right) <= tolerance) return true
+  if (Math.abs(y1 - bottom) <= tolerance && Math.abs(y2 - bottom) <= tolerance) return true
+  if (Math.abs(y1 - top) <= tolerance && Math.abs(y2 - top) <= tolerance) return true
+
+  return false
+} // End isLocalSegmentOnPanelBoundaryLine
 
 //=================
 function getLocalBoundaryCornerBetweenEdges(edgeA, edgeB, panelRect) {
@@ -641,18 +658,25 @@ function eraseLocalPolygonBoundarySpans(ctx, viewport, polygon, panelRect, backg
 
   ctx.save()
   ctx.strokeStyle = background
-  ctx.lineWidth = 10
+  ctx.lineWidth = 14
   ctx.lineCap = 'square'
   ctx.lineJoin = 'miter'
   ctx.setLineDash([])
-  ctx.beginPath()
 
+  ctx.beginPath()
+  polygon.forEach((point, index) => {
+    const nextPoint = polygon[(index + 1) % polygon.length]
+    drawLocalEraseSegment(ctx, viewport, point, nextPoint)
+  })
+  ctx.stroke()
+
+  ctx.beginPath()
   polygon.forEach((point, index) => {
     const nextPoint = polygon[(index + 1) % polygon.length]
     const edgeA = isLocalPointOnPanelRectEdge(point, panelRect)
     const edgeB = isLocalPointOnPanelRectEdge(nextPoint, panelRect)
 
-    if (edgeA && edgeA === edgeB) {
+    if (isLocalSegmentOnPanelBoundaryLine(point, nextPoint, panelRect)) {
       drawLocalEraseSegment(ctx, viewport, point, nextPoint)
       return
     }

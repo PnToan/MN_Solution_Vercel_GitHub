@@ -1486,13 +1486,28 @@ function isPanelEditBoundarySegment(context, pointA, pointB) {
 
 //=================
 function isPanelEditCutoutBoundaryOnlySegment(context, pointA, pointB) {
-  const edgeA = getPanelEditBoundaryEdge(context, pointA)
-  const edgeB = getPanelEditBoundaryEdge(context, pointB)
-
-  if (!edgeA || !edgeB) return false
-
-  return edgeA === edgeB
+  return isPanelEditSegmentOnPanelBoundaryLine(context, pointA, pointB)
 } // End isPanelEditCutoutBoundaryOnlySegment
+
+//=================
+function isPanelEditSegmentOnPanelBoundaryLine(context, pointA, pointB) {
+  if (!context || !pointA || !pointB) return false
+
+  const tolerance = 0.75
+  const x1 = Number(pointA.x || 0)
+  const y1 = Number(pointA.y || 0)
+  const x2 = Number(pointB.x || 0)
+  const y2 = Number(pointB.y || 0)
+  const width = Number(context.width || 0)
+  const height = Number(context.height || 0)
+
+  if (Math.abs(x1) <= tolerance && Math.abs(x2) <= tolerance) return true
+  if (Math.abs(x1 - width) <= tolerance && Math.abs(x2 - width) <= tolerance) return true
+  if (Math.abs(y1) <= tolerance && Math.abs(y2) <= tolerance) return true
+  if (Math.abs(y1 - height) <= tolerance && Math.abs(y2 - height) <= tolerance) return true
+
+  return false
+} // End isPanelEditSegmentOnPanelBoundaryLine
 
 //=================
 function getPanelEditBoundaryCornerBetweenEdges(context, edgeA, edgeB) {
@@ -1810,20 +1825,29 @@ function drawPanelEditEraseSegment(targetContext, context, layout, pointA, point
 function erasePanelEditPolygonBoundarySegments(targetContext, context, layout, polygon) {
   if (!Array.isArray(polygon) || polygon.length < 3) return
 
+  const backgroundColor = getCssVariable('--mn-bg-canvas', '#f4f4f4')
+
   targetContext.save()
-  targetContext.strokeStyle = getCssVariable('--mn-bg-canvas', '#f4f4f4')
-  targetContext.lineWidth = 10
+  targetContext.strokeStyle = backgroundColor
+  targetContext.lineWidth = 14
   targetContext.lineCap = 'square'
   targetContext.lineJoin = 'miter'
   targetContext.setLineDash([])
-  targetContext.beginPath()
 
+  targetContext.beginPath()
+  polygon.forEach((point, index) => {
+    const nextPoint = polygon[(index + 1) % polygon.length]
+    drawPanelEditEraseSegment(targetContext, context, layout, point, nextPoint)
+  })
+  targetContext.stroke()
+
+  targetContext.beginPath()
   polygon.forEach((point, index) => {
     const nextPoint = polygon[(index + 1) % polygon.length]
     const edgeA = getPanelEditBoundaryEdge(context, point)
     const edgeB = getPanelEditBoundaryEdge(context, nextPoint)
 
-    if (edgeA && edgeA === edgeB) {
+    if (isPanelEditSegmentOnPanelBoundaryLine(context, point, nextPoint)) {
       drawPanelEditEraseSegment(targetContext, context, layout, point, nextPoint)
       return
     }
