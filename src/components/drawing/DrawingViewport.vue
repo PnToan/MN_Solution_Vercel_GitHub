@@ -1903,9 +1903,23 @@ function drawPanelEditVisibleBoundarySegment(targetContext, context, layout, edg
 } // End drawPanelEditVisibleBoundarySegment
 
 //=================
-function redrawPanelEditVisiblePanelBoundary(targetContext, context, layout, polygon) {
-  const spans = collectPanelEditPolygonBoundaryEraseSpans(context, polygon)
+function redrawPanelEditVisiblePanelBoundary(targetContext, context, layout, polygons) {
+  const polygonList = Array.isArray(polygons?.[0]) ? polygons : [polygons].filter(Boolean)
   const edges = ['left', 'right', 'bottom', 'top']
+  const spans = {
+    left: [],
+    right: [],
+    bottom: [],
+    top: []
+  }
+
+  polygonList.forEach((polygon) => {
+    const polygonSpans = collectPanelEditPolygonBoundaryEraseSpans(context, polygon)
+
+    edges.forEach((edge) => {
+      spans[edge].push(...(polygonSpans[edge] || []))
+    })
+  })
 
   targetContext.save()
   targetContext.strokeStyle = '#111111'
@@ -1968,8 +1982,6 @@ function erasePanelEditPolygonBoundarySegments(targetContext, context, layout, p
 
   targetContext.stroke()
   targetContext.restore()
-
-  redrawPanelEditVisiblePanelBoundary(targetContext, context, layout, polygon)
 } // End erasePanelEditPolygonBoundarySegments
 
 //=================
@@ -2391,6 +2403,34 @@ function getPanelEditPolygonBounds(points) {
     height: maxY - minY
   }
 } // End getPanelEditPolygonBounds
+
+//=================
+function getPanelEditRectPolygon(rectangle) {
+  const bounds = getPanelEditRectBounds(rectangle)
+
+  if (bounds.width <= 0.01 || bounds.height <= 0.01) return []
+
+  return [
+    { x: bounds.x, y: bounds.y },
+    { x: bounds.x + bounds.width, y: bounds.y },
+    { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
+    { x: bounds.x, y: bounds.y + bounds.height }
+  ]
+} // End getPanelEditRectPolygon
+
+//=================
+function getPanelEditBoundaryCutoutPolygons() {
+  return (panelEditRect.value.rectangles || [])
+    .filter((rectangle) => rectangle.operation === 'cutout')
+    .map((rectangle) => {
+      if (Array.isArray(rectangle.polygon) && rectangle.polygon.length >= 3) {
+        return rectangle.polygon.map((point) => ({ x: Number(point.x || 0), y: Number(point.y || 0) }))
+      }
+
+      return getPanelEditRectPolygon(rectangle)
+    })
+    .filter((polygon) => Array.isArray(polygon) && polygon.length >= 3)
+} // End getPanelEditBoundaryCutoutPolygons
 
 
 //=================
@@ -2974,6 +3014,8 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
   panelEditCircle.value.circles.forEach((circle) => {
     drawPanelEditCircle(targetContext, context, layout, circle)
   })
+
+  redrawPanelEditVisiblePanelBoundary(targetContext, context, layout, getPanelEditBoundaryCutoutPolygons())
 
   if (panelEditRect.value.pendingAction) {
     drawPanelEditRectangle(targetContext, context, layout, panelEditRect.value.pendingAction, { draft: true })
@@ -5382,7 +5424,7 @@ function onKeyDown(event) {
     return
   }
 
-  if (activePanelEditContext.value && event.key === 'Delete') {
+  if (activePanelEditContext.value && (event.key === 'Delete' || event.key === 'Backspace')) {
     event.preventDefault()
     event.stopPropagation()
     deleteSelectedPanelEditLine()
