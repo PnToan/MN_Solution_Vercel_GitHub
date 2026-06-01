@@ -1555,6 +1555,134 @@ function addPanelEditBoundaryEraseSpan(spans, context, edge, pointA, pointB) {
 } // End addPanelEditBoundaryEraseSpan
 
 //=================
+function isPanelEditPointOnSegment(point, start, end) {
+  if (!point || !start || !end) return false
+
+  const tolerance = 0.5
+  const cross = (Number(point.y || 0) - Number(start.y || 0)) * (Number(end.x || 0) - Number(start.x || 0)) - (Number(point.x || 0) - Number(start.x || 0)) * (Number(end.y || 0) - Number(start.y || 0))
+
+  if (Math.abs(cross) > tolerance) return false
+
+  const minX = Math.min(Number(start.x || 0), Number(end.x || 0)) - tolerance
+  const maxX = Math.max(Number(start.x || 0), Number(end.x || 0)) + tolerance
+  const minY = Math.min(Number(start.y || 0), Number(end.y || 0)) - tolerance
+  const maxY = Math.max(Number(start.y || 0), Number(end.y || 0)) + tolerance
+
+  return Number(point.x || 0) >= minX && Number(point.x || 0) <= maxX && Number(point.y || 0) >= minY && Number(point.y || 0) <= maxY
+} // End isPanelEditPointOnSegment
+
+//=================
+function isPanelEditPointInsidePolygon(point, polygon) {
+  if (!point || !Array.isArray(polygon) || polygon.length < 3) return false
+
+  for (let index = 0; index < polygon.length; index += 1) {
+    const start = polygon[index]
+    const end = polygon[(index + 1) % polygon.length]
+
+    if (isPanelEditPointOnSegment(point, start, end)) return true
+  }
+
+  let inside = false
+  const x = Number(point.x || 0)
+  const y = Number(point.y || 0)
+
+  for (let index = 0, previousIndex = polygon.length - 1; index < polygon.length; previousIndex = index, index += 1) {
+    const pointA = polygon[index]
+    const pointB = polygon[previousIndex]
+    const xi = Number(pointA.x || 0)
+    const yi = Number(pointA.y || 0)
+    const xj = Number(pointB.x || 0)
+    const yj = Number(pointB.y || 0)
+    const intersects = ((yi > y) !== (yj > y)) && (x < ((xj - xi) * (y - yi)) / ((yj - yi) || 1e-9) + xi)
+
+    if (intersects) inside = !inside
+  }
+
+  return inside
+} // End isPanelEditPointInsidePolygon
+
+//=================
+function addPanelEditBoundarySplitCoord(values, coord, length) {
+  if (!Array.isArray(values) || !Number.isFinite(coord) || !Number.isFinite(length)) return
+
+  const value = Math.max(0, Math.min(length, coord))
+
+  if (values.some((item) => Math.abs(item - value) <= 0.01)) return
+
+  values.push(value)
+} // End addPanelEditBoundarySplitCoord
+
+//=================
+function getPanelEditBoundaryProbePoint(context, edge, coord) {
+  const epsilon = 0.25
+  const value = Number(coord || 0)
+
+  if (edge === 'left') return { x: epsilon, y: value }
+  if (edge === 'right') return { x: Number(context.width || 0) - epsilon, y: value }
+  if (edge === 'bottom') return { x: value, y: epsilon }
+  if (edge === 'top') return { x: value, y: Number(context.height || 0) - epsilon }
+
+  return { x: 0, y: 0 }
+} // End getPanelEditBoundaryProbePoint
+
+//=================
+function addPanelEditBoundarySegmentIntersection(values, context, edge, pointA, pointB) {
+  if (!values || !context || !edge || !pointA || !pointB) return
+
+  const x1 = Number(pointA.x || 0)
+  const y1 = Number(pointA.y || 0)
+  const x2 = Number(pointB.x || 0)
+  const y2 = Number(pointB.y || 0)
+  const width = Number(context.width || 0)
+  const height = Number(context.height || 0)
+  const length = getPanelEditBoundaryEdgeLength(context, edge)
+  let t = null
+  let coord = null
+
+  if (edge === 'left' || edge === 'right') {
+    const x = edge === 'left' ? 0 : width
+
+    if (Math.abs(x2 - x1) <= 1e-9) return
+
+    t = (x - x1) / (x2 - x1)
+    if (t < -0.0001 || t > 1.0001) return
+
+    coord = y1 + (y2 - y1) * t
+    if (coord < -0.01 || coord > height + 0.01) return
+  } else {
+    const y = edge === 'bottom' ? 0 : height
+
+    if (Math.abs(y2 - y1) <= 1e-9) return
+
+    t = (y - y1) / (y2 - y1)
+    if (t < -0.0001 || t > 1.0001) return
+
+    coord = x1 + (x2 - x1) * t
+    if (coord < -0.01 || coord > width + 0.01) return
+  }
+
+  addPanelEditBoundarySplitCoord(values, coord, length)
+} // End addPanelEditBoundarySegmentIntersection
+
+//=================
+function collectPanelEditBoundarySplitCoords(context, edge, polygon) {
+  const length = getPanelEditBoundaryEdgeLength(context, edge)
+  const values = [0, length]
+
+  polygon.forEach((point, index) => {
+    const nextPoint = polygon[(index + 1) % polygon.length]
+
+    if (getPanelEditBoundaryEdge(context, point) === edge) {
+      addPanelEditBoundarySplitCoord(values, getPanelEditBoundaryPointCoord(edge, point), length)
+    }
+
+    addPanelEditBoundarySegmentIntersection(values, context, edge, point, nextPoint)
+  })
+
+  return values.sort((a, b) => a - b)
+} // End collectPanelEditBoundarySplitCoords
+
+//=================
 function collectPanelEditPolygonBoundaryEraseSpans(context, polygon) {
   const spans = {
     left: [],
@@ -1565,22 +1693,22 @@ function collectPanelEditPolygonBoundaryEraseSpans(context, polygon) {
 
   if (!context || !Array.isArray(polygon) || polygon.length < 3) return spans
 
-  polygon.forEach((point, index) => {
-    const nextPoint = polygon[(index + 1) % polygon.length]
-    const edgeA = getPanelEditBoundaryEdge(context, point)
-    const edgeB = getPanelEditBoundaryEdge(context, nextPoint)
+  Object.keys(spans).forEach((edge) => {
+    const values = collectPanelEditBoundarySplitCoords(context, edge, polygon)
 
-    if (edgeA && edgeA === edgeB) {
-      addPanelEditBoundaryEraseSpan(spans, context, edgeA, point, nextPoint)
-      return
+    for (let index = 0; index < values.length - 1; index += 1) {
+      const start = values[index]
+      const end = values[index + 1]
+
+      if (end - start <= 0.01) continue
+
+      const mid = (start + end) / 2
+      const probe = getPanelEditBoundaryProbePoint(context, edge, mid)
+
+      if (!isPanelEditPointInsidePolygon(probe, polygon)) continue
+
+      spans[edge].push({ start, end })
     }
-
-    const corner = getPanelEditBoundaryCornerBetweenEdges(context, edgeA, edgeB)
-
-    if (!corner) return
-
-    addPanelEditBoundaryEraseSpan(spans, context, edgeA, point, corner)
-    addPanelEditBoundaryEraseSpan(spans, context, edgeB, corner, nextPoint)
   })
 
   return spans

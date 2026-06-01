@@ -372,6 +372,142 @@ function addLocalBoundaryEraseSpan(spans, edge, pointA, pointB, panelRect) {
 } // End addLocalBoundaryEraseSpan
 
 //=================
+function isLocalPointOnSegment(point, start, end) {
+  if (!point || !start || !end) return false
+
+  const tolerance = 0.5
+  const cross = (Number(point.y || 0) - Number(start.y || 0)) * (Number(end.x || 0) - Number(start.x || 0)) - (Number(point.x || 0) - Number(start.x || 0)) * (Number(end.y || 0) - Number(start.y || 0))
+
+  if (Math.abs(cross) > tolerance) return false
+
+  const minX = Math.min(Number(start.x || 0), Number(end.x || 0)) - tolerance
+  const maxX = Math.max(Number(start.x || 0), Number(end.x || 0)) + tolerance
+  const minY = Math.min(Number(start.y || 0), Number(end.y || 0)) - tolerance
+  const maxY = Math.max(Number(start.y || 0), Number(end.y || 0)) + tolerance
+
+  return Number(point.x || 0) >= minX && Number(point.x || 0) <= maxX && Number(point.y || 0) >= minY && Number(point.y || 0) <= maxY
+} // End isLocalPointOnSegment
+
+//=================
+function isLocalPointInsidePolygon(point, polygon) {
+  if (!point || !Array.isArray(polygon) || polygon.length < 3) return false
+
+  for (let index = 0; index < polygon.length; index += 1) {
+    const start = polygon[index]
+    const end = polygon[(index + 1) % polygon.length]
+
+    if (isLocalPointOnSegment(point, start, end)) return true
+  }
+
+  let inside = false
+  const x = Number(point.x || 0)
+  const y = Number(point.y || 0)
+
+  for (let index = 0, previousIndex = polygon.length - 1; index < polygon.length; previousIndex = index, index += 1) {
+    const pointA = polygon[index]
+    const pointB = polygon[previousIndex]
+    const xi = Number(pointA.x || 0)
+    const yi = Number(pointA.y || 0)
+    const xj = Number(pointB.x || 0)
+    const yj = Number(pointB.y || 0)
+    const intersects = ((yi > y) !== (yj > y)) && (x < ((xj - xi) * (y - yi)) / ((yj - yi) || 1e-9) + xi)
+
+    if (intersects) inside = !inside
+  }
+
+  return inside
+} // End isLocalPointInsidePolygon
+
+//=================
+function addLocalBoundarySplitCoord(values, coord, length) {
+  if (!Array.isArray(values) || !Number.isFinite(coord) || !Number.isFinite(length)) return
+
+  const value = Math.max(0, Math.min(length, coord))
+
+  if (values.some((item) => Math.abs(item - value) <= 0.01)) return
+
+  values.push(value)
+} // End addLocalBoundarySplitCoord
+
+//=================
+function getLocalBoundaryProbePoint(edge, coord, panelRect) {
+  const epsilon = 0.25
+  const left = Number(panelRect.x || 0)
+  const right = left + Number(panelRect.width || 0)
+  const bottom = Number(panelRect.y || 0)
+  const top = bottom + Number(panelRect.height || 0)
+  const value = Number(coord || 0)
+
+  if (edge === 'left') return { x: left + epsilon, y: bottom + value }
+  if (edge === 'right') return { x: right - epsilon, y: bottom + value }
+  if (edge === 'bottom') return { x: left + value, y: bottom + epsilon }
+  if (edge === 'top') return { x: left + value, y: top - epsilon }
+
+  return { x: left, y: bottom }
+} // End getLocalBoundaryProbePoint
+
+//=================
+function addLocalBoundarySegmentIntersection(values, edge, pointA, pointB, panelRect) {
+  if (!values || !edge || !pointA || !pointB || !panelRect) return
+
+  const x1 = Number(pointA.x || 0)
+  const y1 = Number(pointA.y || 0)
+  const x2 = Number(pointB.x || 0)
+  const y2 = Number(pointB.y || 0)
+  const left = Number(panelRect.x || 0)
+  const right = left + Number(panelRect.width || 0)
+  const bottom = Number(panelRect.y || 0)
+  const top = bottom + Number(panelRect.height || 0)
+  const length = getLocalBoundaryEdgeLength(edge, panelRect)
+  let t = null
+  let coord = null
+
+  if (edge === 'left' || edge === 'right') {
+    const x = edge === 'left' ? left : right
+
+    if (Math.abs(x2 - x1) <= 1e-9) return
+
+    t = (x - x1) / (x2 - x1)
+    if (t < -0.0001 || t > 1.0001) return
+
+    coord = y1 + (y2 - y1) * t - bottom
+    if (coord < -0.01 || coord > Number(panelRect.height || 0) + 0.01) return
+  } else {
+    const y = edge === 'bottom' ? bottom : top
+
+    if (Math.abs(y2 - y1) <= 1e-9) return
+
+    t = (y - y1) / (y2 - y1)
+    if (t < -0.0001 || t > 1.0001) return
+
+    coord = x1 + (x2 - x1) * t - left
+    if (coord < -0.01 || coord > Number(panelRect.width || 0) + 0.01) return
+  }
+
+  addLocalBoundarySplitCoord(values, coord, length)
+} // End addLocalBoundarySegmentIntersection
+
+//=================
+function collectLocalBoundarySplitCoords(edge, polygon, panelRect) {
+  const length = getLocalBoundaryEdgeLength(edge, panelRect)
+  const values = [0, length]
+
+  polygon.forEach((point, index) => {
+    const nextPoint = polygon[(index + 1) % polygon.length]
+
+    if (isLocalPointOnPanelRectEdge(point, panelRect) === edge) {
+      const rawCoord = getLocalBoundaryPointCoord(edge, point)
+      const offset = edge === 'left' || edge === 'right' ? Number(panelRect.y || 0) : Number(panelRect.x || 0)
+      addLocalBoundarySplitCoord(values, rawCoord - offset, length)
+    }
+
+    addLocalBoundarySegmentIntersection(values, edge, point, nextPoint, panelRect)
+  })
+
+  return values.sort((a, b) => a - b)
+} // End collectLocalBoundarySplitCoords
+
+//=================
 function collectLocalPolygonBoundaryEraseSpans(polygon, panelRect) {
   const spans = {
     left: [],
@@ -382,22 +518,22 @@ function collectLocalPolygonBoundaryEraseSpans(polygon, panelRect) {
 
   if (!Array.isArray(polygon) || polygon.length < 3 || !panelRect) return spans
 
-  polygon.forEach((point, index) => {
-    const nextPoint = polygon[(index + 1) % polygon.length]
-    const edgeA = isLocalPointOnPanelRectEdge(point, panelRect)
-    const edgeB = isLocalPointOnPanelRectEdge(nextPoint, panelRect)
+  Object.keys(spans).forEach((edge) => {
+    const values = collectLocalBoundarySplitCoords(edge, polygon, panelRect)
 
-    if (edgeA && edgeA === edgeB) {
-      addLocalBoundaryEraseSpan(spans, edgeA, point, nextPoint, panelRect)
-      return
+    for (let index = 0; index < values.length - 1; index += 1) {
+      const start = values[index]
+      const end = values[index + 1]
+
+      if (end - start <= 0.01) continue
+
+      const mid = (start + end) / 2
+      const probe = getLocalBoundaryProbePoint(edge, mid, panelRect)
+
+      if (!isLocalPointInsidePolygon(probe, polygon)) continue
+
+      spans[edge].push({ start, end })
     }
-
-    const corner = getLocalBoundaryCornerBetweenEdges(edgeA, edgeB, panelRect)
-
-    if (!corner) return
-
-    addLocalBoundaryEraseSpan(spans, edgeA, point, corner, panelRect)
-    addLocalBoundaryEraseSpan(spans, edgeB, corner, nextPoint, panelRect)
   })
 
   return spans
