@@ -434,10 +434,10 @@ function getPanelAxisSize(panel, axis) {
 } // End getPanelAxisSize
 
 //=================
-function projectPanelAxisValue(value, size, reverse) {
-  if (reverse) return -(value + size)
+function projectPanelAxisValue(value, size, reverse, origin = 0) {
+  if (reverse) return origin - value - size
 
-  return value
+  return value - origin
 } // End projectPanelAxisValue
 
 //=================
@@ -453,8 +453,8 @@ function getPanelRect(panel, currentView = 'front') {
   if (uSize <= 0 || vSize <= 0) return null
 
   return {
-    x: projectPanelAxisValue(uMin, uSize, camera.reverseU),
-    y: projectPanelAxisValue(vMin, vSize, camera.reverseV),
+    x: projectPanelAxisValue(uMin, uSize, camera.reverseU, camera.originU || 0),
+    y: projectPanelAxisValue(vMin, vSize, camera.reverseV, camera.originV || 0),
     width: uSize,
     height: vSize
   }

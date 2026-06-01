@@ -41,7 +41,8 @@ const CAMERA_CONFIG = {
     axisU: 'y',
     axisV: 'z',
     reverseU: true,
-    reverseV: false
+    reverseV: false,
+    originU: 1100
   },
 
   right: {
@@ -78,10 +79,10 @@ function getBoxAxisSize(box, axis) {
 } // End getBoxAxisSize
 
 //=================
-function projectAxisValue(value, size, reverse) {
-  if (reverse) return -(value + size)
+function projectAxisValue(value, size, reverse, origin = 0) {
+  if (reverse) return origin - value - size
 
-  return value
+  return value - origin
 } // End projectAxisValue
 
 //=================
@@ -96,8 +97,8 @@ export function projectBoxToCameraRect(box, viewKey = 'top') {
 
   return {
     id: box.id,
-    x: projectAxisValue(uMin, uSize, camera.reverseU),
-    y: projectAxisValue(vMin, vSize, camera.reverseV),
+    x: projectAxisValue(uMin, uSize, camera.reverseU, camera.originU || 0),
+    y: projectAxisValue(vMin, vSize, camera.reverseV, camera.originV || 0),
     width: uSize,
     height: vSize,
     source: box
@@ -114,8 +115,8 @@ export function cameraLocalToWorldPoint(local, viewKey = 'top') {
     z: 0
   }
 
-  point[camera.axisU] = camera.reverseU ? -local.x : local.x
-  point[camera.axisV] = camera.reverseV ? -local.y : local.y
+  point[camera.axisU] = camera.reverseU ? (camera.originU || 0) - local.x : local.x + (camera.originU || 0)
+  point[camera.axisV] = camera.reverseV ? (camera.originV || 0) - local.y : local.y + (camera.originV || 0)
 
   return point
 } // End cameraLocalToWorldPoint
