@@ -544,6 +544,80 @@ function getPanelEditLineHit(context, layout, screenX, screenY) {
   return best
 } // End getPanelEditLineHit
 
+
+//=================
+function getPanelEditSegmentIntersection(segmentA, segmentB) {
+  if (!segmentA || !segmentB) return null
+
+  const x1 = Number(segmentA.start?.x || 0)
+  const y1 = Number(segmentA.start?.y || 0)
+  const x2 = Number(segmentA.end?.x || 0)
+  const y2 = Number(segmentA.end?.y || 0)
+  const x3 = Number(segmentB.start?.x || 0)
+  const y3 = Number(segmentB.start?.y || 0)
+  const x4 = Number(segmentB.end?.x || 0)
+  const y4 = Number(segmentB.end?.y || 0)
+  const denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+  const tolerance = 0.001
+
+  if (Math.abs(denominator) <= tolerance) return null
+
+  const px = (((x1 * y2 - y1 * x2) * (x3 - x4)) - ((x1 - x2) * (x3 * y4 - y3 * x4))) / denominator
+  const py = (((x1 * y2 - y1 * x2) * (y3 - y4)) - ((y1 - y2) * (x3 * y4 - y3 * x4))) / denominator
+  const withinA = px >= Math.min(x1, x2) - tolerance
+    && px <= Math.max(x1, x2) + tolerance
+    && py >= Math.min(y1, y2) - tolerance
+    && py <= Math.max(y1, y2) + tolerance
+  const withinB = px >= Math.min(x3, x4) - tolerance
+    && px <= Math.max(x3, x4) + tolerance
+    && py >= Math.min(y3, y4) - tolerance
+    && py <= Math.max(y3, y4) + tolerance
+
+  if (!withinA || !withinB) return null
+
+  return { x: px, y: py }
+} // End getPanelEditSegmentIntersection
+
+//=================
+function getPanelEditGuideSegments(context) {
+  if (!context) return []
+
+  return (panelEditTape.value.guides || []).map((guide) => {
+    const value = Number(guide.value || 0)
+
+    if (guide.axis === 'vertical') {
+      return {
+        id: guide.id,
+        type: 'guide',
+        axis: 'vertical',
+        start: { x: value, y: 0 },
+        end: { x: value, y: context.height }
+      }
+    }
+
+    return {
+      id: guide.id,
+      type: 'guide',
+      axis: 'horizontal',
+      start: { x: 0, y: value },
+      end: { x: context.width, y: value }
+    }
+  })
+} // End getPanelEditGuideSegments
+
+//=================
+function getPanelEditLineSegmentsForSnap(context) {
+  if (!context) return []
+
+  return (panelEditLine.value.lines || []).map((line) => ({
+    id: line.id,
+    type: 'line',
+    axis: line.axis,
+    start: { x: Number(line.start?.x || 0), y: Number(line.start?.y || 0) },
+    end: { x: Number(line.end?.x || 0), y: Number(line.end?.y || 0) }
+  }))
+} // End getPanelEditLineSegmentsForSnap
+
 //=================
 function getPanelEditTapeSnap(context, layout, screenX, screenY, options = {}) {
   if (!context || !layout) return null
@@ -591,6 +665,34 @@ function getPanelEditTapeSnap(context, layout, screenX, screenY, options = {}) {
       })
     })
   })
+
+  const snapSegments = [
+    ...getPanelEditLineSegmentsForSnap(context),
+    ...getPanelEditGuideSegments(context)
+  ]
+
+  for (let firstIndex = 0; firstIndex < snapSegments.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < snapSegments.length; secondIndex += 1) {
+      const firstSegment = snapSegments[firstIndex]
+      const secondSegment = snapSegments[secondIndex]
+      const intersection = getPanelEditSegmentIntersection(firstSegment, secondSegment)
+
+      if (!intersection) continue
+
+      candidates.push({
+        key: `snap-cross-${firstSegment.id}-${secondSegment.id}`,
+        x: intersection.x,
+        y: intersection.y,
+        axis: options.preferredAxis || 'both',
+        edge: 'line-cross',
+        kind: 'circle',
+        lineId: firstSegment.type === 'line' ? firstSegment.id : null,
+        lineId2: secondSegment.type === 'line' ? secondSegment.id : null,
+        guideId: firstSegment.type === 'guide' ? firstSegment.id : null,
+        guideId2: secondSegment.type === 'guide' ? secondSegment.id : null
+      })
+    }
+  }
 
   verticalLines.forEach((verticalLine) => {
     const verticalX = Number(verticalLine.start.x || 0)
@@ -1424,6 +1526,21 @@ function getPanelEditLinePointFromPointer(context, layout, event) {
   }
 } // End getPanelEditLinePointFromPointer
 
+
+//=================
+function getPanelEditAxisLockedPoint(start, current) {
+  if (!start || !current) return current
+
+  const dx = Number(current.x || 0) - Number(start.x || 0)
+  const dy = Number(current.y || 0) - Number(start.y || 0)
+
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return { x: Number(current.x || 0), y: Number(start.y || 0) }
+  }
+
+  return { x: Number(start.x || 0), y: Number(current.y || 0) }
+} // End getPanelEditAxisLockedPoint
+
 //=================
 function normalizePanelEditLine(context, start, end, options = {}) {
   if (!context || !start || !end) return null
@@ -1590,32 +1707,213 @@ function isPointInPanelEditPolygon(point, polygon) {
 } // End isPointInPanelEditPolygon
 
 //=================
-function getPanelEditFreeLineRegions(context) {
+function getPanelEditPointKey(point) {
+  return `${Math.round(Number(point.x || 0) * 1000) / 1000},${Math.round(Number(point.y || 0) * 1000) / 1000}`
+} // End getPanelEditPointKey
+
+//=================
+function getPanelEditPolygonSignedArea(points) {
+  if (!Array.isArray(points) || points.length < 3) return 0
+
+  let area = 0
+
+  points.forEach((point, index) => {
+    const nextPoint = points[(index + 1) % points.length]
+
+    area += Number(point.x || 0) * Number(nextPoint.y || 0) - Number(nextPoint.x || 0) * Number(point.y || 0)
+  })
+
+  return area / 2
+} // End getPanelEditPolygonSignedArea
+
+//=================
+function getPanelEditSegmentParameter(segment, point) {
+  const dx = Number(segment.end.x || 0) - Number(segment.start.x || 0)
+  const dy = Number(segment.end.y || 0) - Number(segment.start.y || 0)
+  const lengthSq = dx * dx + dy * dy
+
+  if (lengthSq <= 0.000001) return 0
+
+  return (((Number(point.x || 0) - Number(segment.start.x || 0)) * dx) + ((Number(point.y || 0) - Number(segment.start.y || 0)) * dy)) / lengthSq
+} // End getPanelEditSegmentParameter
+
+//=================
+function addPanelEditUniquePoint(points, point) {
+  const key = getPanelEditPointKey(point)
+
+  if (points.some((item) => getPanelEditPointKey(item) === key)) return
+
+  points.push({
+    x: Math.round(Number(point.x || 0) * 1000) / 1000,
+    y: Math.round(Number(point.y || 0) * 1000) / 1000
+  })
+} // End addPanelEditUniquePoint
+
+//=================
+function getPanelEditPlanarSegments(context) {
   if (!context) return []
 
-  return panelEditLine.value.lines
-    .filter((line) => line.axis === 'free')
-    .map((line, index) => {
-      const startEdge = getPanelEditBoundaryEdge(context, line.start)
-      const endEdge = getPanelEditBoundaryEdge(context, line.end)
-      const corner = getPanelEditCornerForEdges(context, startEdge, endEdge)
+  const userSegments = (panelEditLine.value.lines || []).map((line) => ({
+    id: line.id,
+    type: 'line',
+    start: { x: Number(line.start?.x || 0), y: Number(line.start?.y || 0) },
+    end: { x: Number(line.end?.x || 0), y: Number(line.end?.y || 0) }
+  }))
+  const boundarySegments = [
+    { id: 'boundary-bottom', type: 'boundary', start: { x: 0, y: 0 }, end: { x: context.width, y: 0 } },
+    { id: 'boundary-right', type: 'boundary', start: { x: context.width, y: 0 }, end: { x: context.width, y: context.height } },
+    { id: 'boundary-top', type: 'boundary', start: { x: context.width, y: context.height }, end: { x: 0, y: context.height } },
+    { id: 'boundary-left', type: 'boundary', start: { x: 0, y: context.height }, end: { x: 0, y: 0 } }
+  ]
+  const baseSegments = [...boundarySegments, ...userSegments]
+  const splitPointsBySegment = baseSegments.map((segment) => [{ ...segment.start }, { ...segment.end }])
 
-      if (!startEdge || !endEdge || startEdge === endEdge || !corner) return null
+  for (let firstIndex = 0; firstIndex < baseSegments.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < baseSegments.length; secondIndex += 1) {
+      const intersection = getPanelEditSegmentIntersection(baseSegments[firstIndex], baseSegments[secondIndex])
 
-      const polygon = [
-        { ...line.start },
-        { ...line.end },
-        corner
-      ]
+      if (!intersection) continue
+
+      addPanelEditUniquePoint(splitPointsBySegment[firstIndex], intersection)
+      addPanelEditUniquePoint(splitPointsBySegment[secondIndex], intersection)
+    }
+  }
+
+  const result = []
+
+  baseSegments.forEach((segment, segmentIndex) => {
+    const points = splitPointsBySegment[segmentIndex]
+      .sort((pointA, pointB) => getPanelEditSegmentParameter(segment, pointA) - getPanelEditSegmentParameter(segment, pointB))
+
+    for (let pointIndex = 0; pointIndex < points.length - 1; pointIndex += 1) {
+      const startPoint = points[pointIndex]
+      const endPoint = points[pointIndex + 1]
+      const length = Math.hypot(endPoint.x - startPoint.x, endPoint.y - startPoint.y)
+
+      if (length <= 0.01) continue
+
+      result.push({
+        id: `${segment.id}-part-${pointIndex}`,
+        type: segment.type,
+        start: startPoint,
+        end: endPoint
+      })
+    }
+  })
+
+  return result
+} // End getPanelEditPlanarSegments
+
+//=================
+function getPanelEditPlanarRegions(context) {
+  if (!context || !(panelEditLine.value.lines || []).length) return []
+
+  const segments = getPanelEditPlanarSegments(context)
+  const vertices = new Map()
+  const adjacency = new Map()
+  const edgeKeys = new Set()
+
+  function ensureVertex(point) {
+    const key = getPanelEditPointKey(point)
+
+    if (!vertices.has(key)) {
+      vertices.set(key, {
+        key,
+        x: Math.round(Number(point.x || 0) * 1000) / 1000,
+        y: Math.round(Number(point.y || 0) * 1000) / 1000
+      })
+    }
+
+    if (!adjacency.has(key)) adjacency.set(key, [])
+
+    return key
+  }
+
+  segments.forEach((segment) => {
+    const startKey = ensureVertex(segment.start)
+    const endKey = ensureVertex(segment.end)
+
+    if (startKey === endKey) return
+
+    const edgeKey = [startKey, endKey].sort().join('|')
+
+    if (edgeKeys.has(edgeKey)) return
+
+    edgeKeys.add(edgeKey)
+    adjacency.get(startKey).push(endKey)
+    adjacency.get(endKey).push(startKey)
+  })
+
+  adjacency.forEach((neighbors, key) => {
+    const vertex = vertices.get(key)
+
+    neighbors.sort((neighborA, neighborB) => {
+      const pointA = vertices.get(neighborA)
+      const pointB = vertices.get(neighborB)
+      const angleA = Math.atan2(pointA.y - vertex.y, pointA.x - vertex.x)
+      const angleB = Math.atan2(pointB.y - vertex.y, pointB.x - vertex.x)
+
+      return angleA - angleB
+    })
+  })
+
+  const visited = new Set()
+  const regions = []
+  const panelArea = context.width * context.height
+
+  vertices.forEach((_vertex, startKey) => {
+    const neighbors = adjacency.get(startKey) || []
+
+    neighbors.forEach((nextKey) => {
+      const directedKey = `${startKey}->${nextKey}`
+
+      if (visited.has(directedKey)) return
+
+      const faceKeys = []
+      let fromKey = startKey
+      let toKey = nextKey
+
+      for (let guard = 0; guard < 10000; guard += 1) {
+        const currentDirectedKey = `${fromKey}->${toKey}`
+
+        if (visited.has(currentDirectedKey)) break
+
+        visited.add(currentDirectedKey)
+        faceKeys.push(fromKey)
+
+        const toNeighbors = adjacency.get(toKey) || []
+        const reverseIndex = toNeighbors.indexOf(fromKey)
+
+        if (reverseIndex < 0 || !toNeighbors.length) break
+
+        const followingKey = toNeighbors[(reverseIndex - 1 + toNeighbors.length) % toNeighbors.length]
+
+        fromKey = toKey
+        toKey = followingKey
+
+        if (fromKey === startKey && toKey === nextKey) break
+      }
+
+      const polygon = faceKeys.map((key) => {
+        const point = vertices.get(key)
+
+        return { x: point.x, y: point.y }
+      })
+      const area = getPanelEditPolygonSignedArea(polygon)
+      const absoluteArea = Math.abs(area)
+
+      if (polygon.length < 3) return
+      if (area <= 0.01) return
+      if (absoluteArea >= panelArea - 0.01 && (panelEditLine.value.lines || []).length) return
+
       const bounds = getPanelEditPolygonBounds(polygon)
 
-      if (bounds.width <= 0.01 || bounds.height <= 0.01) return null
+      if (bounds.width <= 0.01 || bounds.height <= 0.01) return
 
-      return {
-        id: `free-region-${line.id}-${index}`,
+      regions.push({
+        id: `planar-region-${regions.length + 1}`,
         source: 'lineRegion',
         regionKind: 'polygon',
-        lineId: line.id,
         polygon,
         start: { x: bounds.x, y: bounds.y },
         end: { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
@@ -1624,53 +1922,16 @@ function getPanelEditFreeLineRegions(context) {
         width: bounds.width,
         height: bounds.height,
         operation: 'none'
-      }
+      })
     })
-    .filter(Boolean)
-} // End getPanelEditFreeLineRegions
+  })
+
+  return regions
+} // End getPanelEditPlanarRegions
 
 //=================
 function getPanelEditLineRegions(context) {
-  if (!context || !panelEditLine.value.lines.length) return []
-
-  const verticalValues = panelEditLine.value.lines
-    .filter((line) => isFullPanelEditVerticalLine(context, line))
-    .map((line) => Number(line.start.x || 0))
-  const horizontalValues = panelEditLine.value.lines
-    .filter((line) => isFullPanelEditHorizontalLine(context, line))
-    .map((line) => Number(line.start.y || 0))
-  const xCuts = getSortedPanelEditCuts(verticalValues, context.width)
-  const yCuts = getSortedPanelEditCuts(horizontalValues, context.height)
-  const regions = []
-
-  for (let xIndex = 0; xIndex < xCuts.length - 1; xIndex += 1) {
-    for (let yIndex = 0; yIndex < yCuts.length - 1; yIndex += 1) {
-      const x = xCuts[xIndex]
-      const y = yCuts[yIndex]
-      const width = xCuts[xIndex + 1] - x
-      const height = yCuts[yIndex + 1] - y
-
-      if (width <= 0.01 || height <= 0.01) continue
-
-      regions.push({
-        id: `region-${xIndex}-${yIndex}`,
-        source: 'lineRegion',
-        regionKind: 'rect',
-        start: { x, y },
-        end: { x: x + width, y: y + height },
-        x,
-        y,
-        width,
-        height,
-        operation: 'none'
-      })
-    }
-  }
-
-  return [
-    ...regions,
-    ...getPanelEditFreeLineRegions(context)
-  ]
+  return getPanelEditPlanarRegions(context)
 } // End getPanelEditLineRegions
 
 //=================
@@ -2063,6 +2324,10 @@ function onPanelEditPointerDown(event) {
     }
 
     if (panelEditLine.value.draft) {
+      const lockedLocal = event.shiftKey
+        ? getPanelEditAxisLockedPoint(panelEditLine.value.draft.start, point.local)
+        : point.local
+
       panelEditLine.value = {
         ...panelEditLine.value,
         hoverSnap: point.snap,
@@ -2070,7 +2335,7 @@ function onPanelEditPointerDown(event) {
         selectedLineId: null,
         draft: {
           ...panelEditLine.value.draft,
-          current: point.local
+          current: lockedLocal
         }
       }
       commitPanelEditLine()
@@ -2195,6 +2460,9 @@ function onPanelEditPointerMove(event) {
 
   if (shapeTool === 'editPanelLine') {
     const point = getPanelEditLinePointFromPointer(context, layout, event)
+    const currentLocal = panelEditLine.value.draft && point?.local
+      ? (event.shiftKey ? getPanelEditAxisLockedPoint(panelEditLine.value.draft.start, point.local) : point.local)
+      : panelEditLine.value.draft?.current
 
     panelEditLine.value = {
       ...panelEditLine.value,
@@ -2204,7 +2472,7 @@ function onPanelEditPointerMove(event) {
       draft: panelEditLine.value.draft
         ? {
           ...panelEditLine.value.draft,
-          current: point?.local || panelEditLine.value.draft.current
+          current: currentLocal
         }
         : null
     }
