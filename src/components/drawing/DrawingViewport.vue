@@ -343,7 +343,7 @@ const panelEditFooterText = computed(() => {
       const radiusDisplay = radiusText ? ` | R: ${radiusText} mm` : ''
       const redText = arcData?.isQuarterOrHalf ? ' | đỏ = cung 1/4 hoặc 1/2' : ''
 
-      return `Arc: chọn điểm đỉnh để đổi độ cong${radiusDisplay}${angleText}${redText} | Enter để OK hoặc click để vẽ`
+      return `Arc: chọn điểm đỉnh để đổi độ cong${radiusDisplay}${angleText}${redText} | Enter hoặc click đúp điểm 2 để OK | click điểm đỉnh để vẽ`
     }
 
     if (hoverSnap) {
@@ -3545,6 +3545,20 @@ function onPanelEditPointerDown(event) {
     const draft = panelEditArc.value.draft
 
     if (draft?.stage === 'bulge') {
+      const isAcceptingSuggestedArc = draft.suggested === true
+        && draft.end
+        && getDistance(point.local, draft.end) <= 0.01
+
+      if (isAcceptingSuggestedArc) {
+        panelEditArc.value = {
+          ...panelEditArc.value,
+          hoverSnap: point.snap,
+          draft
+        }
+        commitPanelEditArc()
+        return
+      }
+
       panelEditArc.value = {
         ...panelEditArc.value,
         hoverSnap: point.snap,
@@ -3577,7 +3591,7 @@ function onPanelEditPointerDown(event) {
           suggested: true
         }
       }
-      app.setStatus('Arc: đang đề xuất cung 1/4 | Enter để OK hoặc rê chuột chọn điểm đỉnh')
+      app.setStatus('Arc: đang đề xuất cung 1/4 | Enter hoặc click đúp điểm 2 để OK | rê chuột chọn điểm đỉnh')
       resizePanelEditCanvas()
       return
     }
