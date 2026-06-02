@@ -21,15 +21,13 @@
       @blur="cancelDimInput"
     />
 
-    <input
+    <BoxHeightInput
       v-if="boxHeightInput.active"
-      ref="boxHeightInputRef"
-      type="number"
-      class="mn-dim-input"
-      :style="boxHeightInputStyle"
-      v-model="boxHeightInput.value"
-      placeholder="Cao Box"
-      @keydown="onBoxHeightInputKeyDown"
+      :model="boxHeightInput"
+      :input-style="boxHeightInputStyle"
+      :set-input-ref="setBoxHeightInputRef"
+      @update-value="updateBoxHeightInputValue"
+      @key-down="onBoxHeightInputKeyDown"
       @blur="cancelBoxHeightInput"
     />
 
@@ -62,6 +60,7 @@
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import Mini3DPreview from '../preview/Mini3DPreview.vue'
 import DimensionInput from './DimensionInput.vue'
+import BoxHeightInput from './BoxHeightInput.vue'
 import PanelEditWindow from '../panel-edit/PanelEditWindow.vue'
 import { useAppStore } from '../../stores/useAppStore'
 import { useCabinetStore } from '../../stores/useCabinetStore'
@@ -98,6 +97,16 @@ function setDimInputRef(element) {
 function updateDimInputValue(value) {
   dimInput.value.value = value
 } // End updateDimInputValue
+
+//=================
+function setBoxHeightInputRef(element) {
+  boxHeightInputRef.value = element
+} // End setBoxHeightInputRef
+
+//=================
+function updateBoxHeightInputValue(value) {
+  boxHeightInput.value.value = value
+} // End updateBoxHeightInputValue
 
 //=================
 function setPanelEditCanvasRef(element) {
@@ -7004,21 +7013,4 @@ onBeforeUnmount(() => {
 .mn-cursor-pointer {
   cursor: pointer;
 }
-.mn-dim-input {
-  position: absolute;
-  width: 72px;
-  height: 26px;
-  transform: translate(-50%, -50%);
-  z-index: 20;
-  border: 1px solid #1a73e8;
-  border-radius: 3px;
-  background: #ffffff;
-  color: #111111;
-  font-size: 13px;
-  text-align: center;
-  outline: none;
-  box-shadow: none;
-}
-
-
 </style>
