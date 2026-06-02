@@ -38,6 +38,25 @@ export function getPanelEditArcEndFromRadius(start, current, radius) {
 } // End getPanelEditArcEndFromRadius
 
 //=================
+export function getPanelEditArcDraftWithRadiusInput(draft, inputBuffer) {
+  if (!draft?.start || draft.stage !== 'end') return draft
+
+  const radiusText = String(inputBuffer ?? '').trim()
+
+  if (radiusText === '') return draft
+
+  const radius = Number(radiusText)
+  const endPoint = getPanelEditArcEndFromRadius(draft.start, draft.current, radius)
+
+  if (!endPoint) return draft
+
+  return {
+    ...draft,
+    end: endPoint
+  }
+} // End getPanelEditArcDraftWithRadiusInput
+
+//=================
 export function getPanelEditCircleFromThreePoints(pointA, pointB, pointC) {
   if (!pointA || !pointB || !pointC) return null
 

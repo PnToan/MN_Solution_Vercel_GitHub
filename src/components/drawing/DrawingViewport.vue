@@ -116,7 +116,7 @@ import { projectBoxToCameraRect, cameraLocalToWorldPoint } from '../../core/view
 import { hitTestPanel, hitTestZoneEdge } from '../../core/snap/snap-engine'
 import { handleViewportKey } from '../../commands/keyboard-controller'
 import { createPanelEditRectangleRecord, getEditPanelToolCursorClass, isEditPanelDrawTool, isEditPanelTool } from '../../core/tools/editPanelTool'
-import { getPanelEditArcData, getPanelEditArcDefaultBulge, getPanelEditArcEndFromRadius, getPanelEditArcPoints } from '../../core/tools/editPanelArcTool'
+import { getPanelEditArcData, getPanelEditArcDefaultBulge, getPanelEditArcDraftWithRadiusInput, getPanelEditArcPoints } from '../../core/tools/editPanelArcTool'
 
 const app = useAppStore()
 const cabinet = useCabinetStore()
@@ -328,7 +328,7 @@ const panelEditFooterText = computed(() => {
     const hoverSnap = panelEditArc.value.hoverSnap
 
     if (draft?.stage === 'end') {
-      const arcData = getPanelEditArcData(draft)
+      const arcData = getPanelEditArcData(getEffectivePanelEditArcDraft(draft))
       const radiusText = panelEditArc.value.inputBuffer || (arcData ? `${Math.round(arcData.radius * 10) / 10}` : '')
       const snapText = hoverSnap ? ` | Snap: ${hoverSnap.kind === 'circle' ? 'điểm' : 'cạnh/guide'}` : ''
       const inputText = radiusText ? ` | R: ${radiusText} mm` : ''
@@ -337,7 +337,7 @@ const panelEditFooterText = computed(() => {
     }
 
     if (draft?.stage === 'bulge') {
-      const arcData = getPanelEditArcData(draft)
+      const arcData = getPanelEditArcData(getEffectivePanelEditArcDraft(draft))
       const radiusText = panelEditArc.value.inputBuffer || (arcData ? `${Math.round(arcData.radius * 10) / 10}` : '')
       const angleText = arcData ? ` | góc ${Math.round(arcData.sweep * 180 / Math.PI)}°` : ''
       const radiusDisplay = radiusText ? ` | R: ${radiusText} mm` : ''
@@ -2358,6 +2358,12 @@ function normalizePanelEditLine(context, start, end, options = {}) {
   }
 } // End normalizePanelEditLine
 
+
+//=================
+function getEffectivePanelEditArcDraft(draft = panelEditArc.value.draft) {
+  return getPanelEditArcDraftWithRadiusInput(draft, panelEditArc.value.inputBuffer)
+} // End getEffectivePanelEditArcDraft
+
 //=================
 function getPanelEditLineScreenPoints(context, layout, line) {
   if (!line?.start) return null
@@ -2402,19 +2408,21 @@ function getPanelEditArcPointFromPointer(context, layout, event) {
 function drawPanelEditArcDraft(targetContext, context, layout, draft, options = {}) {
   if (!draft?.start) return
 
-  const arcData = getPanelEditArcData(draft)
-  const endPoint = draft.end || draft.current
+  const effectiveDraft = getPanelEditArcDraftWithRadiusInput(draft, options.radiusLabel || '')
+  const arcData = getPanelEditArcData(effectiveDraft)
+  const endPoint = effectiveDraft.end || effectiveDraft.current
 
   if (!endPoint) return
 
   targetContext.save()
 
   if (arcData) {
-    const arcPoints = getPanelEditArcPoints(draft, 36)
+    const arcPoints = getPanelEditArcPoints(effectiveDraft, 36)
 
     if (arcPoints.length >= 2) {
-      targetContext.strokeStyle = '#111111'
+      targetContext.strokeStyle = '#ff7a00'
       targetContext.lineWidth = 2
+      targetContext.setLineDash([8, 5])
       targetContext.beginPath()
 
       arcPoints.forEach((point, index) => {
@@ -2470,13 +2478,15 @@ function commitPanelEditArc() {
 
   if (!draft?.start || !context) return
 
-  const arcDraft = draft.stage === 'bulge'
-    ? draft
+  const sourceDraft = getEffectivePanelEditArcDraft(draft)
+  const sourceEnd = sourceDraft.end || sourceDraft.current
+  const arcDraft = sourceDraft.stage === 'bulge'
+    ? sourceDraft
     : {
-        ...draft,
+        ...sourceDraft,
         stage: 'bulge',
-        end: draft.current,
-        current: getPanelEditArcDefaultBulge(draft.start, draft.current)
+        end: sourceEnd,
+        current: getPanelEditArcDefaultBulge(sourceDraft.start, sourceEnd)
       }
   const arcPoints = getPanelEditArcPoints(arcDraft, 28)
 
@@ -5623,12 +5633,13 @@ function handlePanelEditArcKey(event) {
     event.stopPropagation()
 
     const nextChar = key === ',' ? '.' : key
+    const nextBuffer = `${panelEditArc.value.inputBuffer}${nextChar}`
 
     panelEditArc.value = {
       ...panelEditArc.value,
-      inputBuffer: `${panelEditArc.value.inputBuffer}${nextChar}`
+      inputBuffer: nextBuffer
     }
-    app.setStatus(`Arc: đang nhập R${panelEditArc.value.inputBuffer} mm`)
+    app.setStatus(`Arc: đang nhập R${nextBuffer} mm`)
     resizePanelEditCanvas()
     return true
   }
@@ -5636,11 +5647,13 @@ function handlePanelEditArcKey(event) {
   if (key === 'Backspace') {
     event.preventDefault()
     event.stopPropagation()
+    const nextBuffer = panelEditArc.value.inputBuffer.slice(0, -1)
+
     panelEditArc.value = {
       ...panelEditArc.value,
-      inputBuffer: panelEditArc.value.inputBuffer.slice(0, -1)
+      inputBuffer: nextBuffer
     }
-    app.setStatus(panelEditArc.value.inputBuffer ? `Arc: đang nhập R${panelEditArc.value.inputBuffer} mm` : 'Arc: nhập bán kính')
+    app.setStatus(nextBuffer ? `Arc: đang nhập R${nextBuffer} mm` : 'Arc: nhập bán kính')
     resizePanelEditCanvas()
     return true
   }
@@ -5650,10 +5663,10 @@ function handlePanelEditArcKey(event) {
     event.stopPropagation()
 
     if (panelEditArc.value.inputBuffer !== '' && draft.stage === 'end') {
-      const radius = Number(panelEditArc.value.inputBuffer)
-      const endPoint = getPanelEditArcEndFromRadius(draft.start, draft.current, radius)
+      const effectiveDraft = getEffectivePanelEditArcDraft(draft)
+      const endPoint = effectiveDraft.end || effectiveDraft.current
 
-      if (!endPoint) {
+      if (!endPoint || endPoint === draft.current) {
         app.setStatus('Arc: nhập bán kính hợp lệ rồi Enter')
         return true
       }
@@ -5661,10 +5674,10 @@ function handlePanelEditArcKey(event) {
       panelEditArc.value = {
         ...panelEditArc.value,
         draft: {
-          ...draft,
+          ...effectiveDraft,
           stage: 'bulge',
           end: endPoint,
-          current: getPanelEditArcDefaultBulge(draft.start, endPoint),
+          current: getPanelEditArcDefaultBulge(effectiveDraft.start, endPoint),
           suggested: true
         }
       }
@@ -5706,12 +5719,13 @@ function handlePanelEditCircleKey(event) {
     event.stopPropagation()
 
     const nextChar = key === ',' ? '.' : key
+    const nextBuffer = `${panelEditCircle.value.inputBuffer}${nextChar}`
 
     panelEditCircle.value = {
       ...panelEditCircle.value,
-      inputBuffer: `${panelEditCircle.value.inputBuffer}${nextChar}`
+      inputBuffer: nextBuffer
     }
-    app.setStatus(`Vẽ hình tròn: đang nhập R${panelEditCircle.value.inputBuffer} mm`)
+    app.setStatus(`Vẽ hình tròn: đang nhập R${nextBuffer} mm`)
     resizePanelEditCanvas()
     return true
   }
@@ -5719,11 +5733,13 @@ function handlePanelEditCircleKey(event) {
   if (key === 'Backspace') {
     event.preventDefault()
     event.stopPropagation()
+    const nextBuffer = panelEditCircle.value.inputBuffer.slice(0, -1)
+
     panelEditCircle.value = {
       ...panelEditCircle.value,
-      inputBuffer: panelEditCircle.value.inputBuffer.slice(0, -1)
+      inputBuffer: nextBuffer
     }
-    app.setStatus(panelEditCircle.value.inputBuffer ? `Vẽ hình tròn: đang nhập R${panelEditCircle.value.inputBuffer} mm` : 'Vẽ hình tròn: nhập bán kính')
+    app.setStatus(nextBuffer ? `Vẽ hình tròn: đang nhập R${nextBuffer} mm` : 'Vẽ hình tròn: nhập bán kính')
     resizePanelEditCanvas()
     return true
   }
@@ -5802,13 +5818,6 @@ function onKeyDown(event) {
     return
   }
 
-  if (activePanelEditContext.value && (event.key === 'Delete' || event.key === 'Backspace')) {
-    event.preventDefault()
-    event.stopPropagation()
-    deleteSelectedPanelEditLine()
-    return
-  }
-
   if (handlePanelEditHistoryKey(event)) return
 
   if (handlePanelEditTapeKey(event)) return
@@ -5820,6 +5829,13 @@ function onKeyDown(event) {
   if (handlePanelEditArcKey(event)) return
 
   if (handlePanelEditCircleKey(event)) return
+
+  if (activePanelEditContext.value && (event.key === 'Delete' || event.key === 'Backspace')) {
+    event.preventDefault()
+    event.stopPropagation()
+    deleteSelectedPanelEditLine()
+    return
+  }
 
   if (activePanelEditContext.value) {
     event.preventDefault()
