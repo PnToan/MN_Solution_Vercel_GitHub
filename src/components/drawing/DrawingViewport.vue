@@ -62,6 +62,7 @@ import DimensionInput from './DimensionInput.vue'
 import BoxHeightInput from './BoxHeightInput.vue'
 import PanelEditWindow from '../panel-edit/PanelEditWindow.vue'
 import Viewport3DPreview from './Viewport3DPreview.vue'
+import { useBoxHeightInput } from '../../composables/drawing/useBoxHeightInput'
 import { useAppStore } from '../../stores/useAppStore'
 import { useCabinetStore } from '../../stores/useCabinetStore'
 import { useWallStore } from '../../stores/useWallStore'
@@ -86,7 +87,6 @@ const viewportRef = ref(null)
 const canvasRef = ref(null)
 const panelEditCanvasRef = ref(null)
 const dimInputRef = ref(null)
-const boxHeightInputRef = ref(null)
 
 //=================
 function setCanvasRef(element) {
@@ -104,16 +104,6 @@ function updateDimInputValue(value) {
 } // End updateDimInputValue
 
 //=================
-function setBoxHeightInputRef(element) {
-  boxHeightInputRef.value = element
-} // End setBoxHeightInputRef
-
-//=================
-function updateBoxHeightInputValue(value) {
-  boxHeightInput.value.value = value
-} // End updateBoxHeightInputValue
-
-//=================
 function setPanelEditCanvasRef(element) {
   panelEditCanvasRef.value = element
 
@@ -129,15 +119,25 @@ const dimInput = ref({
   value: ''
 })
 
-const boxHeightInput = ref({
-  active: false,
-  x: 0,
-  y: 0,
-  value: ''
-})
-
 const hoverDim = ref(null)
 const moveCopyMode = ref(false)
+const {
+  boxHeightInput,
+  boxHeightInputStyle,
+  setBoxHeightInputRef,
+  updateBoxHeightInputValue,
+  openBoxHeightInput,
+  cancelBoxHeightInput,
+  onBoxHeightInputKeyDown
+} = useBoxHeightInput({
+  canvasRef,
+  wall,
+  box,
+  drawing,
+  app,
+  draw,
+  exitToSelect
+})
 let ctx = null
 let ratio = 1
 let panning = false
@@ -446,10 +446,6 @@ const dimInputStyle = computed(() => ({
   top: `${dimInput.value.y}px`
 }))
 
-const boxHeightInputStyle = computed(() => ({
-  left: `${boxHeightInput.value.x}px`,
-  top: `${boxHeightInput.value.y}px`
-}))
 //=================
 const canvasCursorClass = computed(() => {
   if (app.state.currentTool === 'move') return 'mn-cursor-move'
@@ -5722,20 +5718,6 @@ function cancelDimInput() {
   draw()
 } // End cancelDimInput
 //=================
-function openBoxHeightInput(event) {
-  const rect = canvasRef.value.getBoundingClientRect()
-
-  boxHeightInput.value.active = true
-  boxHeightInput.value.x = event.clientX - rect.left + 12
-  boxHeightInput.value.y = event.clientY - rect.top + 12
-  boxHeightInput.value.value = String(wall.state.height || 600)
-
-  nextTick(() => {
-    boxHeightInputRef.value?.focus()
-    boxHeightInputRef.value?.select()
-  })
-} // End openBoxHeightInput
-//=================
 function exitToSelect() {
   panning = false
   panStart = null
@@ -5772,64 +5754,6 @@ function exitToSelect() {
   draw()
 } // End exitToSelect
 
-//=================
-function cancelBoxHeightInput() {
-  if (!boxHeightInput.value.active) {
-    return
-  }
-
-  exitToSelect()
-} // End cancelBoxHeightInput
-
-//=================
-function commitBoxHeightInput() {
-  const height = Number(boxHeightInput.value.value)
-
-  if (!Number.isFinite(height) || height <= 0) {
-    cancelBoxHeightInput()
-    return
-  }
-
-  const newBox = box.commitDraft(height)
-
-  boxHeightInput.value.active = false
-  boxHeightInput.value.value = ''
-
-  if (newBox) {
-    drawing.rebuildZones()
-    app.setStatus(`Đã tạo ${newBox.name}`)
-  } else {
-    app.setStatus('Box quá nhỏ, chưa tạo')
-  }
-
-  draw()
-} // End commitBoxHeightInput
-// End commitBoxHeightInput
-
-//=================
-function onBoxHeightInputKeyDown(event) {
-  const isSpace = event.key === ' ' || event.key === 'Spacebar' || event.code === 'Space'
-
-  if (isSpace) {
-    event.preventDefault()
-    event.stopPropagation()
-    exitToSelect()
-    return
-  }
-
-  if (event.key === 'Enter') {
-    event.preventDefault()
-    event.stopPropagation()
-    commitBoxHeightInput()
-    return
-  }
-
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    event.stopPropagation()
-    exitToSelect()
-  }
-} // End onBoxHeightInputKeyDown
 //=================
 function commitDimInput() {
   const rawValue = String(dimInput.value.value || '').trim()
