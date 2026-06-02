@@ -26,7 +26,6 @@
 
 <script setup>
 import { useAppStore } from '../../stores/useAppStore'
-import { VIEW_ITEMS } from '../../core/toolbar/toolbar-items'
 
 defineProps({
   commitSha: {
@@ -41,5 +40,12 @@ defineProps({
 
 const app = useAppStore()
 
-const views = VIEW_ITEMS
+const views = [
+  { id: 'front', label: 'Trước' },
+  { id: 'back', label: 'Sau' },
+  { id: 'left', label: 'Trái' },
+  { id: 'right', label: 'Phải' },
+  { id: 'top', label: 'Trên' },
+  { id: 'bottom', label: 'Dưới' }
+]
 </script>

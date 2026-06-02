@@ -148,9 +148,6 @@ import {
   panelEditBoundsTouch
 } from '../../core/edit-panel/editPanelGeometry'
 import { createEditPanelHistoryController } from '../../core/edit-panel/editPanelHistory'
-import { createEditPanelDraftController } from '../../core/edit-panel/editPanelDrafts'
-import { createEditPanelPersistenceController } from '../../core/edit-panel/editPanelPersistence'
-import { PANEL_EDIT_TOOL_ITEMS } from '../../core/toolbar/toolbar-items'
 import { findShortcutAction, loadShortcutSettings, shortcutEventToText } from '../../core/settings/shortcut-settings'
 
 const app = useAppStore()
@@ -268,7 +265,20 @@ const selectDrag = ref({
   mode: 'contain'
 })
 
-const panelEditTools = PANEL_EDIT_TOOL_ITEMS
+const views = [
+  { id: 'front', label: 'Trước' }, { id: 'back', label: 'Sau' }, { id: 'left', label: 'Trái' },
+  { id: 'right', label: 'Phải' }, { id: 'top', label: 'Trên' }, { id: 'bottom', label: 'Dưới' }
+]
+
+const panelEditTools = [
+  { id: 'editPanelSelect', label: 'Select', icon: '/icons/toolbar/select.svg' },
+  { id: 'editPanelMove', label: 'Move', icon: '/icons/toolbar/move.svg' },
+  { id: 'editPanelLine', label: 'Line', icon: '/icons/toolbar/line.svg' },
+  { id: 'editPanelRect', label: 'Vẽ hình chữ nhật', icon: '/icons/toolbar/rect.svg' },
+  { id: 'editPanelArc', label: 'Arc', icon: '/icons/toolbar/arc.svg' },
+  { id: 'editPanelCircle', label: 'Vẽ hình tròn', icon: '/icons/toolbar/circle.svg' },
+  { id: 'editPanelTape', label: 'Thước', icon: '/icons/toolbar/tape.svg' }
+]
 const panelEditMoveController = createEditPanelMoveController({
   panelEditMove,
   panelEditSelection,
@@ -1177,24 +1187,84 @@ function drawPanelEditTapeSnap(targetContext, snap) {
   targetContext.restore()
 } // End drawPanelEditTapeSnap
 
-const panelEditDraftController = createEditPanelDraftController({
-  panelEditTape,
-  panelEditRect,
-  panelEditLine,
-  panelEditCircle,
-  panelEditArc,
-  panelEditSelectDrag,
-  panelEditMoveController
-})
+//=================
+function resetPanelEditTapeDraft() {
+  panelEditTape.value = {
+    ...panelEditTape.value,
+    draft: null,
+    inputBuffer: ''
+  }
+} // End resetPanelEditTapeDraft
 
-const resetPanelEditTapeDraft = panelEditDraftController.resetTapeDraft
-const resetPanelEditRectDraft = panelEditDraftController.resetRectDraft
-const resetPanelEditLineDraft = panelEditDraftController.resetLineDraft
-const resetPanelEditCircleDraft = panelEditDraftController.resetCircleDraft
-const resetPanelEditArcDraft = panelEditDraftController.resetArcDraft
-const resetPanelEditMoveDraft = panelEditDraftController.resetMoveDraft
-const resetPanelEditSelectDrag = panelEditDraftController.resetSelectDrag
-const resetPanelEditCommandDrafts = panelEditDraftController.resetCommandDrafts
+//=================
+function resetPanelEditRectDraft() {
+  panelEditRect.value = {
+    ...panelEditRect.value,
+    hoverSnap: null,
+    draft: null,
+    pendingAction: null
+  }
+} // End resetPanelEditRectDraft
+
+//=================
+function resetPanelEditLineDraft() {
+  panelEditLine.value = {
+    ...panelEditLine.value,
+    hoverSnap: null,
+    hoverRegion: null,
+    hoverLine: null,
+    selectedLineId: null,
+    draft: null
+  }
+} // End resetPanelEditLineDraft
+
+//=================
+function resetPanelEditCircleDraft() {
+  panelEditCircle.value = {
+    ...panelEditCircle.value,
+    hoverSnap: null,
+    draft: null,
+    inputBuffer: ''
+  }
+} // End resetPanelEditCircleDraft
+
+//=================
+function resetPanelEditArcDraft() {
+  panelEditArc.value = {
+    ...panelEditArc.value,
+    hoverSnap: null,
+    hoverPoint: null,
+    draft: null,
+    inputBuffer: ''
+  }
+} // End resetPanelEditArcDraft
+
+//=================
+function resetPanelEditMoveDraft() {
+  panelEditMoveController.reset()
+} // End resetPanelEditMoveDraft
+
+//=================
+function resetPanelEditSelectDrag() {
+  panelEditSelectDrag.value = {
+    active: false,
+    start: null,
+    current: null,
+    moved: false
+  }
+} // End resetPanelEditSelectDrag
+
+//=================
+function resetPanelEditCommandDrafts() {
+  resetPanelEditTapeDraft()
+  resetPanelEditRectDraft()
+  resetPanelEditLineDraft()
+  resetPanelEditCircleDraft()
+  resetPanelEditArcDraft()
+  resetPanelEditMoveDraft()
+  resetPanelEditSelectDrag()
+} // End resetPanelEditCommandDrafts
+
 
 const panelEditHistoryController = createEditPanelHistoryController({
   app,
@@ -1218,24 +1288,151 @@ const clearPanelEditHistory = panelEditHistoryController.clearHistory
 const undoPanelEditHistory = panelEditHistoryController.undoHistory
 const redoPanelEditHistory = panelEditHistoryController.redoHistory
 
-const panelEditPersistenceController = createEditPanelPersistenceController({
-  app,
-  drawing,
-  activePanelEditContext,
-  panelEditTape,
-  panelEditRect,
-  panelEditLine,
-  panelEditCircle,
-  panelEditArc,
-  clearPanelEditSelection,
-  resetPanelEditMoveDraft,
-  resetPanelEditSelectDrag,
-  clearPanelEditHistory,
-  draw
-})
+//=================
+function getPanelEditSavedStateKey(context) {
+  if (!context) return null
 
-const loadPanelEditSavedState = panelEditPersistenceController.loadSavedState
-const applyPanelEdit = panelEditPersistenceController.applyPanelEdit
+  return `${context.faceKey || 'face'}:${context.faceSide || 'side'}`
+} // End getPanelEditSavedStateKey
+
+//=================
+function clonePanelEditSavedPoint(point) {
+  return {
+    x: Number(point?.x || 0),
+    y: Number(point?.y || 0)
+  }
+} // End clonePanelEditSavedPoint
+
+//=================
+function loadPanelEditSavedState(context) {
+  const resetState = () => {
+    panelEditTape.value = {
+      hoverSnap: null,
+      draft: null,
+      guides: [],
+      inputBuffer: ''
+    }
+    panelEditRect.value = {
+      hoverSnap: null,
+      draft: null,
+      pendingAction: null,
+      rectangles: []
+    }
+    panelEditLine.value = {
+      hoverSnap: null,
+      hoverRegion: null,
+      hoverLine: null,
+      selectedLineId: null,
+      draft: null,
+      lines: []
+    }
+    panelEditCircle.value = {
+      hoverSnap: null,
+      draft: null,
+      circles: [],
+      inputBuffer: ''
+    }
+    panelEditArc.value = {
+      hoverSnap: null,
+      hoverPoint: null,
+      draft: null,
+      inputBuffer: ''
+    }
+    clearPanelEditSelection()
+    resetPanelEditMoveDraft()
+    resetPanelEditSelectDrag()
+    clearPanelEditHistory()
+  }
+
+  if (!context) {
+    resetState()
+    return
+  }
+
+  const panel = drawing.state.panels.find((item) => item.id === context.panelId) || null
+  const stateKey = getPanelEditSavedStateKey(context)
+  const savedState = stateKey ? panel?.editPanelData?.[stateKey] : null
+
+  if (!savedState) {
+    resetState()
+    return
+  }
+
+  panelEditTape.value = {
+    hoverSnap: null,
+    draft: null,
+    inputBuffer: '',
+    guides: Array.isArray(savedState.guides)
+      ? savedState.guides.map((guide) => ({
+          id: guide.id || `guide-${Date.now()}-${Math.random()}`,
+          axis: guide.axis,
+          edge: guide.edge || null,
+          baseValue: Number(guide.baseValue || 0),
+          value: Number(guide.value || 0)
+        }))
+      : []
+  }
+  panelEditRect.value = {
+    hoverSnap: null,
+    draft: null,
+    pendingAction: null,
+    rectangles: Array.isArray(savedState.rectangles)
+      ? savedState.rectangles.map((rectangle) => ({
+          id: rectangle.id || `rect-${Date.now()}-${Math.random()}`,
+          start: clonePanelEditSavedPoint(rectangle.start),
+          end: clonePanelEditSavedPoint(rectangle.end),
+          operation: rectangle.operation || 'none',
+          source: rectangle.source || 'rectangle',
+          regionKind: rectangle.regionKind || 'rect',
+          shapeType: rectangle.shapeType || null,
+          center: rectangle.center ? clonePanelEditSavedPoint(rectangle.center) : null,
+          radius: Number(rectangle.radius || 0),
+          polygon: Array.isArray(rectangle.polygon)
+            ? rectangle.polygon.map((point) => clonePanelEditSavedPoint(point))
+            : null
+        }))
+      : []
+  }
+  panelEditLine.value = {
+    hoverSnap: null,
+    hoverRegion: null,
+    hoverLine: null,
+    selectedLineId: null,
+    draft: null,
+    lines: Array.isArray(savedState.lines)
+      ? savedState.lines.map((line) => ({
+          id: line.id || `line-${Date.now()}-${Math.random()}`,
+          groupId: line.groupId || null,
+          groupType: line.groupType || null,
+          axis: line.axis || 'free',
+          start: clonePanelEditSavedPoint(line.start),
+          end: clonePanelEditSavedPoint(line.end)
+        }))
+      : []
+  }
+  panelEditCircle.value = {
+    hoverSnap: null,
+    draft: null,
+    inputBuffer: '',
+    circles: Array.isArray(savedState.circles)
+      ? savedState.circles.map((circle) => ({
+          id: circle.id || `circle-${Date.now()}-${Math.random()}`,
+          center: clonePanelEditSavedPoint(circle.center),
+          radius: Number(circle.radius || 0)
+        })).filter((circle) => circle.radius > 0)
+      : []
+  }
+  panelEditArc.value = {
+    hoverSnap: null,
+    hoverPoint: null,
+    draft: null,
+    inputBuffer: ''
+  }
+  clearPanelEditSelection()
+  resetPanelEditMoveDraft()
+  resetPanelEditSelectDrag()
+  clearPanelEditHistory()
+} // End loadPanelEditSavedState
 
 //=================
 function exitPanelEditCommandToSelect() {
@@ -3975,6 +4172,120 @@ function onPanelEditWheel(event) {
 } // End onPanelEditWheel
 
 
+//=================
+function clonePanelEditApplyPoint(point) {
+  return {
+    x: Number(point?.x || 0),
+    y: Number(point?.y || 0)
+  }
+} // End clonePanelEditApplyPoint
+
+//=================
+function getPanelEditSavedRectanglesForApply() {
+  return (panelEditRect.value.rectangles || []).map((rectangle) => ({
+    id: rectangle.id,
+    start: clonePanelEditApplyPoint(rectangle.start),
+    end: clonePanelEditApplyPoint(rectangle.end),
+    operation: rectangle.operation || 'none',
+    source: rectangle.source || 'rectangle',
+    regionKind: rectangle.regionKind || 'rect',
+    shapeType: rectangle.shapeType || null,
+    center: rectangle.center ? clonePanelEditApplyPoint(rectangle.center) : null,
+    radius: Number(rectangle.radius || 0),
+    polygon: Array.isArray(rectangle.polygon)
+      ? rectangle.polygon.map((point) => clonePanelEditApplyPoint(point))
+      : null
+  }))
+} // End getPanelEditSavedRectanglesForApply
+
+//=================
+function getPanelEditSavedLinesForApply() {
+  return (panelEditLine.value.lines || []).map((line) => ({
+    id: line.id,
+    groupId: line.groupId || null,
+    groupType: line.groupType || null,
+    axis: line.axis || 'free',
+    start: clonePanelEditApplyPoint(line.start),
+    end: clonePanelEditApplyPoint(line.end)
+  }))
+} // End getPanelEditSavedLinesForApply
+
+//=================
+function getPanelEditSavedCirclesForApply() {
+  return (panelEditCircle.value.circles || []).map((circle) => ({
+    id: circle.id,
+    center: clonePanelEditApplyPoint(circle.center),
+    radius: Number(circle.radius || 0)
+  })).filter((circle) => circle.radius > 0)
+} // End getPanelEditSavedCirclesForApply
+
+//=================
+function getPanelEditSavedGuidesForApply() {
+  return (panelEditTape.value.guides || []).map((guide) => ({
+    id: guide.id,
+    axis: guide.axis,
+    edge: guide.edge || null,
+    baseValue: Number(guide.baseValue || 0),
+    value: Number(guide.value || 0)
+  }))
+} // End getPanelEditSavedGuidesForApply
+
+//=================
+function applyPanelEdit() {
+  const context = activePanelEditContext.value
+
+  if (!context) return
+
+  const savedRectangles = getPanelEditSavedRectanglesForApply()
+  const savedLines = getPanelEditSavedLinesForApply()
+  const savedCircles = getPanelEditSavedCirclesForApply()
+  const savedGuides = getPanelEditSavedGuidesForApply()
+
+  drawing.applyPanelEditOperations({
+    panelId: context.panelId,
+    faceSide: context.faceSide,
+    faceKey: context.faceKey,
+    axisU: context.axisU,
+    axisV: context.axisV,
+    thicknessAxis: context.thicknessAxis,
+    rectangles: savedRectangles,
+    lines: savedLines,
+    circles: savedCircles,
+    guides: savedGuides
+  })
+
+  panelEditTape.value = {
+    hoverSnap: null,
+    draft: null,
+    guides: [],
+    inputBuffer: ''
+  }
+  panelEditRect.value = {
+    hoverSnap: null,
+    draft: null,
+    pendingAction: null,
+    rectangles: []
+  }
+  panelEditLine.value = {
+    hoverSnap: null,
+    hoverRegion: null,
+    hoverLine: null,
+    selectedLineId: null,
+    draft: null,
+    lines: []
+  }
+  panelEditCircle.value = {
+    hoverSnap: null,
+    draft: null,
+    circles: [],
+    inputBuffer: ''
+  }
+  clearPanelEditHistory()
+  drawing.clearPanelEdit()
+  app.setTool('select')
+  app.setStatus('Edit Panel: cập nhật thành công')
+  draw()
+} // End applyPanelEdit
 
 
 //=================
