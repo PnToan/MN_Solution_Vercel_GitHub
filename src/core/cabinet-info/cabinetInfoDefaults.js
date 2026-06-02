@@ -3,7 +3,7 @@ export function createDefaultCabinetInfoState() {
   return {
     groupName: 'Box 1',
     general: {
-      cabinetDepth: 500,
+      cabinetDepth: 600,
       panelThickness: 17.4,
       leftSide: true,
       rightSide: true,
@@ -13,7 +13,7 @@ export function createDefaultCabinetInfoState() {
       bottomOverlap: false
     },
     back: {
-      enabled: false,
+      enabled: true,
       grooveDepth: 10,
       thickness: 10,
       inset: 10,
@@ -23,8 +23,8 @@ export function createDefaultCabinetInfoState() {
       overlayBack: false
     },
     topStrip: {
-      enabled: false,
-      inset: false,
+      enabled: true,
+      inset: true,
       size: 50,
       faceOffset: 0
     },
@@ -44,7 +44,7 @@ export function createDefaultCabinetInfoState() {
       faceOffset: 0
     },
     toeKick: {
-      enabled: false,
+      enabled: true,
       height: 100,
       inset: 17.4,
       detached: false,

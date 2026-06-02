@@ -3,6 +3,8 @@ import { useCabinetStore } from './useCabinetStore'
 import { useAppStore } from './useAppStore'
 import { useBoxStore } from './useBoxStore'
 import { useWallStore } from './useWallStore'
+import { createDefaultCabinetInfoState } from '../core/cabinet-info/cabinetInfoDefaults'
+import { buildCabinetInfoPanels } from '../core/cabinet-info/cabinetInfoBuilder'
 import { buildZones } from '../core/zone/zone-engine'
 import {
   createPanelOnZoneEdge,
@@ -1559,20 +1561,27 @@ const store = createSimpleStore({
     if (boxStore.state.boxes.length || state.panels.length) return false
 
     const cabinet = useCabinetStore()
+    const defaultInfo = createDefaultCabinetInfoState()
     const width = 1200
-    const height = 2200
-    const depth = 580
-    const panelThickness = Math.max(1, toNumber(cabinet.state.panelThickness, 17.4))
-    const backThickness = 10
-    const toeKickHeight = 80
+    const height = 2000
+    const depth = 600
+    const panelThickness = Math.max(1, toNumber(defaultInfo.general.panelThickness, cabinet.state.panelThickness || 17.4))
     const wallBox = useWallStore().getBox3D()
-    const baseX = toNumber(wallBox.x, 0) + (Math.max(width, toNumber(wallBox.width, width)) - width) / 2
-    const baseY = toNumber(wallBox.y, 0) - depth
+    const wallX = toNumber(wallBox.x, 0)
+    const wallY = toNumber(wallBox.y, 0)
+    const wallWidth = Math.max(0, toNumber(wallBox.width, width))
+    const baseX = wallX + ((wallWidth - width) / 2)
+    const baseY = wallY - depth
     const baseZ = 0
-    const boxId = `box_default_${Date.now()}`
+    const boxId = 'box_default_1'
+
+    defaultInfo.groupName = 'Box 1'
+    defaultInfo.general.cabinetDepth = depth
+    defaultInfo.general.panelThickness = panelThickness
+
     const baseBox = {
       id: boxId,
-      name: 'Box test 1200x2200x580',
+      name: 'Box 1',
       x: baseX,
       y: baseY,
       z: baseZ,
@@ -1582,107 +1591,22 @@ const store = createSimpleStore({
       panelThickness,
       unit: cabinet.state.unit || 'mm',
       color: 'rgba(0, 119, 204, 0.12)',
-      isDefaultTestBox: true,
-      sourceType: 'default-test-box',
+      isDefaultBox: true,
+      sourceType: 'default-info-box',
       cabinetWidth: width,
       cabinetHeight: height,
-      cabinetDepth: depth
+      cabinetDepth: depth,
+      cabinetInfo: JSON.parse(JSON.stringify(defaultInfo))
     }
 
-    const makePanel = (panelSide, name, geometry, extra = {}) => ({
-      id: `panel_default_${panelSide}_${Date.now()}`,
-      name,
-      sourceType: 'default-test-box',
-      panelSide,
-      edge: panelSide,
-      linkedFrameId: boxId,
-      frameId: boxId,
-      sourceBoxId: boxId,
-      baseObjectId: boxId,
-      x3d: geometry.x,
-      y3d: geometry.y,
-      z3d: geometry.z,
-      xSize: geometry.xSize,
-      ySize: geometry.ySize,
-      zSize: geometry.zSize,
-      x: geometry.x,
-      y: geometry.z,
-      z: geometry.z,
-      width: geometry.xSize,
-      depth: geometry.ySize,
-      height: geometry.zSize,
-      panelThickness: geometry.thickness,
-      thickness: geometry.thickness,
-      dimEnabled: false,
-      ...extra
-    })
-
-    const panels = [
-      makePanel('left', 'Hông trái', {
-        x: baseX,
-        y: baseY,
-        z: baseZ,
-        xSize: panelThickness,
-        ySize: depth,
-        zSize: height,
-        thickness: panelThickness
-      }),
-      makePanel('right', 'Hông phải', {
-        x: baseX + width - panelThickness,
-        y: baseY,
-        z: baseZ,
-        xSize: panelThickness,
-        ySize: depth,
-        zSize: height,
-        thickness: panelThickness
-      }),
-      makePanel('top', 'Nóc', {
-        x: baseX,
-        y: baseY,
-        z: baseZ + height - panelThickness,
-        xSize: width,
-        ySize: depth,
-        zSize: panelThickness,
-        thickness: panelThickness
-      }),
-      makePanel('bottom', 'Đáy', {
-        x: baseX,
-        y: baseY,
-        z: baseZ + toeKickHeight,
-        xSize: width,
-        ySize: depth,
-        zSize: panelThickness,
-        thickness: panelThickness
-      }),
-      makePanel('back', 'Hậu', {
-        x: baseX,
-        y: baseY + depth - backThickness,
-        z: baseZ,
-        xSize: width,
-        ySize: backThickness,
-        zSize: height,
-        thickness: backThickness
-      }, {
-        cabinetInfoKind: 'back',
-        panelThickness: backThickness,
-        thickness: backThickness
-      }),
-      makePanel('toe_kick_front', 'Len chân', {
-        x: baseX,
-        y: baseY,
-        z: baseZ,
-        xSize: width,
-        ySize: panelThickness,
-        zSize: toeKickHeight,
-        thickness: panelThickness
-      })
-    ]
+    const panels = buildCabinetInfoPanels(baseBox, defaultInfo)
 
     boxStore.setBoxes([baseBox])
+    boxStore.reserveBoxIdSeed?.(2)
     boxStore.selectBox(boxId)
     state.panels = panels
-    state.selectedPanelId = panels[0]?.id || null
-    state.selectedPanelIds = panels[0] ? [panels[0].id] : []
+    state.selectedPanelId = null
+    state.selectedPanelIds = []
     state.selectedDimensionIds = []
     state.dimensions = []
     state.move = createMoveState()

@@ -132,6 +132,15 @@ const store = createSimpleStore({
   }, // End clearSelection
 
   //=================
+  reserveBoxIdSeed(nextSeed) {
+    const safeSeed = Math.floor(Number(nextSeed))
+
+    if (!Number.isFinite(safeSeed) || safeSeed <= boxIdSeed) return
+
+    boxIdSeed = safeSeed
+  }, // End reserveBoxIdSeed
+
+  //=================
   setEditingDim(dimKey) {
     state.editingDim = dimKey
   }, // End setEditingDim
