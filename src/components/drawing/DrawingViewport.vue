@@ -147,7 +147,7 @@ import {
   isPointInPanelEditPolygon,
   panelEditBoundsTouch
 } from '../../core/edit-panel/editPanelGeometry'
-import { createEditPanelHistoryController } from '../../core/edit-panel/editPanelHistory'
+import { createEditPanelHistoryController, clonePanelEditHistoryData } from '../../core/edit-panel/editPanelHistory'
 import { findShortcutAction, loadShortcutSettings, shortcutEventToText } from '../../core/settings/shortcut-settings'
 
 const app = useAppStore()
@@ -279,24 +279,7 @@ const panelEditTools = [
   { id: 'editPanelCircle', label: 'Vẽ hình tròn', icon: '/icons/toolbar/circle.svg' },
   { id: 'editPanelTape', label: 'Thước', icon: '/icons/toolbar/tape.svg' }
 ]
-const panelEditMoveController = createEditPanelMoveController({
-  panelEditMove,
-  panelEditSelection,
-  panelEditLine,
-  panelEditRect,
-  panelEditCircle,
-  drawing,
-  app,
-  nextTick,
-  resizePanelEditCanvas,
-  getPanelEditSelectedLineKeySet,
-  getPanelEditLineSelectionKey,
-  clonePanelEditHistoryData,
-  pushPanelEditHistorySnapshot,
-  drawPanelEditLine,
-  drawPanelEditRectangle,
-  drawPanelEditCircle
-})
+let panelEditMoveController = null
 const zoomLabel = computed(() => `${Math.round(app.state.viewport.zoom * 100)}%`)
 const localX = computed(() => Math.round(app.state.mouse.localX))
 const localY = computed(() => Math.round(app.state.mouse.localY))
@@ -1287,6 +1270,25 @@ const pushPanelEditHistorySnapshot = panelEditHistoryController.pushSnapshot
 const clearPanelEditHistory = panelEditHistoryController.clearHistory
 const undoPanelEditHistory = panelEditHistoryController.undoHistory
 const redoPanelEditHistory = panelEditHistoryController.redoHistory
+
+panelEditMoveController = createEditPanelMoveController({
+  panelEditMove,
+  panelEditSelection,
+  panelEditLine,
+  panelEditRect,
+  panelEditCircle,
+  drawing,
+  app,
+  nextTick,
+  resizePanelEditCanvas,
+  getPanelEditSelectedLineKeySet,
+  getPanelEditLineSelectionKey,
+  clonePanelEditHistoryData,
+  pushPanelEditHistorySnapshot,
+  drawPanelEditLine,
+  drawPanelEditRectangle,
+  drawPanelEditCircle
+})
 
 //=================
 function getPanelEditSavedStateKey(context) {

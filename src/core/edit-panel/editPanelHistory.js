@@ -1,5 +1,5 @@
 //=================
-function clonePanelEditHistoryData(value) {
+export function clonePanelEditHistoryData(value) {
   return JSON.parse(JSON.stringify(value || null))
 } // End clonePanelEditHistoryData
 
