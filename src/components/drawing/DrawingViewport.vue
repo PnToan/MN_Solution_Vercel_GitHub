@@ -1169,6 +1169,34 @@ function getPanelEditTapeSnap(context, layout, screenX, screenY, options = {}) {
       })
     })
 
+  const circleEdgeSources = [
+    ...(selectedMoveOnly ? snapSource.circles : (panelEditCircle.value.circles || [])),
+    ...(selectedMoveOnly ? snapSource.rectangles : (panelEditRect.value.rectangles || []))
+      .filter((rectangle) => rectangle.shapeType === 'circle' && rectangle.center && Number(rectangle.radius || 0) > 0)
+  ]
+
+  circleEdgeSources.forEach((circle, index) => {
+    const closest = getClosestPointOnPanelEditCircleEdge(circle, clampedLocal)
+
+    if (!closest) return
+
+    const point = getPanelEditPoint(context, layout.left, layout.top, layout.scale, closest.x, closest.y)
+    const distance = Math.hypot(point.x - screenX, point.y - screenY)
+    const sourceId = circle.id || `circle-edge-${index}`
+
+    edgeCandidates.push({
+      key: `circle-edge-${sourceId}`,
+      distance,
+      axis: 'free',
+      edge: 'circle',
+      kind: 'square',
+      circleId: circle.shapeType === 'circle' ? null : circle.id,
+      rectangleId: circle.shapeType === 'circle' ? circle.id : null,
+      local: { x: closest.x, y: closest.y },
+      screen: point
+    })
+  })
+
   const bestEdge = edgeCandidates
     .filter((candidate) => candidate.distance <= tolerance)
     .sort((a, b) => a.distance - b.distance)[0]
@@ -1695,6 +1723,32 @@ function getPanelEditCircleRadius(circle) {
     Number(current.y || 0) - Number(circle.center.y || 0)
   )
 } // End getPanelEditCircleRadius
+
+//=================
+
+function getClosestPointOnPanelEditCircleEdge(circle, local) {
+  if (!circle?.center || !local) return null
+
+  const radius = getPanelEditCircleRadius(circle)
+
+  if (radius <= 0) return null
+
+  const centerX = Number(circle.center.x || 0)
+  const centerY = Number(circle.center.y || 0)
+  const dx = Number(local.x || 0) - centerX
+  const dy = Number(local.y || 0) - centerY
+  const length = Math.hypot(dx, dy)
+  const unitX = length <= 0.0001 ? 1 : dx / length
+  const unitY = length <= 0.0001 ? 0 : dy / length
+  const x = centerX + unitX * radius
+  const y = centerY + unitY * radius
+
+  return {
+    x,
+    y,
+    distance: Math.hypot(Number(local.x || 0) - x, Number(local.y || 0) - y)
+  }
+} // End getClosestPointOnPanelEditCircleEdge
 
 //=================
 function drawPanelEditCircle(targetContext, context, layout, circle, options = {}) {
