@@ -117,6 +117,7 @@ import { hitTestPanel, hitTestZoneEdge } from '../../core/snap/snap-engine'
 import { handleViewportKey } from '../../commands/keyboard-controller'
 import { createPanelEditRectangleRecord, getEditPanelToolCursorClass, isEditPanelDrawTool, isEditPanelTool } from '../../core/tools/editPanelTool'
 import { getPanelEditArcData, getPanelEditArcDefaultBulge, getPanelEditArcDraftWithRadiusInput, getPanelEditArcPoints } from '../../core/tools/editPanelArcTool'
+import { findShortcutAction, loadShortcutSettings, shortcutEventToText } from '../../core/settings/shortcut-settings'
 
 const app = useAppStore()
 const cabinet = useCabinetStore()
@@ -5856,6 +5857,29 @@ function deleteCurrentSelection() {
   return true
 } // End deleteCurrentSelection
 //=================
+function runPanelEditShortcutAction(action) {
+  if (!action || action.type !== 'editPanelTool') return false
+  if (!activePanelEditContext.value) return false
+  if (!panelEditTools.some((tool) => tool.id === action.value)) return false
+
+  selectPanelEditWindowTool(action.value)
+  return true
+} // End runPanelEditShortcutAction
+
+//=================
+function handlePanelEditShortcutKey(event) {
+  if (!activePanelEditContext.value) return false
+  const shortcutText = shortcutEventToText(event)
+  const action = findShortcutAction(shortcutText, loadShortcutSettings())
+
+  if (!runPanelEditShortcutAction(action)) return false
+
+  event.preventDefault()
+  event.stopPropagation()
+  return true
+} // End handlePanelEditShortcutKey
+
+//=================
 function onKeyDown(event) {
   const key = event.key
   const isSpace = key === ' ' || key === 'Spacebar' || event.code === 'Space'
@@ -5878,6 +5902,8 @@ function onKeyDown(event) {
   if (handlePanelEditArcKey(event)) return
 
   if (handlePanelEditCircleKey(event)) return
+
+  if (handlePanelEditShortcutKey(event)) return
 
   if (activePanelEditContext.value && (event.key === 'Delete' || event.key === 'Backspace')) {
     event.preventDefault()

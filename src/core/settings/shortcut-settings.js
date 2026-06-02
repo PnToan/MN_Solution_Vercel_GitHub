@@ -7,6 +7,13 @@ export const SHORTCUT_FUNCTIONS = [
   { id: 'tool.move', group: 'Thanh công cụ', label: 'Di chuyển', defaultShortcuts: ['M'], type: 'tool', value: 'move' },
   { id: 'tool.dimensions', group: 'Thanh công cụ', label: 'Dimensions', defaultShortcuts: ['D'], type: 'tool', value: 'dimensions' },
 
+  { id: 'editPanel.select', group: 'Edit Panel', label: 'Edit Panel - Select', defaultShortcuts: ['S'], type: 'editPanelTool', value: 'editPanelSelect' },
+  { id: 'editPanel.line', group: 'Edit Panel', label: 'Edit Panel - Line', defaultShortcuts: ['L'], type: 'editPanelTool', value: 'editPanelLine' },
+  { id: 'editPanel.rect', group: 'Edit Panel', label: 'Edit Panel - Rectangle', defaultShortcuts: ['R'], type: 'editPanelTool', value: 'editPanelRect' },
+  { id: 'editPanel.arc', group: 'Edit Panel', label: 'Edit Panel - Arc', defaultShortcuts: ['A'], type: 'editPanelTool', value: 'editPanelArc' },
+  { id: 'editPanel.circle', group: 'Edit Panel', label: 'Edit Panel - Circle', defaultShortcuts: ['C'], type: 'editPanelTool', value: 'editPanelCircle' },
+  { id: 'editPanel.tape', group: 'Edit Panel', label: 'Edit Panel - Tape', defaultShortcuts: ['T'], type: 'editPanelTool', value: 'editPanelTape' },
+
   { id: 'view.top', group: 'View', label: 'Mặt Trên', defaultShortcuts: ['Alt+T'], type: 'view', value: 'top' },
   { id: 'view.bottom', group: 'View', label: 'Mặt Dưới', defaultShortcuts: ['Alt+B'], type: 'view', value: 'bottom' },
   { id: 'view.front', group: 'View', label: 'Mặt Trước', defaultShortcuts: ['Alt+F'], type: 'view', value: 'front' },

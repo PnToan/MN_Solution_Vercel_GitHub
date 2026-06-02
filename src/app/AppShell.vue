@@ -225,10 +225,10 @@ function onGlobalKeyDown(event) {
 
   if (!action) return
 
+  if (!runShortcutAction(action)) return
+
   event.preventDefault()
   event.stopPropagation()
-
-  runShortcutAction(action)
 } // End onGlobalKeyDown
 
 watch(() => drawingStore.state.panelEdit?.active, (active) => {
