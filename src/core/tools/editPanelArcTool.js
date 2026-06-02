@@ -39,16 +39,32 @@ export function getPanelEditArcEndFromRadius(start, current, radius) {
 
 //=================
 export function getPanelEditArcDraftWithRadiusInput(draft, inputBuffer) {
-  if (!draft?.start || draft.stage !== 'end') return draft
+  if (!draft?.start) return draft
 
   const radiusText = String(inputBuffer ?? '').trim()
 
   if (radiusText === '') return draft
 
   const radius = Number(radiusText)
-  const endPoint = getPanelEditArcEndFromRadius(draft.start, draft.current, radius)
+  const directionPoint = draft.stage === 'bulge'
+    ? (draft.end || draft.current)
+    : draft.current
+  const endPoint = getPanelEditArcEndFromRadius(draft.start, directionPoint, radius)
 
   if (!endPoint) return draft
+
+  if (draft.stage === 'bulge') {
+    const defaultBulge = getPanelEditArcDefaultBulge(draft.start, endPoint)
+
+    if (!defaultBulge) return draft
+
+    return {
+      ...draft,
+      end: endPoint,
+      current: draft.suggested === true ? defaultBulge : draft.current,
+      radiusLocked: true
+    }
+  }
 
   return {
     ...draft,
