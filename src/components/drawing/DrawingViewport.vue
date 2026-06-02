@@ -200,6 +200,24 @@ const panelEditArc = ref({
   inputBuffer: ''
 })
 
+const panelEditSelection = ref({
+  items: []
+})
+
+const panelEditSelectDrag = ref({
+  active: false,
+  start: null,
+  current: null,
+  moved: false
+})
+
+const panelEditMove = ref({
+  stage: 'idle',
+  start: null,
+  current: null,
+  baseItems: []
+})
+
 const panelEditHistory = ref({
   undoStack: [],
   redoStack: [],
@@ -221,6 +239,7 @@ const views = [
 
 const panelEditTools = [
   { id: 'editPanelSelect', label: 'Select', icon: '/icons/toolbar/select.svg' },
+  { id: 'editPanelMove', label: 'Move', icon: '/icons/toolbar/move.svg' },
   { id: 'editPanelLine', label: 'Line', icon: '/icons/toolbar/line.svg' },
   { id: 'editPanelRect', label: 'Vẽ hình chữ nhật', icon: '/icons/toolbar/rect.svg' },
   { id: 'editPanelArc', label: 'Arc', icon: '/icons/toolbar/arc.svg' },
@@ -240,14 +259,18 @@ const panelEditFooterText = computed(() => {
   if (!shapeTool || shapeTool === 'editPanelSelect') {
     const hoverRegion = panelEditLine.value.hoverRegion
     const hoverLine = panelEditLine.value.hoverLine
-    const selectedLineId = panelEditLine.value.selectedLineId
+    const selectedCount = panelEditSelection.value.items.length
 
-    if (selectedLineId) {
-      return 'Select: line đã chọn | Delete để xóa line'
+    if (panelEditSelectDrag.value.active) {
+      return 'Select: thả chuột để chọn toàn bộ line / hình chữ nhật / hình tròn trong vùng quét'
+    }
+
+    if (selectedCount > 0) {
+      return `Select: đã chọn ${selectedCount} chi tiết | M/Move để di chuyển | Delete để xóa`
     }
 
     if (hoverLine) {
-      return 'Select: đang nhận line | click để chọn line'
+      return 'Select: đang nhận line | click để chọn toàn bộ line / arc'
     }
 
     if (panelEditRect.value.pendingAction?.source === 'lineRegion') {
@@ -278,6 +301,20 @@ const panelEditFooterText = computed(() => {
     }
 
     return 'Line: click điểm đầu, rê chuột preview, click điểm cuối để tạo line'
+  }
+
+  if (shapeTool === 'editPanelMove') {
+    const selectedCount = panelEditSelection.value.items.length
+
+    if (panelEditMove.value.stage === 'target') {
+      return `Move: đang preview ${selectedCount} chi tiết | click điểm 2 để hoàn tất | Shift khóa trục | Esc hủy`
+    }
+
+    if (selectedCount > 0) {
+      return `Move: đã chọn ${selectedCount} chi tiết | click điểm 1 để bắt đầu di chuyển`
+    }
+
+    return 'Move: chọn line / quét chọn hình trước, sau đó click điểm 1 để di chuyển'
   }
 
   if (shapeTool === 'editPanelTape') {
@@ -1096,12 +1133,34 @@ function resetPanelEditArcDraft() {
 } // End resetPanelEditArcDraft
 
 //=================
+function resetPanelEditMoveDraft() {
+  panelEditMove.value = {
+    stage: 'idle',
+    start: null,
+    current: null,
+    baseItems: []
+  }
+} // End resetPanelEditMoveDraft
+
+//=================
+function resetPanelEditSelectDrag() {
+  panelEditSelectDrag.value = {
+    active: false,
+    start: null,
+    current: null,
+    moved: false
+  }
+} // End resetPanelEditSelectDrag
+
+//=================
 function resetPanelEditCommandDrafts() {
   resetPanelEditTapeDraft()
   resetPanelEditRectDraft()
   resetPanelEditLineDraft()
   resetPanelEditCircleDraft()
   resetPanelEditArcDraft()
+  resetPanelEditMoveDraft()
+  resetPanelEditSelectDrag()
 } // End resetPanelEditCommandDrafts
 
 //=================
@@ -1158,6 +1217,9 @@ function restorePanelEditHistorySnapshot(snapshot) {
     draft: null,
     inputBuffer: ''
   }
+  clearPanelEditSelection()
+  resetPanelEditMoveDraft()
+  resetPanelEditSelectDrag()
 } // End restorePanelEditHistorySnapshot
 
 //=================
@@ -1269,6 +1331,9 @@ function loadPanelEditSavedState(context) {
       draft: null,
       inputBuffer: ''
     }
+    clearPanelEditSelection()
+    resetPanelEditMoveDraft()
+    resetPanelEditSelectDrag()
     clearPanelEditHistory()
   }
 
@@ -1353,6 +1418,9 @@ function loadPanelEditSavedState(context) {
     draft: null,
     inputBuffer: ''
   }
+  clearPanelEditSelection()
+  resetPanelEditMoveDraft()
+  resetPanelEditSelectDrag()
   clearPanelEditHistory()
 } // End loadPanelEditSavedState
 
@@ -1491,11 +1559,12 @@ function drawPanelEditCircle(targetContext, context, layout, circle, options = {
 
   const center = getPanelEditPoint(context, layout.left, layout.top, layout.scale, circle.center.x, circle.center.y)
   const isDraft = options.draft === true
+  const isSelected = options.selected === true
 
   targetContext.save()
-  targetContext.strokeStyle = isDraft ? '#ff7a00' : '#111111'
+  targetContext.strokeStyle = isDraft ? '#ff7a00' : (isSelected ? '#ff0000' : '#111111')
   targetContext.fillStyle = isDraft ? 'rgba(255, 122, 0, 0.08)' : 'rgba(0, 0, 0, 0.02)'
-  targetContext.lineWidth = isDraft ? 2 : 1.5
+  targetContext.lineWidth = isDraft ? 2 : (isSelected ? 2.5 : 1.5)
   targetContext.setLineDash(isDraft ? [8, 5] : [])
   targetContext.beginPath()
   targetContext.arc(center.x, center.y, radius * layout.scale, 0, Math.PI * 2)
@@ -1534,6 +1603,7 @@ function drawPanelEditRectangle(targetContext, context, layout, rectangle, optio
   if (!rectangle) return
 
   const isDraft = options.draft === true
+  const isSelected = options.selected === true
   const isCutout = rectangle.operation === 'cutout'
 
   if (rectangle.regionKind === 'polygon' && Array.isArray(rectangle.polygon)) {
@@ -1554,9 +1624,9 @@ function drawPanelEditRectangle(targetContext, context, layout, rectangle, optio
       return
     }
 
-    targetContext.strokeStyle = isDraft ? '#ff7a00' : '#111111'
+    targetContext.strokeStyle = isDraft ? '#ff7a00' : (isSelected ? '#ff0000' : '#111111')
     targetContext.fillStyle = isDraft ? 'rgba(255, 122, 0, 0.12)' : 'rgba(0, 0, 0, 0.04)'
-    targetContext.lineWidth = isDraft ? 2 : 1.5
+    targetContext.lineWidth = isDraft ? 2 : (isSelected ? 2.5 : 1.5)
     targetContext.setLineDash(isDraft ? [8, 5] : [])
     targetContext.beginPath()
     if (drawPanelEditPolygonPath(targetContext, context, layout, rectangle.polygon)) {
@@ -1590,9 +1660,9 @@ function drawPanelEditRectangle(targetContext, context, layout, rectangle, optio
     return
   }
 
-  targetContext.strokeStyle = isDraft ? '#ff7a00' : '#111111'
+  targetContext.strokeStyle = isDraft ? '#ff7a00' : (isSelected ? '#ff0000' : '#111111')
   targetContext.fillStyle = isDraft ? 'rgba(255, 122, 0, 0.12)' : 'rgba(0, 0, 0, 0.04)'
-  targetContext.lineWidth = isDraft ? 2 : 1.5
+  targetContext.lineWidth = isDraft ? 2 : (isSelected ? 2.5 : 1.5)
   targetContext.setLineDash(isDraft ? [8, 5] : [])
   targetContext.beginPath()
   targetContext.rect(start.x, start.y, rectWidth, rectHeight)
@@ -3182,6 +3252,344 @@ function commitPanelEditCircle(radiusOverride = null) {
   nextTick(resizePanelEditCanvas)
 } // End commitPanelEditCircle
 
+
+//=================
+function getPanelEditSelectionItemKey(item) {
+  if (!item) return null
+
+  return `${item.type}:${item.key || item.id}`
+} // End getPanelEditSelectionItemKey
+
+//=================
+function normalizePanelEditSelectionItems(items = []) {
+  const seen = new Set()
+  const output = []
+
+  items.forEach((item) => {
+    const key = getPanelEditSelectionItemKey(item)
+
+    if (!key || seen.has(key)) return
+
+    seen.add(key)
+    output.push({ ...item })
+  })
+
+  return output
+} // End normalizePanelEditSelectionItems
+
+//=================
+function setPanelEditSelection(items = []) {
+  const nextItems = normalizePanelEditSelectionItems(items)
+  const firstLine = nextItems.find((item) => item.type === 'line')
+
+  panelEditSelection.value = { items: nextItems }
+  panelEditLine.value = {
+    ...panelEditLine.value,
+    selectedLineId: firstLine?.key || null
+  }
+} // End setPanelEditSelection
+
+//=================
+function clearPanelEditSelection() {
+  panelEditSelection.value = { items: [] }
+  panelEditLine.value = {
+    ...panelEditLine.value,
+    selectedLineId: null
+  }
+} // End clearPanelEditSelection
+
+//=================
+function getPanelEditSelectedLineKeySet() {
+  return new Set(
+    panelEditSelection.value.items
+      .filter((item) => item.type === 'line')
+      .map((item) => item.key)
+  )
+} // End getPanelEditSelectedLineKeySet
+
+//=================
+function isPanelEditRectangleSelected(rectangle) {
+  return panelEditSelection.value.items.some((item) => item.type === 'rect' && item.id === rectangle?.id)
+} // End isPanelEditRectangleSelected
+
+//=================
+function isPanelEditCircleSelected(circle) {
+  return panelEditSelection.value.items.some((item) => item.type === 'circle' && item.id === circle?.id)
+} // End isPanelEditCircleSelected
+
+//=================
+function getPanelEditPointerLocal(context, layout, event) {
+  const canvas = panelEditCanvasRef.value
+
+  if (!canvas || !context || !layout || !event) return null
+
+  const rect = canvas.getBoundingClientRect()
+  const rawLocal = getPanelEditLocalFromScreen(context, layout, event.clientX - rect.left, event.clientY - rect.top)
+
+  return {
+    x: Math.max(0, Math.min(context.width, rawLocal.x)),
+    y: Math.max(0, Math.min(context.height, rawLocal.y))
+  }
+} // End getPanelEditPointerLocal
+
+//=================
+function getPanelEditSelectDragRectFromPoints(start, current) {
+  if (!start || !current) return null
+
+  const x1 = Number(start.x || 0)
+  const y1 = Number(start.y || 0)
+  const x2 = Number(current.x || 0)
+  const y2 = Number(current.y || 0)
+
+  return {
+    x: Math.min(x1, x2),
+    y: Math.min(y1, y2),
+    width: Math.abs(x2 - x1),
+    height: Math.abs(y2 - y1)
+  }
+} // End getPanelEditSelectDragRectFromPoints
+
+//=================
+function getPanelEditSelectDragRect() {
+  const drag = panelEditSelectDrag.value
+
+  return getPanelEditSelectDragRectFromPoints(drag.start, drag.current)
+} // End getPanelEditSelectDragRect
+
+//=================
+function panelEditBoundsTouch(boundsA, boundsB) {
+  if (!boundsA || !boundsB) return false
+
+  return boundsA.x <= boundsB.x + boundsB.width
+    && boundsA.x + boundsA.width >= boundsB.x
+    && boundsA.y <= boundsB.y + boundsB.height
+    && boundsA.y + boundsA.height >= boundsB.y
+} // End panelEditBoundsTouch
+
+//=================
+function getPanelEditLineBounds(line) {
+  if (!line?.start || !line?.end) return null
+
+  const x1 = Number(line.start.x || 0)
+  const y1 = Number(line.start.y || 0)
+  const x2 = Number(line.end.x || 0)
+  const y2 = Number(line.end.y || 0)
+
+  return {
+    x: Math.min(x1, x2),
+    y: Math.min(y1, y2),
+    width: Math.abs(x2 - x1),
+    height: Math.abs(y2 - y1)
+  }
+} // End getPanelEditLineBounds
+
+//=================
+function getPanelEditSelectionByRect(selectionRect) {
+  if (!selectionRect || selectionRect.width <= 0.01 || selectionRect.height <= 0.01) return []
+
+  const items = []
+
+  panelEditLine.value.lines.forEach((line) => {
+    const lineBounds = getPanelEditLineBounds(line)
+
+    if (!panelEditBoundsTouch(selectionRect, lineBounds)) return
+
+    items.push({
+      type: 'line',
+      key: getPanelEditLineSelectionKey(line)
+    })
+  })
+
+  panelEditRect.value.rectangles.forEach((rectangle) => {
+    const bounds = Array.isArray(rectangle?.polygon) && rectangle.polygon.length >= 3
+      ? getPanelEditPolygonBounds(rectangle.polygon)
+      : getPanelEditRectBounds(rectangle)
+
+    if (!panelEditBoundsTouch(selectionRect, bounds)) return
+
+    items.push({ type: 'rect', id: rectangle.id })
+  })
+
+  panelEditCircle.value.circles.forEach((circle) => {
+    const bounds = getPanelEditCircleBounds(circle)
+
+    if (!panelEditBoundsTouch(selectionRect, bounds)) return
+
+    items.push({ type: 'circle', id: circle.id })
+  })
+
+  return normalizePanelEditSelectionItems(items)
+} // End getPanelEditSelectionByRect
+
+//=================
+function drawPanelEditSelectDrag(targetContext, context, layout) {
+  const dragRect = getPanelEditSelectDragRect()
+
+  if (!dragRect || dragRect.width <= 0.01 || dragRect.height <= 0.01) return
+
+  const topLeft = getPanelEditPoint(context, layout.left, layout.top, layout.scale, dragRect.x, dragRect.y + dragRect.height)
+
+  targetContext.save()
+  targetContext.fillStyle = 'rgba(255, 122, 0, 0.08)'
+  targetContext.strokeStyle = '#ff7a00'
+  targetContext.lineWidth = 1.5
+  targetContext.setLineDash([6, 4])
+  targetContext.fillRect(topLeft.x, topLeft.y, dragRect.width * layout.scale, dragRect.height * layout.scale)
+  targetContext.strokeRect(topLeft.x, topLeft.y, dragRect.width * layout.scale, dragRect.height * layout.scale)
+  targetContext.restore()
+} // End drawPanelEditSelectDrag
+
+//=================
+function translatePanelEditPoint(point, delta) {
+  return {
+    x: Number(point?.x || 0) + Number(delta.x || 0),
+    y: Number(point?.y || 0) + Number(delta.y || 0)
+  }
+} // End translatePanelEditPoint
+
+//=================
+function translatePanelEditRectangle(rectangle, delta) {
+  return {
+    ...rectangle,
+    start: translatePanelEditPoint(rectangle.start, delta),
+    end: translatePanelEditPoint(rectangle.end, delta),
+    polygon: Array.isArray(rectangle.polygon)
+      ? rectangle.polygon.map((point) => translatePanelEditPoint(point, delta))
+      : null
+  }
+} // End translatePanelEditRectangle
+
+//=================
+function translatePanelEditLine(line, delta) {
+  return {
+    ...line,
+    start: translatePanelEditPoint(line.start, delta),
+    end: translatePanelEditPoint(line.end, delta)
+  }
+} // End translatePanelEditLine
+
+//=================
+function translatePanelEditCircle(circle, delta) {
+  return {
+    ...circle,
+    center: translatePanelEditPoint(circle.center, delta)
+  }
+} // End translatePanelEditCircle
+
+//=================
+function getPanelEditMoveDelta() {
+  const move = panelEditMove.value
+
+  if (!move.start || !move.current) return { x: 0, y: 0 }
+
+  return {
+    x: Number(move.current.x || 0) - Number(move.start.x || 0),
+    y: Number(move.current.y || 0) - Number(move.start.y || 0)
+  }
+} // End getPanelEditMoveDelta
+
+//=================
+function getPanelEditMovePreviewItems() {
+  const delta = getPanelEditMoveDelta()
+  const selectedLineKeys = getPanelEditSelectedLineKeySet()
+  const selectedRectIds = new Set(panelEditSelection.value.items.filter((item) => item.type === 'rect').map((item) => item.id))
+  const selectedCircleIds = new Set(panelEditSelection.value.items.filter((item) => item.type === 'circle').map((item) => item.id))
+
+  return {
+    lines: panelEditLine.value.lines
+      .filter((line) => selectedLineKeys.has(getPanelEditLineSelectionKey(line)))
+      .map((line) => translatePanelEditLine(line, delta)),
+    rectangles: panelEditRect.value.rectangles
+      .filter((rectangle) => selectedRectIds.has(rectangle.id))
+      .map((rectangle) => translatePanelEditRectangle(rectangle, delta)),
+    circles: panelEditCircle.value.circles
+      .filter((circle) => selectedCircleIds.has(circle.id))
+      .map((circle) => translatePanelEditCircle(circle, delta))
+  }
+} // End getPanelEditMovePreviewItems
+
+//=================
+function isPanelEditMovePreviewActive() {
+  return drawing.state.panelEdit?.shapeTool === 'editPanelMove' && panelEditMove.value.stage === 'target'
+} // End isPanelEditMovePreviewActive
+
+//=================
+function drawPanelEditMovePreview(targetContext, context, layout) {
+  if (!isPanelEditMovePreviewActive()) return
+
+  const preview = getPanelEditMovePreviewItems()
+
+  preview.lines.forEach((line) => drawPanelEditLine(targetContext, context, layout, line, { draft: true }))
+  preview.rectangles.forEach((rectangle) => drawPanelEditRectangle(targetContext, context, layout, rectangle, { draft: true }))
+  preview.circles.forEach((circle) => drawPanelEditCircle(targetContext, context, layout, circle, { draft: true }))
+} // End drawPanelEditMovePreview
+
+//=================
+function commitPanelEditMove() {
+  if (!isPanelEditMovePreviewActive()) return false
+
+  const delta = getPanelEditMoveDelta()
+
+  if (Math.abs(delta.x) <= 0.001 && Math.abs(delta.y) <= 0.001) {
+    resetPanelEditMoveDraft()
+    app.setStatus('Move: khoảng di chuyển bằng 0')
+    resizePanelEditCanvas()
+    return false
+  }
+
+  const selectedLineKeys = getPanelEditSelectedLineKeySet()
+  const selectedRectIds = new Set(panelEditSelection.value.items.filter((item) => item.type === 'rect').map((item) => item.id))
+  const selectedCircleIds = new Set(panelEditSelection.value.items.filter((item) => item.type === 'circle').map((item) => item.id))
+
+  pushPanelEditHistorySnapshot()
+  panelEditLine.value = {
+    ...panelEditLine.value,
+    lines: panelEditLine.value.lines.map((line) => selectedLineKeys.has(getPanelEditLineSelectionKey(line)) ? translatePanelEditLine(line, delta) : line),
+    hoverLine: null,
+    hoverRegion: null
+  }
+  panelEditRect.value = {
+    ...panelEditRect.value,
+    rectangles: panelEditRect.value.rectangles.map((rectangle) => selectedRectIds.has(rectangle.id) ? translatePanelEditRectangle(rectangle, delta) : rectangle)
+  }
+  panelEditCircle.value = {
+    ...panelEditCircle.value,
+    circles: panelEditCircle.value.circles.map((circle) => selectedCircleIds.has(circle.id) ? translatePanelEditCircle(circle, delta) : circle)
+  }
+  resetPanelEditMoveDraft()
+  app.setStatus(`Move: đã di chuyển ${panelEditSelection.value.items.length} chi tiết`)
+  nextTick(resizePanelEditCanvas)
+
+  return true
+} // End commitPanelEditMove
+
+//=================
+function cancelPanelEditMove() {
+  if (panelEditMove.value.stage !== 'target') return false
+
+  resetPanelEditMoveDraft()
+  app.setStatus('Move: đã hủy di chuyển')
+  resizePanelEditCanvas()
+
+  return true
+} // End cancelPanelEditMove
+
+//=================
+function startPanelEditMove(point) {
+  if (!point || panelEditSelection.value.items.length === 0) return false
+
+  panelEditMove.value = {
+    stage: 'target',
+    start: { ...point },
+    current: { ...point },
+    baseItems: clonePanelEditHistoryData(panelEditSelection.value.items)
+  }
+  app.setStatus('Move: rê chuột preview, click điểm 2 để hoàn tất | Shift khóa trục')
+  resizePanelEditCanvas()
+
+  return true
+} // End startPanelEditMove
+
 //=================
 function drawPanelEditCanvas(editContext = null, width = null, height = null) {
   const canvas = panelEditCanvasRef.value
@@ -3236,14 +3644,18 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
   drawPanelEditLineRegions(targetContext, context, layout)
 
   const hoverLineKey = getPanelEditLineSelectionKey(panelEditLine.value.hoverLine)
-  const selectedLineKey = panelEditLine.value.selectedLineId
+  const selectedLineKeys = getPanelEditSelectedLineKeySet()
+  const movePreviewActive = isPanelEditMovePreviewActive()
 
   panelEditLine.value.lines.forEach((line) => {
     const lineKey = getPanelEditLineSelectionKey(line)
+    const isSelected = selectedLineKeys.has(lineKey)
+
+    if (movePreviewActive && isSelected) return
 
     drawPanelEditLine(targetContext, context, layout, line, {
       hover: hoverLineKey && hoverLineKey === lineKey,
-      selected: selectedLineKey && selectedLineKey === lineKey
+      selected: isSelected
     })
   })
 
@@ -3260,12 +3672,22 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
   }
 
   panelEditRect.value.rectangles.forEach((rectangle) => {
-    drawPanelEditRectangle(targetContext, context, layout, rectangle)
+    const isSelected = isPanelEditRectangleSelected(rectangle)
+
+    if (movePreviewActive && isSelected) return
+
+    drawPanelEditRectangle(targetContext, context, layout, rectangle, { selected: isSelected })
   })
 
   panelEditCircle.value.circles.forEach((circle) => {
-    drawPanelEditCircle(targetContext, context, layout, circle)
+    const isSelected = isPanelEditCircleSelected(circle)
+
+    if (movePreviewActive && isSelected) return
+
+    drawPanelEditCircle(targetContext, context, layout, circle, { selected: isSelected })
   })
+
+  drawPanelEditMovePreview(targetContext, context, layout)
 
   const boundaryCutoutPolygons = getPanelEditBoundaryCutoutPolygons()
 
@@ -3305,6 +3727,10 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
 
   if (drawing.state.panelEdit?.shapeTool === 'editPanelCircle') {
     drawPanelEditTapeSnap(targetContext, panelEditCircle.value.hoverSnap)
+  }
+
+  if (drawing.state.panelEdit?.shapeTool === 'editPanelSelect') {
+    drawPanelEditSelectDrag(targetContext, context, layout)
   }
 
   targetContext.strokeStyle = dimColor
@@ -3400,7 +3826,7 @@ function onPanelEditPointerDown(event) {
     // Ignore browsers that cannot capture this pointer.
   }
 
-  if (event.button === 1 || event.button === 2 || event.shiftKey) {
+  if (event.button === 1 || event.button === 2) {
     panelEditPanning = true
     panelEditPanStart = { x: event.clientX, y: event.clientY }
     panelEditPanOriginal = {
@@ -3419,49 +3845,51 @@ function onPanelEditPointerDown(event) {
   const layout = getPanelEditLayout(context, rect.width, rect.height)
 
   if (!shapeTool || shapeTool === 'editPanelSelect') {
-    const lineHit = getPanelEditLineHit(context, layout, event.clientX - rect.left, event.clientY - rect.top)
+    const startLocal = getPanelEditPointerLocal(context, layout, event)
 
-    if (lineHit) {
-      panelEditLine.value = {
-        ...panelEditLine.value,
-        hoverLine: lineHit,
-        hoverRegion: null,
-        selectedLineId: getPanelEditLineSelectionKey(lineHit)
-      }
-      app.setStatus(lineHit.groupType === 'arc' ? 'Select: đã chọn toàn bộ cạnh arc | Delete để xóa' : 'Select: đã chọn line | Delete để xóa')
-      resizePanelEditCanvas()
-      return
+    panelEditSelectDrag.value = {
+      active: true,
+      start: startLocal,
+      current: startLocal,
+      moved: false
     }
-
-    const region = hitPanelEditLineRegion(context, layout, event)
-
-    if (!region) {
-      panelEditLine.value = {
-        ...panelEditLine.value,
-        hoverLine: null,
-        hoverRegion: null,
-        selectedLineId: null
-      }
-      resizePanelEditCanvas()
-      return
-    }
-
-    panelEditLine.value = {
-      ...panelEditLine.value,
-      hoverLine: null,
-      selectedLineId: null,
-      hoverRegion: region
-    }
-    panelEditRect.value = {
-      ...panelEditRect.value,
-      pendingAction: {
-        ...region,
-        id: `region-cutout-${Date.now()}`,
-        operation: 'none'
-      }
-    }
-    app.setStatus('Select vùng: chọn None hoặc Khấu')
     resizePanelEditCanvas()
+    return
+  }
+
+  if (shapeTool === 'editPanelMove') {
+    const point = getPanelEditLinePointFromPointer(context, layout, event)
+
+    if (!point) return
+
+    if (panelEditMove.value.stage === 'target') {
+      const lockedLocal = event.shiftKey
+        ? getPanelEditAxisLockedPoint(panelEditMove.value.start, point.local)
+        : point.local
+
+      panelEditMove.value = {
+        ...panelEditMove.value,
+        current: lockedLocal
+      }
+      commitPanelEditMove()
+      return
+    }
+
+    if (panelEditSelection.value.items.length === 0) {
+      const lineHit = getPanelEditLineHit(context, layout, event.clientX - rect.left, event.clientY - rect.top)
+
+      if (lineHit) {
+        setPanelEditSelection([{ type: 'line', key: getPanelEditLineSelectionKey(lineHit) }])
+      }
+    }
+
+    if (panelEditSelection.value.items.length === 0) {
+      app.setStatus('Move: chưa có chi tiết được chọn')
+      resizePanelEditCanvas()
+      return
+    }
+
+    startPanelEditMove(point.local)
     return
   }
 
@@ -3704,12 +4132,44 @@ function onPanelEditPointerMove(event) {
   }
 
   if (!shapeTool || shapeTool === 'editPanelSelect') {
+    const currentLocal = getPanelEditPointerLocal(context, layout, event)
+
+    if (panelEditSelectDrag.value.active) {
+      const distance = panelEditSelectDrag.value.start && currentLocal
+        ? Math.hypot(currentLocal.x - panelEditSelectDrag.value.start.x, currentLocal.y - panelEditSelectDrag.value.start.y)
+        : 0
+
+      panelEditSelectDrag.value = {
+        ...panelEditSelectDrag.value,
+        current: currentLocal,
+        moved: panelEditSelectDrag.value.moved || distance > 2
+      }
+      resizePanelEditCanvas()
+      return
+    }
+
     const lineHit = getPanelEditLineHit(context, layout, event.clientX - rect.left, event.clientY - rect.top)
 
     panelEditLine.value = {
       ...panelEditLine.value,
       hoverLine: lineHit,
       hoverRegion: lineHit ? null : hitPanelEditLineRegion(context, layout, event)
+    }
+    resizePanelEditCanvas()
+    return
+  }
+
+  if (shapeTool === 'editPanelMove') {
+    if (panelEditMove.value.stage !== 'target') return
+
+    const point = getPanelEditLinePointFromPointer(context, layout, event)
+    const currentLocal = point?.local
+      ? (event.shiftKey ? getPanelEditAxisLockedPoint(panelEditMove.value.start, point.local) : point.local)
+      : panelEditMove.value.current
+
+    panelEditMove.value = {
+      ...panelEditMove.value,
+      current: currentLocal
     }
     resizePanelEditCanvas()
     return
@@ -3816,10 +4276,87 @@ function onPanelEditPointerMove(event) {
 } // End onPanelEditPointerMove
 
 //=================
-function onPanelEditPointerUp() {
+function onPanelEditPointerUp(event = null) {
+  const context = activePanelEditContext.value
+  const canvas = panelEditCanvasRef.value
+
   panelEditPanning = false
   panelEditPanStart = null
   panelEditPanOriginal = null
+
+  if (!canvas || !context || !panelEditSelectDrag.value.active) {
+    resetPanelEditSelectDrag()
+    return
+  }
+
+  const rect = canvas.getBoundingClientRect()
+  const layout = getPanelEditLayout(context, rect.width, rect.height)
+  const drag = panelEditSelectDrag.value
+
+  resetPanelEditSelectDrag()
+
+  if (drawing.state.panelEdit?.shapeTool !== 'editPanelSelect') return
+
+  if (drag.moved) {
+    const selectionRect = getPanelEditSelectDragRectFromPoints(drag.start, drag.current)
+    const selectedItems = getPanelEditSelectionByRect(selectionRect)
+
+    setPanelEditSelection(selectedItems)
+    panelEditLine.value = {
+      ...panelEditLine.value,
+      hoverLine: null,
+      hoverRegion: null
+    }
+    app.setStatus(selectedItems.length > 0 ? `Select: đã quét chọn ${selectedItems.length} chi tiết` : 'Select: vùng quét không có chi tiết')
+    resizePanelEditCanvas()
+    return
+  }
+
+  if (!event) return
+
+  const lineHit = getPanelEditLineHit(context, layout, event.clientX - rect.left, event.clientY - rect.top)
+
+  if (lineHit) {
+    setPanelEditSelection([{ type: 'line', key: getPanelEditLineSelectionKey(lineHit) }])
+    panelEditLine.value = {
+      ...panelEditLine.value,
+      hoverLine: lineHit,
+      hoverRegion: null
+    }
+    app.setStatus(lineHit.groupType === 'arc' ? 'Select: đã chọn toàn bộ arc | Delete để xóa | Move để di chuyển' : 'Select: đã chọn line | Delete để xóa | Move để di chuyển')
+    resizePanelEditCanvas()
+    return
+  }
+
+  const region = hitPanelEditLineRegion(context, layout, event)
+
+  if (!region) {
+    clearPanelEditSelection()
+    panelEditLine.value = {
+      ...panelEditLine.value,
+      hoverLine: null,
+      hoverRegion: null
+    }
+    resizePanelEditCanvas()
+    return
+  }
+
+  clearPanelEditSelection()
+  panelEditLine.value = {
+    ...panelEditLine.value,
+    hoverLine: null,
+    hoverRegion: region
+  }
+  panelEditRect.value = {
+    ...panelEditRect.value,
+    pendingAction: {
+      ...region,
+      id: `region-cutout-${Date.now()}`,
+      operation: 'none'
+    }
+  }
+  app.setStatus('Select vùng: chọn None hoặc Khấu')
+  resizePanelEditCanvas()
 } // End onPanelEditPointerUp
 
 //=================
@@ -5747,6 +6284,22 @@ function handlePanelEditArcKey(event) {
 } // End handlePanelEditArcKey
 
 //=================
+function handlePanelEditMoveKey(event) {
+  if (drawing.state.panelEdit?.shapeTool !== 'editPanelMove') return false
+
+  if (event.key !== 'Escape') return false
+
+  event.preventDefault()
+  event.stopPropagation()
+
+  if (!cancelPanelEditMove()) {
+    exitPanelEditCommandToSelect()
+  }
+
+  return true
+} // End handlePanelEditMoveKey
+
+//=================
 function handlePanelEditCircleKey(event) {
   if (drawing.state.panelEdit?.shapeTool !== 'editPanelCircle') return false
 
@@ -5815,13 +6368,21 @@ function handlePanelEditCircleKey(event) {
 
 //=================
 function deleteSelectedPanelEditLine() {
-  const selectedLineId = panelEditLine.value.selectedLineId
+  const selectedItems = panelEditSelection.value.items
 
-  if (!activePanelEditContext.value || !selectedLineId) return false
+  if (!activePanelEditContext.value || selectedItems.length === 0) return false
 
-  const nextLines = panelEditLine.value.lines.filter((line) => getPanelEditLineSelectionKey(line) !== selectedLineId)
+  const selectedLineKeys = getPanelEditSelectedLineKeySet()
+  const selectedRectIds = new Set(selectedItems.filter((item) => item.type === 'rect').map((item) => item.id))
+  const selectedCircleIds = new Set(selectedItems.filter((item) => item.type === 'circle').map((item) => item.id))
+  const nextLines = panelEditLine.value.lines.filter((line) => !selectedLineKeys.has(getPanelEditLineSelectionKey(line)))
+  const nextRectangles = panelEditRect.value.rectangles.filter((rectangle) => !selectedRectIds.has(rectangle.id))
+  const nextCircles = panelEditCircle.value.circles.filter((circle) => !selectedCircleIds.has(circle.id))
+  const changed = nextLines.length !== panelEditLine.value.lines.length
+    || nextRectangles.length !== panelEditRect.value.rectangles.length
+    || nextCircles.length !== panelEditCircle.value.circles.length
 
-  if (nextLines.length === panelEditLine.value.lines.length) return false
+  if (!changed) return false
 
   pushPanelEditHistorySnapshot()
   panelEditLine.value = {
@@ -5833,7 +6394,17 @@ function deleteSelectedPanelEditLine() {
     draft: null,
     lines: nextLines
   }
-  app.setStatus('Select: đã xóa line / cạnh arc')
+  panelEditRect.value = {
+    ...panelEditRect.value,
+    rectangles: nextRectangles
+  }
+  panelEditCircle.value = {
+    ...panelEditCircle.value,
+    circles: nextCircles
+  }
+  clearPanelEditSelection()
+  resetPanelEditMoveDraft()
+  app.setStatus(`Select: đã xóa ${selectedItems.length} chi tiết`)
   resizePanelEditCanvas()
 
   return true
@@ -5870,6 +6441,14 @@ function runPanelEditShortcutAction(action) {
 function handlePanelEditShortcutKey(event) {
   if (!activePanelEditContext.value) return false
   const shortcutText = shortcutEventToText(event)
+
+  if (shortcutText === 'M') {
+    selectPanelEditWindowTool('editPanelMove')
+    event.preventDefault()
+    event.stopPropagation()
+    return true
+  }
+
   const action = findShortcutAction(shortcutText, loadShortcutSettings())
 
   if (!runPanelEditShortcutAction(action)) return false
@@ -5962,6 +6541,8 @@ function onKeyDown(event) {
   if (handlePanelEditLineKey(event)) return
 
   if (handlePanelEditArcKey(event)) return
+
+  if (handlePanelEditMoveKey(event)) return
 
   if (handlePanelEditCircleKey(event)) return
 
