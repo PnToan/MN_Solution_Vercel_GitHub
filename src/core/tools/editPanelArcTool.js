@@ -151,24 +151,27 @@ export function getPanelEditArcData(draft) {
 } // End getPanelEditArcData
 
 //=================
-export function getPanelEditArcSegmentCount(arcData) {
-  if (!arcData || !Number.isFinite(arcData.radius) || !Number.isFinite(arcData.sweep)) return 6
+export function getPanelEditArcSegmentCount(arcData, fallbackSegmentCount = 24) {
+  if (!arcData || !Number.isFinite(Number(arcData.radius)) || !Number.isFinite(Number(arcData.sweep))) {
+    return Math.max(6, Math.ceil(Number(fallbackSegmentCount || 24)))
+  }
 
   const radius = Math.max(0, Number(arcData.radius || 0))
   const sweepRatio = Math.max(0, Math.abs(Number(arcData.sweep || 0)) / Math.PI)
-  const rawCount = radius * 1.2 * sweepRatio
-  const roundedToSix = Math.ceil(rawCount / 6) * 6
+  const smoothCount = radius * 1.2 * sweepRatio
+  const fallbackCount = Number(fallbackSegmentCount || 24) * sweepRatio
+  const rawCount = Math.max(smoothCount, fallbackCount, 6)
 
-  return Math.max(6, roundedToSix)
+  return Math.ceil(rawCount / 6) * 6
 } // End getPanelEditArcSegmentCount
 
 //=================
-export function getPanelEditArcPoints(draft) {
+export function getPanelEditArcPoints(draft, segmentCount = 24) {
   const arcData = getPanelEditArcData(draft)
 
   if (!arcData) return []
 
-  const count = getPanelEditArcSegmentCount(arcData)
+  const count = getPanelEditArcSegmentCount(arcData, segmentCount)
   const points = []
 
   for (let index = 0; index <= count; index += 1) {
@@ -180,6 +183,9 @@ export function getPanelEditArcPoints(draft) {
       y: Math.round((arcData.center.y + Math.sin(angle) * arcData.radius) * 1000) / 1000
     })
   }
+
+  points[0] = { ...arcData.start }
+  points[points.length - 1] = { ...arcData.end }
 
   return points
 } // End getPanelEditArcPoints
