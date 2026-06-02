@@ -8,6 +8,7 @@ export const SHORTCUT_FUNCTIONS = [
   { id: 'tool.dimensions', group: 'Thanh công cụ', label: 'Dimensions', defaultShortcuts: ['D'], type: 'tool', value: 'dimensions' },
 
   { id: 'editPanel.select', group: 'Edit Panel', label: 'Edit Panel - Select', defaultShortcuts: ['S'], type: 'editPanelTool', value: 'editPanelSelect' },
+  { id: 'editPanel.move', group: 'Edit Panel', label: 'Edit Panel - Move', defaultShortcuts: ['M'], type: 'editPanelTool', value: 'editPanelMove' },
   { id: 'editPanel.line', group: 'Edit Panel', label: 'Edit Panel - Line', defaultShortcuts: ['L'], type: 'editPanelTool', value: 'editPanelLine' },
   { id: 'editPanel.rect', group: 'Edit Panel', label: 'Edit Panel - Rectangle', defaultShortcuts: ['R'], type: 'editPanelTool', value: 'editPanelRect' },
   { id: 'editPanel.arc', group: 'Edit Panel', label: 'Edit Panel - Arc', defaultShortcuts: ['A'], type: 'editPanelTool', value: 'editPanelArc' },
