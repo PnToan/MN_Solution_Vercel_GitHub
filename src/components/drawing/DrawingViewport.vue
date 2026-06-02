@@ -768,6 +768,81 @@ function getPanelEditLineSegmentsForSnap(context) {
   }))
 } // End getPanelEditLineSegmentsForSnap
 
+
+//=================
+function getPanelEditRectangleSegmentsForSnap(context) {
+  if (!context) return []
+
+  const segments = []
+
+  ;(panelEditRect.value.rectangles || []).forEach((rectangle) => {
+    const id = rectangle.id || `rect-${segments.length}`
+    const polygon = Array.isArray(rectangle.polygon) && rectangle.polygon.length >= 3
+      ? rectangle.polygon.map((point) => ({ x: Number(point.x || 0), y: Number(point.y || 0) }))
+      : getPanelEditRectPolygon(rectangle)
+
+    polygon.forEach((point, index) => {
+      const nextPoint = polygon[(index + 1) % polygon.length]
+
+      if (!point || !nextPoint) return
+
+      const dx = Number(nextPoint.x || 0) - Number(point.x || 0)
+      const dy = Number(nextPoint.y || 0) - Number(point.y || 0)
+      const axis = Math.abs(dx) <= 0.001 ? 'vertical' : (Math.abs(dy) <= 0.001 ? 'horizontal' : 'free')
+
+      segments.push({
+        id: `rect-edge-${id}-${index}`,
+        type: 'rect',
+        rectangleId: id,
+        axis,
+        start: { x: Number(point.x || 0), y: Number(point.y || 0) },
+        end: { x: Number(nextPoint.x || 0), y: Number(nextPoint.y || 0) }
+      })
+    })
+  })
+
+  return segments
+} // End getPanelEditRectangleSegmentsForSnap
+
+//=================
+function getPanelEditCircleSnapCandidates() {
+  const candidates = []
+
+  ;(panelEditCircle.value.circles || []).forEach((circle) => {
+    const radius = getPanelEditCircleRadius(circle)
+    const centerX = Number(circle?.center?.x || 0)
+    const centerY = Number(circle?.center?.y || 0)
+
+    if (!circle?.center || radius <= 0) return
+
+    candidates.push(
+      { key: `circle-center-${circle.id}`, x: centerX, y: centerY, axis: 'both', edge: 'circle-center', kind: 'circle', circleId: circle.id },
+      { key: `circle-top-${circle.id}`, x: centerX, y: centerY + radius, axis: 'horizontal', edge: 'circle-top', kind: 'circle', circleId: circle.id },
+      { key: `circle-bottom-${circle.id}`, x: centerX, y: centerY - radius, axis: 'horizontal', edge: 'circle-bottom', kind: 'circle', circleId: circle.id },
+      { key: `circle-left-${circle.id}`, x: centerX - radius, y: centerY, axis: 'vertical', edge: 'circle-left', kind: 'circle', circleId: circle.id },
+      { key: `circle-right-${circle.id}`, x: centerX + radius, y: centerY, axis: 'vertical', edge: 'circle-right', kind: 'circle', circleId: circle.id }
+    )
+  })
+
+  ;(panelEditRect.value.rectangles || []).forEach((rectangle) => {
+    const radius = Number(rectangle.radius || 0)
+    const centerX = Number(rectangle.center?.x || 0)
+    const centerY = Number(rectangle.center?.y || 0)
+
+    if (rectangle.shapeType !== 'circle' || !rectangle.center || radius <= 0) return
+
+    candidates.push(
+      { key: `circle-cutout-center-${rectangle.id}`, x: centerX, y: centerY, axis: 'both', edge: 'circle-center', kind: 'circle', rectangleId: rectangle.id },
+      { key: `circle-cutout-top-${rectangle.id}`, x: centerX, y: centerY + radius, axis: 'horizontal', edge: 'circle-top', kind: 'circle', rectangleId: rectangle.id },
+      { key: `circle-cutout-bottom-${rectangle.id}`, x: centerX, y: centerY - radius, axis: 'horizontal', edge: 'circle-bottom', kind: 'circle', rectangleId: rectangle.id },
+      { key: `circle-cutout-left-${rectangle.id}`, x: centerX - radius, y: centerY, axis: 'vertical', edge: 'circle-left', kind: 'circle', rectangleId: rectangle.id },
+      { key: `circle-cutout-right-${rectangle.id}`, x: centerX + radius, y: centerY, axis: 'vertical', edge: 'circle-right', kind: 'circle', rectangleId: rectangle.id }
+    )
+  })
+
+  return candidates
+} // End getPanelEditCircleSnapCandidates
+
 //=================
 function getPanelEditTapeSnap(context, layout, screenX, screenY, options = {}) {
   if (!context || !layout) return null
@@ -802,6 +877,8 @@ function getPanelEditTapeSnap(context, layout, screenX, screenY, options = {}) {
   const verticalLines = editLines.filter((line) => line.axis === 'vertical')
   const horizontalLines = editLines.filter((line) => line.axis === 'horizontal')
 
+  candidates.push(...getPanelEditCircleSnapCandidates())
+
   editLines.forEach((line) => {
     ;[line.start, line.end].forEach((point, pointIndex) => {
       candidates.push({
@@ -818,6 +895,7 @@ function getPanelEditTapeSnap(context, layout, screenX, screenY, options = {}) {
 
   const snapSegments = [
     ...getPanelEditLineSegmentsForSnap(context),
+    ...getPanelEditRectangleSegmentsForSnap(context),
     ...getPanelEditGuideSegments(context),
     ...getPanelEditPanelBoundarySegments(context)
   ]
@@ -1037,6 +1115,28 @@ function getPanelEditTapeSnap(context, layout, screenX, screenY, options = {}) {
         edge: 'line',
         kind: 'square',
         lineId: line.id,
+        local: { x: closest.x, y: closest.y },
+        screen: point
+      })
+    })
+
+  snapSegments
+    .filter((segment) => segment.type === 'rect')
+    .forEach((segment) => {
+      const closest = getClosestPointOnPanelEditLine(segment, clampedLocal)
+
+      if (!closest) return
+
+      const point = getPanelEditPoint(context, layout.left, layout.top, layout.scale, closest.x, closest.y)
+      const distance = Math.hypot(point.x - screenX, point.y - screenY)
+
+      edgeCandidates.push({
+        key: `rect-edge-${segment.id}`,
+        distance,
+        axis: segment.axis,
+        edge: 'rect',
+        kind: 'square',
+        rectangleId: segment.rectangleId,
         local: { x: closest.x, y: closest.y },
         screen: point
       })
@@ -1397,6 +1497,9 @@ function loadPanelEditSavedState(context) {
           operation: rectangle.operation || 'none',
           source: rectangle.source || 'rectangle',
           regionKind: rectangle.regionKind || 'rect',
+          shapeType: rectangle.shapeType || null,
+          center: rectangle.center ? clonePanelEditSavedPoint(rectangle.center) : null,
+          radius: Number(rectangle.radius || 0),
           polygon: Array.isArray(rectangle.polygon)
             ? rectangle.polygon.map((point) => clonePanelEditSavedPoint(point))
             : null
@@ -1641,6 +1744,16 @@ function drawPanelEditRectangle(targetContext, context, layout, rectangle, optio
         targetContext.fill()
         erasePanelEditPolygonBoundarySegments(targetContext, context, layout, rectangle.polygon)
         drawPanelEditPolygonCutoutEdges(targetContext, context, layout, rectangle.polygon)
+
+        if (isSelected || isHover) {
+          targetContext.strokeStyle = isSelected ? '#ff0000' : '#ff7a00'
+          targetContext.lineWidth = 2.5
+          targetContext.setLineDash(isHover && !isSelected ? [6, 4] : [])
+          targetContext.beginPath()
+          if (drawPanelEditPolygonPath(targetContext, context, layout, rectangle.polygon)) {
+            targetContext.stroke()
+          }
+        }
       }
       targetContext.restore()
       return
@@ -1678,6 +1791,16 @@ function drawPanelEditRectangle(targetContext, context, layout, rectangle, optio
     targetContext.fill()
     erasePanelEditCutoutBoundarySegments(targetContext, context, layout, bounds)
     drawPanelEditCutoutEdges(targetContext, context, layout, bounds)
+
+    if (isSelected || isHover) {
+      targetContext.strokeStyle = isSelected ? '#ff0000' : '#ff7a00'
+      targetContext.lineWidth = 2.5
+      targetContext.setLineDash(isHover && !isSelected ? [6, 4] : [])
+      targetContext.beginPath()
+      targetContext.rect(start.x, start.y, rectWidth, rectHeight)
+      targetContext.stroke()
+    }
+
     targetContext.restore()
     return
   }
@@ -2254,6 +2377,9 @@ function confirmPanelEditRectangleAction(operation) {
     end: { ...pending.end },
     source: pending.source || 'rectangle',
     regionKind: pending.regionKind || 'rect',
+    shapeType: pending.shapeType || null,
+    center: pending.center ? { x: Number(pending.center.x || 0), y: Number(pending.center.y || 0) } : null,
+    radius: Number(pending.radius || 0),
     polygon: Array.isArray(pending.polygon) ? pending.polygon.map((point) => ({ ...point })) : null,
     operation: isCutout ? 'cutout' : 'none'
   }
@@ -3527,6 +3653,39 @@ function getPanelEditSelectionByRect(selectionRect) {
 } // End getPanelEditSelectionByRect
 
 //=================
+function getPanelEditMoveSnapHintCandidates() {
+  const selectedCircleIds = new Set(panelEditSelection.value.items.filter((item) => item.type === 'circle').map((item) => item.id))
+  const selectedRectIds = new Set(panelEditSelection.value.items.filter((item) => item.type === 'rect').map((item) => item.id))
+  const hasCircleSelection = selectedCircleIds.size > 0 || (panelEditRect.value.rectangles || []).some((rectangle) => selectedRectIds.has(rectangle.id) && rectangle.shapeType === 'circle')
+  const candidates = getPanelEditCircleSnapCandidates()
+
+  if (!hasCircleSelection) return candidates
+
+  return candidates.filter((candidate) => {
+    if (candidate.circleId) return selectedCircleIds.has(candidate.circleId)
+    if (candidate.rectangleId) return selectedRectIds.has(candidate.rectangleId)
+
+    return false
+  })
+} // End getPanelEditMoveSnapHintCandidates
+
+//=================
+function drawPanelEditMoveSnapHints(targetContext, context, layout) {
+  if (drawing.state.panelEdit?.shapeTool !== 'editPanelMove') return
+  if (panelEditMove.value.stage === 'target') return
+
+  getPanelEditMoveSnapHintCandidates().forEach((candidate) => {
+    const screen = getPanelEditPoint(context, layout.left, layout.top, layout.scale, candidate.x, candidate.y)
+
+    drawPanelEditTapeSnap(targetContext, {
+      ...candidate,
+      screen,
+      local: { x: candidate.x, y: candidate.y }
+    })
+  })
+} // End drawPanelEditMoveSnapHints
+
+//=================
 function drawPanelEditSelectDrag(targetContext, context, layout) {
   const dragRect = getPanelEditSelectDragRect()
 
@@ -3725,6 +3884,7 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
   }
 
   if (drawing.state.panelEdit?.shapeTool === 'editPanelMove') {
+    drawPanelEditMoveSnapHints(targetContext, context, layout)
     drawPanelEditTapeSnap(targetContext, panelEditMove.value.hoverSnap)
   }
 
@@ -4416,6 +4576,9 @@ function getPanelEditSavedRectanglesForApply() {
     operation: rectangle.operation || 'none',
     source: rectangle.source || 'rectangle',
     regionKind: rectangle.regionKind || 'rect',
+    shapeType: rectangle.shapeType || null,
+    center: rectangle.center ? clonePanelEditApplyPoint(rectangle.center) : null,
+    radius: Number(rectangle.radius || 0),
     polygon: Array.isArray(rectangle.polygon)
       ? rectangle.polygon.map((point) => clonePanelEditApplyPoint(point))
       : null
