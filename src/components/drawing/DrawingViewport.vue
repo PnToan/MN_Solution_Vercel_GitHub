@@ -51,17 +51,19 @@
       @confirm-action="confirmPanelEditRectangleAction"
     />
 
-  <Mini3DPreview v-if="app.state.mini3DVisible" />
-  <button class="mn-preview-toggle" @click="app.toggleMini3D">{{ app.state.mini3DVisible ? 'Ẩn 3D' : 'Hiện 3D' }}</button>
+    <Viewport3DPreview
+      :visible="app.state.mini3DVisible"
+      @toggle="app.toggleMini3D"
+    />
   </main>
 </template>
 
 <script setup>
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
-import Mini3DPreview from '../preview/Mini3DPreview.vue'
 import DimensionInput from './DimensionInput.vue'
 import BoxHeightInput from './BoxHeightInput.vue'
 import PanelEditWindow from '../panel-edit/PanelEditWindow.vue'
+import Viewport3DPreview from './Viewport3DPreview.vue'
 import { useAppStore } from '../../stores/useAppStore'
 import { useCabinetStore } from '../../stores/useCabinetStore'
 import { useWallStore } from '../../stores/useWallStore'
