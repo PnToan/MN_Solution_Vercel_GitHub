@@ -38,6 +38,48 @@ export function getPanelEditArcEndFromRadius(start, current, radius) {
 } // End getPanelEditArcEndFromRadius
 
 //=================
+export function getPanelEditArcBulgeFromRadius(start, end, radius, referencePoint = null) {
+  if (!start || !end) return null
+
+  const parsedRadius = Number(radius)
+  const startX = Number(start.x || 0)
+  const startY = Number(start.y || 0)
+  const endX = Number(end.x || 0)
+  const endY = Number(end.y || 0)
+  const dx = endX - startX
+  const dy = endY - startY
+  const chordLength = Math.hypot(dx, dy)
+
+  if (!Number.isFinite(parsedRadius) || parsedRadius <= 0 || chordLength <= 0.01) return null
+  if (parsedRadius < chordLength / 2 - 0.001) return null
+
+  const halfChord = chordLength / 2
+  const centerDistance = Math.sqrt(Math.max(0, parsedRadius * parsedRadius - halfChord * halfChord))
+  const sagitta = parsedRadius - centerDistance
+
+  if (!Number.isFinite(sagitta) || sagitta <= 0) return null
+
+  const midX = (startX + endX) / 2
+  const midY = (startY + endY) / 2
+  const normalX = dy / chordLength
+  const normalY = -dx / chordLength
+  let side = 1
+
+  if (referencePoint) {
+    const refX = Number(referencePoint.x || 0) - midX
+    const refY = Number(referencePoint.y || 0) - midY
+    const dot = refX * normalX + refY * normalY
+
+    if (dot < 0) side = -1
+  }
+
+  return {
+    x: midX + normalX * sagitta * side,
+    y: midY + normalY * sagitta * side
+  }
+} // End getPanelEditArcBulgeFromRadius
+
+//=================
 export function getPanelEditArcDraftWithRadiusInput(draft, inputBuffer) {
   if (!draft?.start) return draft
 
@@ -54,14 +96,15 @@ export function getPanelEditArcDraftWithRadiusInput(draft, inputBuffer) {
   if (!endPoint) return draft
 
   if (draft.stage === 'bulge') {
-    const defaultBulge = getPanelEditArcDefaultBulge(draft.start, endPoint)
+    const fixedEnd = draft.end || draft.current
+    const fixedBulge = getPanelEditArcBulgeFromRadius(draft.start, fixedEnd, radius, draft.current || draft.bulge)
 
-    if (!defaultBulge) return draft
+    if (!fixedEnd || !fixedBulge) return draft
 
     return {
       ...draft,
-      end: endPoint,
-      current: draft.suggested === true ? defaultBulge : draft.current,
+      end: fixedEnd,
+      current: fixedBulge,
       radiusLocked: true
     }
   }

@@ -1481,7 +1481,10 @@ function getPanelEditCircleRadius(circle) {
 function drawPanelEditCircle(targetContext, context, layout, circle, options = {}) {
   if (!circle?.center) return
 
-  const radius = getPanelEditCircleRadius(circle)
+  const inputRadius = Number(options.radiusLabel)
+  const radius = Number.isFinite(inputRadius) && inputRadius > 0
+    ? inputRadius
+    : getPanelEditCircleRadius(circle)
 
   if (radius <= 0) return
 
