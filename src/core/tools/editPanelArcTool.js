@@ -151,12 +151,24 @@ export function getPanelEditArcData(draft) {
 } // End getPanelEditArcData
 
 //=================
-export function getPanelEditArcPoints(draft, segmentCount = 24) {
+export function getPanelEditArcSegmentCount(arcData) {
+  if (!arcData || !Number.isFinite(arcData.radius) || !Number.isFinite(arcData.sweep)) return 6
+
+  const radius = Math.max(0, Number(arcData.radius || 0))
+  const sweepRatio = Math.max(0, Math.abs(Number(arcData.sweep || 0)) / Math.PI)
+  const rawCount = radius * 1.2 * sweepRatio
+  const roundedToSix = Math.ceil(rawCount / 6) * 6
+
+  return Math.max(6, roundedToSix)
+} // End getPanelEditArcSegmentCount
+
+//=================
+export function getPanelEditArcPoints(draft) {
   const arcData = getPanelEditArcData(draft)
 
   if (!arcData) return []
 
-  const count = Math.max(6, Math.ceil(Number(segmentCount || 24) * (arcData.sweep / Math.PI)))
+  const count = getPanelEditArcSegmentCount(arcData)
   const points = []
 
   for (let index = 0; index <= count; index += 1) {

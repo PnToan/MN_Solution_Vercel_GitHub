@@ -2417,7 +2417,7 @@ function drawPanelEditArcDraft(targetContext, context, layout, draft, options = 
   targetContext.save()
 
   if (arcData) {
-    const arcPoints = getPanelEditArcPoints(effectiveDraft, 36)
+    const arcPoints = getPanelEditArcPoints(effectiveDraft)
 
     if (arcPoints.length >= 2) {
       targetContext.strokeStyle = '#ff7a00'
@@ -2488,7 +2488,7 @@ function commitPanelEditArc() {
         end: sourceEnd,
         current: getPanelEditArcDefaultBulge(sourceDraft.start, sourceEnd)
       }
-  const arcPoints = getPanelEditArcPoints(arcDraft, 28)
+  const arcPoints = getPanelEditArcPoints(arcDraft)
 
   if (arcPoints.length < 2) {
     resetPanelEditArcDraft()
