@@ -583,6 +583,13 @@ function getClosestPointOnPanelEditLine(line, local) {
 } // End getClosestPointOnPanelEditLine
 
 //=================
+function getPanelEditLineSelectionKey(line) {
+  if (!line) return null
+
+  return line.groupId || line.id || null
+} // End getPanelEditLineSelectionKey
+
+//=================
 function getPanelEditLineHit(context, layout, screenX, screenY) {
   if (!context || !layout) return null
 
@@ -1319,6 +1326,8 @@ function loadPanelEditSavedState(context) {
     lines: Array.isArray(savedState.lines)
       ? savedState.lines.map((line) => ({
           id: line.id || `line-${Date.now()}-${Math.random()}`,
+          groupId: line.groupId || null,
+          groupType: line.groupType || null,
           axis: line.axis || 'free',
           start: clonePanelEditSavedPoint(line.start),
           end: clonePanelEditSavedPoint(line.end)
@@ -1683,7 +1692,7 @@ function isPanelEditCutoutBoundaryOnlySegment(context, pointA, pointB) {
 function isPanelEditSegmentOnPanelBoundaryLine(context, pointA, pointB) {
   if (!context || !pointA || !pointB) return false
 
-  const tolerance = 0.75
+  const tolerance = 0.01
   const x1 = Number(pointA.x || 0)
   const y1 = Number(pointA.y || 0)
   const x2 = Number(pointB.x || 0)
@@ -2080,6 +2089,15 @@ function drawPanelEditPolygonCutoutEdges(targetContext, context, layout, polygon
 } // End drawPanelEditPolygonCutoutEdges
 
 //=================
+function redrawPanelEditCutoutEdgesAfterBoundary(targetContext, context, layout, polygons) {
+  const polygonList = Array.isArray(polygons?.[0]) ? polygons : [polygons].filter(Boolean)
+
+  polygonList.forEach((polygon) => {
+    drawPanelEditPolygonCutoutEdges(targetContext, context, layout, polygon)
+  })
+} // End redrawPanelEditCutoutEdgesAfterBoundary
+
+//=================
 function commitPanelEditRectangle() {
   const draft = panelEditRect.value.draft
 
@@ -2352,6 +2370,8 @@ function normalizePanelEditLine(context, start, end, options = {}) {
 
   return {
     id: options.id || `line-${Date.now()}`,
+    groupId: options.groupId || null,
+    groupType: options.groupType || null,
     axis,
     start: { x: x1, y: y1 },
     end: { x: x2, y: y2 }
@@ -2502,7 +2522,9 @@ function commitPanelEditArc() {
 
   for (let index = 0; index < arcPoints.length - 1; index += 1) {
     const line = normalizePanelEditLine(context, arcPoints[index], arcPoints[index + 1], {
-      id: `${baseId}-seg-${index + 1}`
+      id: `${baseId}-seg-${index + 1}`,
+      groupId: baseId,
+      groupType: 'arc'
     })
 
     if (line) nextLines.push(line)
@@ -2576,7 +2598,7 @@ function getSortedPanelEditCuts(values, maxValue) {
 function getPanelEditBoundaryEdge(context, point) {
   if (!context || !point) return null
 
-  const tolerance = 0.5
+  const tolerance = 0.01
   const x = Number(point.x || 0)
   const y = Number(point.y || 0)
 
@@ -3209,10 +3231,15 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
 
   drawPanelEditLineRegions(targetContext, context, layout)
 
+  const hoverLineKey = getPanelEditLineSelectionKey(panelEditLine.value.hoverLine)
+  const selectedLineKey = panelEditLine.value.selectedLineId
+
   panelEditLine.value.lines.forEach((line) => {
+    const lineKey = getPanelEditLineSelectionKey(line)
+
     drawPanelEditLine(targetContext, context, layout, line, {
-      hover: panelEditLine.value.hoverLine?.id === line.id,
-      selected: panelEditLine.value.selectedLineId === line.id
+      hover: hoverLineKey && hoverLineKey === lineKey,
+      selected: selectedLineKey && selectedLineKey === lineKey
     })
   })
 
@@ -3236,7 +3263,10 @@ function drawPanelEditCanvas(editContext = null, width = null, height = null) {
     drawPanelEditCircle(targetContext, context, layout, circle)
   })
 
-  redrawPanelEditVisiblePanelBoundary(targetContext, context, layout, getPanelEditBoundaryCutoutPolygons())
+  const boundaryCutoutPolygons = getPanelEditBoundaryCutoutPolygons()
+
+  redrawPanelEditVisiblePanelBoundary(targetContext, context, layout, boundaryCutoutPolygons)
+  redrawPanelEditCutoutEdgesAfterBoundary(targetContext, context, layout, boundaryCutoutPolygons)
 
   if (panelEditRect.value.pendingAction) {
     drawPanelEditRectangle(targetContext, context, layout, panelEditRect.value.pendingAction, { draft: true })
@@ -3392,9 +3422,9 @@ function onPanelEditPointerDown(event) {
         ...panelEditLine.value,
         hoverLine: lineHit,
         hoverRegion: null,
-        selectedLineId: lineHit.id
+        selectedLineId: getPanelEditLineSelectionKey(lineHit)
       }
-      app.setStatus('Select: đã chọn line | Delete để xóa')
+      app.setStatus(lineHit.groupType === 'arc' ? 'Select: đã chọn toàn bộ cạnh arc | Delete để xóa' : 'Select: đã chọn line | Delete để xóa')
       resizePanelEditCanvas()
       return
     }
@@ -3834,6 +3864,8 @@ function getPanelEditSavedRectanglesForApply() {
 function getPanelEditSavedLinesForApply() {
   return (panelEditLine.value.lines || []).map((line) => ({
     id: line.id,
+    groupId: line.groupId || null,
+    groupType: line.groupType || null,
     axis: line.axis || 'free',
     start: clonePanelEditApplyPoint(line.start),
     end: clonePanelEditApplyPoint(line.end)
@@ -5769,7 +5801,7 @@ function deleteSelectedPanelEditLine() {
 
   if (!activePanelEditContext.value || !selectedLineId) return false
 
-  const nextLines = panelEditLine.value.lines.filter((line) => line.id !== selectedLineId)
+  const nextLines = panelEditLine.value.lines.filter((line) => getPanelEditLineSelectionKey(line) !== selectedLineId)
 
   if (nextLines.length === panelEditLine.value.lines.length) return false
 
@@ -5783,7 +5815,7 @@ function deleteSelectedPanelEditLine() {
     draft: null,
     lines: nextLines
   }
-  app.setStatus('Select: đã xóa line')
+  app.setStatus('Select: đã xóa line / cạnh arc')
   resizePanelEditCanvas()
 
   return true
