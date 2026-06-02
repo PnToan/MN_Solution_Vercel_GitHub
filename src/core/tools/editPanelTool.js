@@ -139,12 +139,13 @@ export function isEditPanelTool(toolId) {
 
 //=================
 export function isEditPanelDrawTool(toolId) {
-  return ['editPanelSelect', 'editPanelLine', 'editPanelRect', 'editPanelArc', 'editPanelCircle', 'editPanelTape'].includes(toolId)
+  return ['editPanelSelect', 'editPanelMove', 'editPanelLine', 'editPanelRect', 'editPanelArc', 'editPanelCircle', 'editPanelTape'].includes(toolId)
 } // End isEditPanelDrawTool
 
 
 //=================
 export function getEditPanelToolCursorClass(toolId) {
+  if (toolId === 'editPanelMove') return 'mn-cursor-move'
   if (toolId === 'editPanelTape') return 'mn-cursor-panel-tape'
   if (toolId === 'editPanelRect') return 'mn-cursor-panel-rect'
   if (toolId === 'editPanelCircle') return 'mn-cursor-panel-circle'
