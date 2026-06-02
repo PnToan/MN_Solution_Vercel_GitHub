@@ -12,9 +12,10 @@ function translateEditPanelMoveRectangle(rectangle, delta) {
     ...rectangle,
     start: translateEditPanelMovePoint(rectangle.start, delta),
     end: translateEditPanelMovePoint(rectangle.end, delta),
+    center: rectangle.center ? translateEditPanelMovePoint(rectangle.center, delta) : rectangle.center,
     polygon: Array.isArray(rectangle.polygon)
       ? rectangle.polygon.map((point) => translateEditPanelMovePoint(point, delta))
-      : null
+      : rectangle.polygon
   }
 } // End translateEditPanelMoveRectangle
 
