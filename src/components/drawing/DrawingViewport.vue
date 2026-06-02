@@ -11,17 +11,13 @@
       @wheel.prevent="onWheel"
       @contextmenu.prevent
     />
-    <input
+    <DimensionInput
       v-if="dimInput.active"
-      ref="dimInputRef"
-      type="text"
-      inputmode="decimal"
-      class="mn-dim-input"
-      :style="dimInputStyle"
-      v-model="dimInput.value"
-      @pointerdown.stop
-      @click.stop
-      @keydown.stop="onDimInputKeyDown"
+      :model="dimInput"
+      :input-style="dimInputStyle"
+      :set-input-ref="setDimInputRef"
+      @update-value="updateDimInputValue"
+      @key-down="onDimInputKeyDown"
       @blur="cancelDimInput"
     />
 
@@ -65,6 +61,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import Mini3DPreview from '../preview/Mini3DPreview.vue'
+import DimensionInput from './DimensionInput.vue'
 import PanelEditWindow from '../panel-edit/PanelEditWindow.vue'
 import { useAppStore } from '../../stores/useAppStore'
 import { useCabinetStore } from '../../stores/useCabinetStore'
@@ -91,6 +88,16 @@ const canvasRef = ref(null)
 const panelEditCanvasRef = ref(null)
 const dimInputRef = ref(null)
 const boxHeightInputRef = ref(null)
+
+//=================
+function setDimInputRef(element) {
+  dimInputRef.value = element
+} // End setDimInputRef
+
+//=================
+function updateDimInputValue(value) {
+  dimInput.value.value = value
+} // End updateDimInputValue
 
 //=================
 function setPanelEditCanvasRef(element) {
