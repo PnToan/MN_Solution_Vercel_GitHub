@@ -66,6 +66,7 @@ import { useBoxHeightInput } from '../../composables/drawing/useBoxHeightInput'
 import { useDimensionInput } from '../../composables/drawing/useDimensionInput'
 import { usePanelToolKeyboard } from '../../composables/drawing/usePanelToolKeyboard'
 import { useSelectDrag } from '../../composables/drawing/useSelectDrag'
+import { useViewportKeyboard } from '../../composables/drawing/useViewportKeyboard'
 import { useAppStore } from '../../stores/useAppStore'
 import { useCabinetStore } from '../../stores/useCabinetStore'
 import { useWallStore } from '../../stores/useWallStore'
@@ -75,7 +76,6 @@ import { renderCanvas2D, getWallDimHit, getBoxDimHit, getDimensionHit } from '..
 import { screenToLocal, localToScreen } from '../../renderers/viewport-transform'
 import { projectBoxToCameraRect, cameraLocalToWorldPoint, getCameraConfig } from '../../core/view/view-camera'
 import { hitTestPanel, hitTestZoneEdge } from '../../core/snap/snap-engine'
-import { handleViewportKey } from '../../commands/keyboard-controller'
 import { createPanelEditRectangleRecord, getEditPanelToolCursorClass, isEditPanelDrawTool, isEditPanelTool } from '../../core/tools/editPanelTool'
 import { createEditPanelMoveController } from '../../core/tools/editPanelMoveTool'
 import { getPanelEditArcData, getPanelEditArcDefaultBulge, getPanelEditArcDraftWithRadiusInput, getPanelEditArcPoints } from '../../core/tools/editPanelArcTool'
@@ -167,6 +167,19 @@ const {
   app,
   drawing,
   draw
+})
+const {
+  handleViewportKeyboard
+} = useViewportKeyboard({
+  app,
+  drawing,
+  box,
+  wall,
+  draw,
+  moveCopyMode,
+  dimInput,
+  boxHeightInput,
+  exitToSelect
 })
 let ctx = null
 let ratio = 1
@@ -6320,23 +6333,6 @@ function deleteSelectedPanelEditLine() {
 } // End deleteSelectedPanelEditLine
 
 //=================
-function deleteCurrentSelection() {
-  const hasPanels = Array.isArray(drawing.state.selectedPanelIds) && drawing.state.selectedPanelIds.length > 0
-  const hasBoxes = Array.isArray(box.state.selectedBoxIds) && box.state.selectedBoxIds.length > 0
-  const hasDimensions = Array.isArray(drawing.state.selectedDimensionIds) && drawing.state.selectedDimensionIds.length > 0
-
-  if (!hasPanels && !hasBoxes && !hasDimensions) return false
-
-  drawing.pushHistorySnapshot('Xóa selection')
-  drawing.deleteSelectedPanels()
-  drawing.deleteSelectedDimensions()
-  box.deleteSelectedBoxes()
-  drawing.rebuildZones()
-  draw()
-
-  return true
-} // End deleteCurrentSelection
-//=================
 function runPanelEditShortcutAction(action) {
   if (!action || action.type !== 'editPanelTool') return false
   if (!activePanelEditContext.value) return false
@@ -6410,57 +6406,7 @@ function onKeyDown(event) {
 
   if (handlePanelToolKey(event)) return
 
-  if (event.key === 'Delete') {
-    if (deleteCurrentSelection()) {
-      event.preventDefault()
-      event.stopPropagation()
-    }
-
-    return
-  }
-
-  if (isSpace) {
-    event.preventDefault()
-    event.stopPropagation()
-    exitToSelect()
-    return
-  }
-
-  if (dimInput.value.active || boxHeightInput.value.active) {
-    return
-  }
-
-  if (event.ctrlKey && !event.shiftKey && (key === 'z' || key === 'Z')) {
-    event.preventDefault()
-    event.stopPropagation()
-    drawing.undo()
-    draw()
-    return
-  }
-
-  if (event.ctrlKey && !event.shiftKey && (key === 'y' || key === 'Y')) {
-    event.preventDefault()
-    event.stopPropagation()
-    drawing.redo()
-    draw()
-    return
-  }
-
-  if (app.state.currentTool === 'move' && event.ctrlKey && !event.shiftKey && !event.altKey) {
-    event.preventDefault()
-    event.stopPropagation()
-    moveCopyMode.value = !moveCopyMode.value
-    app.setStatus(moveCopyMode.value ? 'Move Copy: ON' : 'Move Copy: OFF')
-    draw()
-    return
-  }
-
-  if (key === 'Escape') {
-    exitToSelect()
-    return
-  }
-
-  handleViewportKey(event, { app, drawing, box, wall, draw })
+  handleViewportKeyboard(event)
 } // End onKeyDown
 
 watch(() => [cabinet.state.width, cabinet.state.depth, cabinet.state.height, cabinet.state.panelThickness, app.state.currentView], () => {
