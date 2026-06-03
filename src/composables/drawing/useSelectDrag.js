@@ -8,7 +8,9 @@ export function useSelectDrag({
   drawing,
   draw,
   getVisiblePanels,
+  getVisibleBoxes,
   getPanelSelectRect,
+  getBoxSelectRect,
   getDimensionSelectRect
 }) {
   const selectDrag = ref({
@@ -156,6 +158,18 @@ export function useSelectDrag({
       .filter((hit) => !(hasNonBackPanelHit && hit.isBackPanel))
       .map((hit) => hit.panel.id)
 
+    const boxIds = typeof getVisibleBoxes === 'function' && typeof getBoxSelectRect === 'function'
+      ? getVisibleBoxes()
+        .filter((targetBox) => {
+          const rect = getBoxSelectRect(targetBox)
+
+          if (!rect || rect.width <= 0 || rect.height <= 0) return false
+
+          return checkRect(selectRect, rect)
+        })
+        .map((targetBox) => targetBox.id)
+      : []
+
     const dimensionIds = drawing.getRenderableDimensions(app.state.currentView)
       .filter((dimension) => {
         const rect = getDimensionSelectRect(dimension)
@@ -168,7 +182,7 @@ export function useSelectDrag({
 
     return {
       panelIds,
-      boxIds: [],
+      boxIds,
       dimensionIds
     }
   } // End getSelectedIdsByDragRect

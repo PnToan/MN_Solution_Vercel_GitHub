@@ -153,7 +153,9 @@ const {
   drawing,
   draw,
   getVisiblePanels,
+  getVisibleBoxes,
   getPanelSelectRect,
+  getBoxSelectRect,
   getDimensionSelectRect
 })
 const {
@@ -5083,6 +5085,14 @@ function getPanelSelectRect(panel) {
   })
 } // End getPanelSelectRect
 //=================
+function getBoxSelectRect(targetBox) {
+  const rect = projectBoxToCameraRect(targetBox, app.state.currentView)
+
+  if (!rect || rect.width <= 0 || rect.height <= 0) return null
+
+  return localRectToScreenRect(rect)
+} // End getBoxSelectRect
+//=================
 function getPanelOwnerBoxId(panel) {
   if (!panel) return null
 
@@ -5906,11 +5916,14 @@ function onPointerUp(event) {
     const selectRect = getSelectDragRect()
     const selectedIds = getSelectedIdsByDragRect(selectRect)
 
+    const panelIdsFromBoxes = selectedIds.boxIds.flatMap((boxId) => getPanelIdsInBox(boxId))
+    const panelIds = [...new Set([...selectedIds.panelIds, ...panelIdsFromBoxes])]
+
     if (event?.shiftKey) {
       drawing.selectPanels([
         ...new Set([
           ...(Array.isArray(drawing.state.selectedPanelIds) ? drawing.state.selectedPanelIds : []),
-          ...selectedIds.panelIds
+          ...panelIds
         ])
       ])
 
@@ -5920,10 +5933,22 @@ function onPointerUp(event) {
           ...selectedIds.dimensionIds
         ])
       ])
+
+      box.selectBoxes([
+        ...new Set([
+          ...(Array.isArray(box.state.selectedBoxIds) ? box.state.selectedBoxIds : []),
+          ...selectedIds.boxIds
+        ])
+      ])
     } else {
-      drawing.selectPanels(selectedIds.panelIds)
+      drawing.selectPanels(panelIds)
       drawing.selectDimensions(selectedIds.dimensionIds)
-      box.clearSelection()
+
+      if (selectedIds.boxIds.length) {
+        box.selectBoxes(selectedIds.boxIds)
+      } else {
+        box.clearSelection()
+      }
     }
 
     resetSelectDrag()
