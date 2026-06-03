@@ -2,8 +2,47 @@
 function getPanelEditSavedStateKey(context) {
   if (!context) return null
 
-  return `${context.faceKey || 'face'}:${context.faceSide || 'side'}`
+  return `${context.faceKey || 'face'}:physical`
 } // End getPanelEditSavedStateKey
+
+//=================
+function getPanelEditLegacyStateKeys(context) {
+  if (!context) return []
+
+  const faceKey = context.faceKey || 'face'
+  const faceSide = context.faceSide || 'side'
+  const oppositeMap = {
+    top: 'bottom',
+    bottom: 'top',
+    left: 'right',
+    right: 'left',
+    front: 'back',
+    back: 'front'
+  }
+  const oppositeSide = oppositeMap[faceSide] || null
+  const keys = [`${faceKey}:${faceSide}`]
+
+  if (oppositeSide) keys.push(`${faceKey}:${oppositeSide}`)
+
+  return keys
+} // End getPanelEditLegacyStateKeys
+
+//=================
+function getPanelEditSavedState(panel, context) {
+  const data = panel?.editPanelData || {}
+  const stateKey = getPanelEditSavedStateKey(context)
+  const canonicalState = stateKey ? data[stateKey] : null
+
+  if (canonicalState) return canonicalState
+
+  const legacyKeys = getPanelEditLegacyStateKeys(context)
+
+  for (const legacyKey of legacyKeys) {
+    if (data[legacyKey]) return data[legacyKey]
+  }
+
+  return null
+} // End getPanelEditSavedState
 
 //=================
 function clonePanelEditSavedPoint(point) {
@@ -76,8 +115,7 @@ export function usePanelEditSavedState(options = {}) {
     }
 
     const panel = drawing.state.panels.find((item) => item.id === context.panelId) || null
-    const stateKey = getPanelEditSavedStateKey(context)
-    const savedState = stateKey ? panel?.editPanelData?.[stateKey] : null
+    const savedState = getPanelEditSavedState(panel, context)
 
     if (!savedState) {
       resetPanelEditSavedState()

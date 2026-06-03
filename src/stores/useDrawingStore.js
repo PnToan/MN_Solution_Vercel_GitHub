@@ -25,6 +25,51 @@ import {
 
 let dimensionIdSeed = 1
 
+
+//=================
+function getPanelEditPhysicalStateKey(faceKey) {
+  return `${faceKey || 'face'}:physical`
+} // End getPanelEditPhysicalStateKey
+
+//=================
+function getPanelEditLegacyStateKey(faceKey, faceSide) {
+  return `${faceKey || 'face'}:${faceSide || 'side'}`
+} // End getPanelEditLegacyStateKey
+
+//=================
+function getPanelEditOppositeFaceSide(faceSide) {
+  const oppositeMap = {
+    top: 'bottom',
+    bottom: 'top',
+    left: 'right',
+    right: 'left',
+    front: 'back',
+    back: 'front'
+  }
+
+  return oppositeMap[faceSide] || null
+} // End getPanelEditOppositeFaceSide
+
+//=================
+function getPanelEditStateGroupKey(faceKey, faceSide) {
+  const physicalKey = getPanelEditPhysicalStateKey(faceKey)
+  const legacyKey = getPanelEditLegacyStateKey(faceKey, faceSide)
+  const oppositeSide = getPanelEditOppositeFaceSide(faceSide)
+  const oppositeKey = oppositeSide ? getPanelEditLegacyStateKey(faceKey, oppositeSide) : null
+
+  return {
+    physicalKey,
+    legacyKey,
+    oppositeKey,
+    keys: [physicalKey, legacyKey, oppositeKey].filter(Boolean)
+  }
+} // End getPanelEditStateGroupKey
+
+//=================
+function getPanelEditCutoutGroupKey(cutout) {
+  return getPanelEditPhysicalStateKey(cutout?.faceKey || 'face')
+} // End getPanelEditCutoutGroupKey
+
 //=================
 function cloneDimensionPoint(point) {
   if (!point) return null
@@ -2190,7 +2235,8 @@ const store = createSimpleStore({
 
     const faceSide = payload.faceSide || state.panelEdit?.context?.faceSide || null
     const faceKey = payload.faceKey || state.panelEdit?.context?.faceKey || null
-    const faceStateKey = `${faceKey || 'face'}:${faceSide || 'side'}`
+    const faceStateGroup = getPanelEditStateGroupKey(faceKey, faceSide)
+    const faceStateKey = faceStateGroup.physicalKey
     const normalizePoint = (point) => ({
       x: Number(point?.x || 0),
       y: Number(point?.y || 0)
@@ -2245,11 +2291,14 @@ const store = createSimpleStore({
       if (panel.id !== panelId) return panel
 
       const oldData = panel.editPanelData || {}
+      const nextEditPanelData = Object.fromEntries(
+        Object.entries(oldData).filter(([key]) => !faceStateGroup.keys.includes(key))
+      )
       const otherCutouts = Array.isArray(panel.editPanelCutouts)
-        ? panel.editPanelCutouts.filter((cutout) => `${cutout.faceKey || 'face'}:${cutout.faceSide || 'side'}` !== faceStateKey)
+        ? panel.editPanelCutouts.filter((cutout) => getPanelEditCutoutGroupKey(cutout) !== faceStateKey)
         : []
       const otherShapes = Array.isArray(panel.editPanelShapes)
-        ? panel.editPanelShapes.filter((shape) => `${shape.faceKey || 'face'}:${shape.faceSide || 'side'}` !== faceStateKey)
+        ? panel.editPanelShapes.filter((shape) => getPanelEditCutoutGroupKey(shape) !== faceStateKey)
         : []
       const faceShapes = [
         ...normalizedRectangles.filter((rectangle) => rectangle.operation !== 'cutout'),
@@ -2260,7 +2309,7 @@ const store = createSimpleStore({
       return {
         ...panel,
         editPanelData: {
-          ...oldData,
+          ...nextEditPanelData,
           [faceStateKey]: {
             faceSide,
             faceKey,
