@@ -157,18 +157,13 @@ export function useSelectDrag({
     const checkRect = selectRect.mode === 'touch'
       ? rectTouchesRect
       : rectContainsRect
-    const localSelectRect = getSelectDragLocalRect()
 
     const panelHits = getVisiblePanels()
       .map((panel) => {
-        const localRect = typeof getPanelLocalRect === 'function'
-          ? getPanelLocalRect(panel)
-          : null
-        const rect = localRect || getPanelSelectRect(panel)
-        const targetSelectRect = localRect ? localSelectRect : selectRect
+        const rect = getPanelSelectRect(panel)
 
-        if (!targetSelectRect || !rect || rect.width <= 0 || rect.height <= 0) return null
-        if (!checkRect(targetSelectRect, rect)) return null
+        if (!rect || rect.width <= 0 || rect.height <= 0) return null
+        if (!checkRect(selectRect, rect)) return null
 
         return {
           panel,
@@ -182,22 +177,6 @@ export function useSelectDrag({
       .filter((hit) => !(hasNonBackPanelHit && hit.isBackPanel))
       .map((hit) => hit.panel.id)
 
-    const boxIds = typeof getVisibleBoxes === 'function'
-      ? getVisibleBoxes()
-        .filter((targetBox) => {
-          const localRect = typeof getBoxLocalRect === 'function'
-            ? getBoxLocalRect(targetBox)
-            : null
-          const rect = localRect || (typeof getBoxSelectRect === 'function' ? getBoxSelectRect(targetBox) : null)
-          const targetSelectRect = localRect ? localSelectRect : selectRect
-
-          if (!targetSelectRect || !rect || rect.width <= 0 || rect.height <= 0) return false
-
-          return checkRect(targetSelectRect, rect)
-        })
-        .map((targetBox) => targetBox.id)
-      : []
-
     const dimensionIds = drawing.getRenderableDimensions(app.state.currentView)
       .filter((dimension) => {
         const rect = getDimensionSelectRect(dimension)
@@ -207,6 +186,21 @@ export function useSelectDrag({
         return checkRect(selectRect, rect)
       })
       .map((dimension) => dimension.id)
+
+    const shouldCheckBoxes = !panelIds.length && !dimensionIds.length
+    const boxIds = shouldCheckBoxes && typeof getVisibleBoxes === 'function'
+      ? getVisibleBoxes()
+        .filter((targetBox) => {
+          const rect = typeof getBoxSelectRect === 'function'
+            ? getBoxSelectRect(targetBox)
+            : null
+
+          if (!rect || rect.width <= 0 || rect.height <= 0) return false
+
+          return checkRect(selectRect, rect)
+        })
+        .map((targetBox) => targetBox.id)
+      : []
 
     return {
       panelIds,

@@ -5044,9 +5044,9 @@ function zoomAtPoint(screenX, screenY, nextZoom) {
 } // End zoomAtPoint
 //=================
 function getPanelAxisMin(panel, axis) {
-  if (axis === 'x') return Number(panel.x ?? panel.x3d ?? 0)
-  if (axis === 'y') return Number(panel.y3d ?? panel.worldY ?? panel.depthY ?? panel.y ?? 0)
-  if (axis === 'z') return Number(panel.z ?? panel.z3d ?? panel.y ?? 0)
+  if (axis === 'x') return Number(panel.x || 0)
+  if (axis === 'y') return Number((panel.y3d ?? panel.worldY ?? panel.depthY ?? panel.y) || 0)
+  if (axis === 'z') return Number(panel.z ?? panel.y ?? 0)
 
   return 0
 } // End getPanelAxisMin
@@ -5886,8 +5886,8 @@ function onPointerUp(event) {
     const selectRect = getSelectDragRect()
     const selectedIds = getSelectedIdsByDragRect(selectRect)
 
-    const panelIdsFromBoxes = selectedIds.boxIds.flatMap((boxId) => getPanelIdsInBox(boxId))
-    const panelIds = [...new Set([...selectedIds.panelIds, ...panelIdsFromBoxes])]
+    const panelIds = selectedIds.panelIds
+    const hasDetailSelection = panelIds.length > 0 || selectedIds.dimensionIds.length > 0
 
     if (event?.shiftKey) {
       drawing.selectPanels([
@@ -5904,17 +5904,21 @@ function onPointerUp(event) {
         ])
       ])
 
-      box.selectBoxes([
-        ...new Set([
-          ...(Array.isArray(box.state.selectedBoxIds) ? box.state.selectedBoxIds : []),
-          ...selectedIds.boxIds
+      if (!hasDetailSelection && selectedIds.boxIds.length) {
+        box.selectBoxes([
+          ...new Set([
+            ...(Array.isArray(box.state.selectedBoxIds) ? box.state.selectedBoxIds : []),
+            ...selectedIds.boxIds
+          ])
         ])
-      ])
+      } else if (!event?.shiftKey) {
+        box.clearSelection()
+      }
     } else {
       drawing.selectPanels(panelIds)
       drawing.selectDimensions(selectedIds.dimensionIds)
 
-      if (selectedIds.boxIds.length) {
+      if (!hasDetailSelection && selectedIds.boxIds.length) {
         box.selectBoxes(selectedIds.boxIds)
       } else {
         box.clearSelection()
