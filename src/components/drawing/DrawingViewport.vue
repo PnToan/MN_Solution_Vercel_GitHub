@@ -117,6 +117,52 @@ function setPanelEditCanvasRef(element) {
 
 const hoverDim = ref(null)
 const moveCopyMode = ref(false)
+const viewportCanvas = useViewportCanvas({
+  viewportRef,
+  app,
+  drawing,
+  renderCanvas2D,
+  afterResize: resizePanelEditCanvas,
+  getRenderPayload: ({ width, height }) => ({
+    width,
+    height,
+    viewport: app.state.viewport,
+    currentView: app.state.currentView,
+    wallRect: projectBoxToCameraRect(getWallBox3D(), app.state.currentView),
+    wallEditingDim: wall.state.editingDim,
+    zones: drawing.state.zones,
+    panels: getVisiblePanels(),
+    movePreviewTarget: drawing.getMovePreviewTarget(),
+    moveHoverSnapPoints: drawing.getMoveHoverSnapPoints(),
+    moveTargetSnap: drawing.getMoveTargetSnap(),
+    moveCursorLocal: app.state.currentTool === 'move'
+      ? drawing.getMoveCursorLocal()
+      : null,
+    moveCopyMode: app.state.currentTool === 'move' ? moveCopyMode.value : false,
+    panelPreviewItems: drawing.getPanelPreviewItems(),
+    panelInputBuffer: drawing.state.panelInputBuffer,
+    boxes: getVisibleBoxes(),
+    boxDraftRect: box.getDraftRect(),
+    boxEditingDim: box.state.editingDim,
+    hover: drawing.state.hover,
+    snapPreview: drawing.state.snapPreview,
+    selectedPanelId: drawing.state.selectedPanelId,
+    selectedPanelIds: drawing.state.selectedPanelIds,
+    selectedBoxId: app.state.currentTool === 'select' ? null : box.state.selectedBoxId,
+    selectedBoxIds: app.state.currentTool === 'select' ? [] : box.state.selectedBoxIds,
+    selectDrag: selectDrag.value,
+    dimensions: drawing.getRenderableDimensions(app.state.currentView),
+    selectedDimensionIds: drawing.state.selectedDimensionIds,
+    dimensionDraft: drawing.getDimensionDraft(),
+    editingDimensionId: dimInput.value.target === 'dimension' ? dimInput.value.dimensionId : null,
+    showGrid: app.state.showGrid
+  })
+})
+const canvasRef = viewportCanvas.canvasRef
+const setCanvasRef = viewportCanvas.setCanvasRef
+drawImpl = viewportCanvas.draw
+resizeCanvasImpl = viewportCanvas.resizeCanvas
+onAppSettingsAppliedImpl = viewportCanvas.onAppSettingsApplied
 const {
   dimInput,
   dimInputStyle,
@@ -500,52 +546,7 @@ const canvasCursorClass = computed(() => {
 
   return 'mn-cursor-default'
 }) // End canvasCursorClass
-const viewportCanvas = useViewportCanvas({
-  viewportRef,
-  app,
-  drawing,
-  renderCanvas2D,
-  afterResize: resizePanelEditCanvas,
-  getRenderPayload: ({ width, height }) => ({
-    width,
-    height,
-    viewport: app.state.viewport,
-    currentView: app.state.currentView,
-    wallRect: projectBoxToCameraRect(getWallBox3D(), app.state.currentView),
-    wallEditingDim: wall.state.editingDim,
-    zones: drawing.state.zones,
-    panels: getVisiblePanels(),
-    movePreviewTarget: drawing.getMovePreviewTarget(),
-    moveHoverSnapPoints: drawing.getMoveHoverSnapPoints(),
-    moveTargetSnap: drawing.getMoveTargetSnap(),
-    moveCursorLocal: app.state.currentTool === 'move'
-      ? drawing.getMoveCursorLocal()
-      : null,
-    moveCopyMode: app.state.currentTool === 'move' ? moveCopyMode.value : false,
-    panelPreviewItems: drawing.getPanelPreviewItems(),
-    panelInputBuffer: drawing.state.panelInputBuffer,
-    boxes: getVisibleBoxes(),
-    boxDraftRect: box.getDraftRect(),
-    boxEditingDim: box.state.editingDim,
-    hover: drawing.state.hover,
-    snapPreview: drawing.state.snapPreview,
-    selectedPanelId: drawing.state.selectedPanelId,
-    selectedPanelIds: drawing.state.selectedPanelIds,
-    selectedBoxId: app.state.currentTool === 'select' ? null : box.state.selectedBoxId,
-    selectedBoxIds: app.state.currentTool === 'select' ? [] : box.state.selectedBoxIds,
-    selectDrag: selectDrag.value,
-    dimensions: drawing.getRenderableDimensions(app.state.currentView),
-    selectedDimensionIds: drawing.state.selectedDimensionIds,
-    dimensionDraft: drawing.getDimensionDraft(),
-    editingDimensionId: dimInput.value.target === 'dimension' ? dimInput.value.dimensionId : null,
-    showGrid: app.state.showGrid
-  })
-})
-const canvasRef = viewportCanvas.canvasRef
-const setCanvasRef = viewportCanvas.setCanvasRef
-drawImpl = viewportCanvas.draw
-resizeCanvasImpl = viewportCanvas.resizeCanvas
-onAppSettingsAppliedImpl = viewportCanvas.onAppSettingsApplied
+
 
 //=================
 function getCssVariable(variableName, fallback) {
