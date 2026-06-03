@@ -154,7 +154,9 @@ const {
   draw,
   getVisiblePanels,
   getVisibleBoxes,
+  getPanelLocalRect,
   getPanelSelectRect,
+  getBoxLocalRect,
   getBoxSelectRect,
   getDimensionSelectRect
 })
@@ -5042,9 +5044,9 @@ function zoomAtPoint(screenX, screenY, nextZoom) {
 } // End zoomAtPoint
 //=================
 function getPanelAxisMin(panel, axis) {
-  if (axis === 'x') return Number(panel.x3d ?? panel.x ?? 0)
+  if (axis === 'x') return Number(panel.x ?? panel.x3d ?? 0)
   if (axis === 'y') return Number(panel.y3d ?? panel.worldY ?? panel.depthY ?? panel.y ?? 0)
-  if (axis === 'z') return Number(panel.z3d ?? panel.z ?? 0)
+  if (axis === 'z') return Number(panel.z ?? panel.z3d ?? panel.y ?? 0)
 
   return 0
 } // End getPanelAxisMin
@@ -5090,10 +5092,18 @@ function getPanelSelectRect(panel) {
   return localRectToScreenRect(getPanelLocalRect(panel))
 } // End getPanelSelectRect
 //=================
-function getBoxSelectRect(targetBox) {
+function getBoxLocalRect(targetBox) {
   const rect = projectBoxToCameraRect(targetBox, app.state.currentView)
 
   if (!rect || rect.width <= 0 || rect.height <= 0) return null
+
+  return rect
+} // End getBoxLocalRect
+//=================
+function getBoxSelectRect(targetBox) {
+  const rect = getBoxLocalRect(targetBox)
+
+  if (!rect) return null
 
   return localRectToScreenRect(rect)
 } // End getBoxSelectRect
@@ -5112,7 +5122,7 @@ function getPanelIdsInBox(boxId) {
   if (!boxId) return []
 
   return getVisiblePanels()
-    .filter((panel) => getPanelOwnerBoxId(panel) === boxId)
+    .filter((panel) => String(getPanelOwnerBoxId(panel)) === String(boxId))
     .map((panel) => panel.id)
 } // End getPanelIdsInBox
 

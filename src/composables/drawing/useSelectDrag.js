@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { localToScreen } from '../../renderers/viewport-transform'
+import { localToScreen, screenToLocal } from '../../renderers/viewport-transform'
 
 //=================
 export function useSelectDrag({
@@ -9,7 +9,9 @@ export function useSelectDrag({
   draw,
   getVisiblePanels,
   getVisibleBoxes,
+  getPanelLocalRect,
   getPanelSelectRect,
+  getBoxLocalRect,
   getBoxSelectRect,
   getDimensionSelectRect
 }) {
@@ -78,6 +80,24 @@ export function useSelectDrag({
     }
   } // End getSelectDragRect
 
+
+  //=================
+  function getSelectDragLocalRect() {
+    if (!selectDrag.value.start || !selectDrag.value.current) return null
+
+    const viewport = app.state.viewport
+    const start = screenToLocal(viewport, selectDrag.value.start.x, selectDrag.value.start.y)
+    const current = screenToLocal(viewport, selectDrag.value.current.x, selectDrag.value.current.y)
+
+    return {
+      x: Math.min(start.x, current.x),
+      y: Math.min(start.y, current.y),
+      width: Math.abs(current.x - start.x),
+      height: Math.abs(current.y - start.y),
+      mode: selectDrag.value.mode
+    }
+  } // End getSelectDragLocalRect
+
   //=================
   function localRectToScreenRect(rect) {
     if (!rect) return null
@@ -137,13 +157,18 @@ export function useSelectDrag({
     const checkRect = selectRect.mode === 'touch'
       ? rectTouchesRect
       : rectContainsRect
+    const localSelectRect = getSelectDragLocalRect()
 
     const panelHits = getVisiblePanels()
       .map((panel) => {
-        const rect = getPanelSelectRect(panel)
+        const localRect = typeof getPanelLocalRect === 'function'
+          ? getPanelLocalRect(panel)
+          : null
+        const rect = localRect || getPanelSelectRect(panel)
+        const targetSelectRect = localRect ? localSelectRect : selectRect
 
-        if (!rect || rect.width <= 0 || rect.height <= 0) return null
-        if (!checkRect(selectRect, rect)) return null
+        if (!targetSelectRect || !rect || rect.width <= 0 || rect.height <= 0) return null
+        if (!checkRect(targetSelectRect, rect)) return null
 
         return {
           panel,
@@ -157,14 +182,18 @@ export function useSelectDrag({
       .filter((hit) => !(hasNonBackPanelHit && hit.isBackPanel))
       .map((hit) => hit.panel.id)
 
-    const boxIds = typeof getVisibleBoxes === 'function' && typeof getBoxSelectRect === 'function'
+    const boxIds = typeof getVisibleBoxes === 'function'
       ? getVisibleBoxes()
         .filter((targetBox) => {
-          const rect = getBoxSelectRect(targetBox)
+          const localRect = typeof getBoxLocalRect === 'function'
+            ? getBoxLocalRect(targetBox)
+            : null
+          const rect = localRect || (typeof getBoxSelectRect === 'function' ? getBoxSelectRect(targetBox) : null)
+          const targetSelectRect = localRect ? localSelectRect : selectRect
 
-          if (!rect || rect.width <= 0 || rect.height <= 0) return false
+          if (!targetSelectRect || !rect || rect.width <= 0 || rect.height <= 0) return false
 
-          return checkRect(selectRect, rect)
+          return checkRect(targetSelectRect, rect)
         })
         .map((targetBox) => targetBox.id)
       : []
@@ -192,6 +221,7 @@ export function useSelectDrag({
     startSelectDrag,
     resetSelectDrag,
     getSelectDragRect,
+    getSelectDragLocalRect,
     localRectToScreenRect,
     getSelectedIdsByDragRect
   }
