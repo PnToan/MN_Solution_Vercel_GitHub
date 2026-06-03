@@ -35,7 +35,6 @@ export function useSelectDrag({
   function startSelectDrag(event) {
     if (app.state.currentTool !== 'select') return false
     if (event.button !== 0) return false
-    if (event.shiftKey) return false
 
     const point = getScreenPointFromEvent(event)
 

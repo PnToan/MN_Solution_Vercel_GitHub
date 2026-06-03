@@ -73,7 +73,7 @@ import { useDrawingStore } from '../../stores/useDrawingStore'
 import { useBoxStore } from '../../stores/useBoxStore'
 import { renderCanvas2D, getWallDimHit, getBoxDimHit, getDimensionHit } from '../../renderers/canvas-2d-renderer'
 import { screenToLocal, localToScreen } from '../../renderers/viewport-transform'
-import { projectBoxToCameraRect, cameraLocalToWorldPoint } from '../../core/view/view-camera'
+import { projectBoxToCameraRect, cameraLocalToWorldPoint, getCameraConfig } from '../../core/view/view-camera'
 import { hitTestPanel, hitTestZoneEdge } from '../../core/snap/snap-engine'
 import { handleViewportKey } from '../../commands/keyboard-controller'
 import { createPanelEditRectangleRecord, getEditPanelToolCursorClass, isEditPanelDrawTool, isEditPanelTool } from '../../core/tools/editPanelTool'
@@ -5041,48 +5041,53 @@ function zoomAtPoint(screenX, screenY, nextZoom) {
   app.setPan(nextPanX, nextPanY)
 } // End zoomAtPoint
 //=================
-function getPanelSelectRect(panel) {
+function getPanelAxisMin(panel, axis) {
+  if (axis === 'x') return Number(panel.x3d ?? panel.x ?? 0)
+  if (axis === 'y') return Number(panel.y3d ?? panel.worldY ?? panel.depthY ?? panel.y ?? 0)
+  if (axis === 'z') return Number(panel.z3d ?? panel.z ?? 0)
+
+  return 0
+} // End getPanelAxisMin
+
+//=================
+function getPanelAxisSize(panel, axis) {
+  if (axis === 'x') return Number(panel.xSize ?? panel.width ?? 0)
+  if (axis === 'y') return Number(panel.ySize ?? panel.depth ?? 0)
+  if (axis === 'z') return Number(panel.zSize ?? panel.height ?? panel.thickness ?? 0)
+
+  return 0
+} // End getPanelAxisSize
+
+//=================
+function projectPanelAxisValue(value, size, reverse, origin = 0) {
+  if (reverse) return origin - value - size
+
+  return value - origin
+} // End projectPanelAxisValue
+
+//=================
+function getPanelLocalRect(panel) {
   if (!panel) return null
 
-  const view = app.getViewConfig(app.state.currentView)
-  const axisU = String(view.axisA || 'X').toLowerCase()
-  const axisV = String(view.axisB || 'Z').toLowerCase()
-
-  const getAxisMin = (target, axis) => {
-    if (axis === 'x') return Number(target.x || 0)
-    if (axis === 'y') return Number((target.y3d ?? target.worldY ?? target.depthY ?? target.y) || 0)
-    if (axis === 'z') return Number(target.z ?? target.y ?? 0)
-
-    return 0
-  }
-
-  const getAxisSize = (target, axis) => {
-    if (axis === 'x') return Number(target.xSize ?? target.width ?? 0)
-    if (axis === 'y') return Number(target.ySize ?? target.depth ?? 0)
-    if (axis === 'z') return Number(target.zSize ?? target.height ?? target.thickness ?? 0)
-
-    return 0
-  }
-
-  const projectAxisValue = (value, size, reverse) => {
-    if (reverse) return -(value + size)
-
-    return value
-  }
-
-  const uMin = getAxisMin(panel, axisU)
-  const vMin = getAxisMin(panel, axisV)
-  const uSize = getAxisSize(panel, axisU)
-  const vSize = getAxisSize(panel, axisV)
+  const camera = getCameraConfig(app.state.currentView)
+  const uMin = getPanelAxisMin(panel, camera.axisU)
+  const vMin = getPanelAxisMin(panel, camera.axisV)
+  const uSize = getPanelAxisSize(panel, camera.axisU)
+  const vSize = getPanelAxisSize(panel, camera.axisV)
 
   if (uSize <= 0 || vSize <= 0) return null
 
-  return localRectToScreenRect({
-    x: projectAxisValue(uMin, uSize, view.reverseHorizontal),
-    y: projectAxisValue(vMin, vSize, view.reverseVertical),
+  return {
+    x: projectPanelAxisValue(uMin, uSize, camera.reverseU, camera.originU || 0),
+    y: projectPanelAxisValue(vMin, vSize, camera.reverseV, camera.originV || 0),
     width: uSize,
     height: vSize
-  })
+  }
+} // End getPanelLocalRect
+
+//=================
+function getPanelSelectRect(panel) {
+  return localRectToScreenRect(getPanelLocalRect(panel))
 } // End getPanelSelectRect
 //=================
 function getBoxSelectRect(targetBox) {
@@ -5165,51 +5170,6 @@ function hitTestBoxFill(local) {
 
   return null
 } // End hitTestBoxFill
-
-//=================
-function getPanelLocalRect(panel) {
-  if (!panel) return null
-
-  const view = app.getViewConfig(app.state.currentView)
-  const axisU = String(view.axisA || 'X').toLowerCase()
-  const axisV = String(view.axisB || 'Z').toLowerCase()
-
-  const getAxisMin = (target, axis) => {
-    if (axis === 'x') return Number(target.x || 0)
-    if (axis === 'y') return Number((target.y3d ?? target.worldY ?? target.depthY ?? target.y) || 0)
-    if (axis === 'z') return Number(target.z ?? target.y ?? 0)
-
-    return 0
-  }
-
-  const getAxisSize = (target, axis) => {
-    if (axis === 'x') return Number(target.xSize ?? target.width ?? 0)
-    if (axis === 'y') return Number(target.ySize ?? target.depth ?? 0)
-    if (axis === 'z') return Number(target.zSize ?? target.height ?? target.thickness ?? 0)
-
-    return 0
-  }
-
-  const projectAxisValue = (value, size, reverse) => {
-    if (reverse) return -(value + size)
-
-    return value
-  }
-
-  const uMin = getAxisMin(panel, axisU)
-  const vMin = getAxisMin(panel, axisV)
-  const uSize = getAxisSize(panel, axisU)
-  const vSize = getAxisSize(panel, axisV)
-
-  if (uSize <= 0 || vSize <= 0) return null
-
-  return {
-    x: projectAxisValue(uMin, uSize, view.reverseHorizontal),
-    y: projectAxisValue(vMin, vSize, view.reverseVertical),
-    width: uSize,
-    height: vSize
-  }
-} // End getPanelLocalRect
 
 //=================
 function hitTestVisiblePanel(local) {
