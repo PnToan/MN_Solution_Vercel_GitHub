@@ -158,7 +158,8 @@ const {
   getPanelSelectRect,
   getBoxLocalRect,
   getBoxSelectRect,
-  getDimensionSelectRect
+  getDimensionSelectRect,
+  hitTestVisiblePanel
 })
 const {
   handlePanelToolKey

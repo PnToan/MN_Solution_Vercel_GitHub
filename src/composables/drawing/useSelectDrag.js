@@ -13,7 +13,8 @@ export function useSelectDrag({
   getPanelSelectRect,
   getBoxLocalRect,
   getBoxSelectRect,
-  getDimensionSelectRect
+  getDimensionSelectRect,
+  hitTestVisiblePanel
 }) {
   const selectDrag = ref({
     active: false,
@@ -144,6 +145,40 @@ export function useSelectDrag({
     )
   } // End rectTouchesRect
 
+
+
+  //=================
+  function getPanelHitsByDragSampling(selectRect) {
+    if (!selectRect || typeof hitTestVisiblePanel !== 'function') return []
+
+    const hitsById = new Map()
+    const step = 8
+    const maxSamplesPerAxis = 90
+    const cols = Math.max(1, Math.min(maxSamplesPerAxis, Math.ceil(selectRect.width / step)))
+    const rows = Math.max(1, Math.min(maxSamplesPerAxis, Math.ceil(selectRect.height / step)))
+
+    for (let col = 0; col <= cols; col += 1) {
+      const x = selectRect.x + (selectRect.width * col) / cols
+
+      for (let row = 0; row <= rows; row += 1) {
+        const y = selectRect.y + (selectRect.height * row) / rows
+        const local = screenToLocal(app.state.viewport, x, y)
+        const hit = hitTestVisiblePanel(local)
+        const panel = hit?.panel
+
+        if (!panel?.id) continue
+
+        hitsById.set(panel.id, {
+          panel,
+          rect: hit.rect || getPanelSelectRect(panel),
+          isBackPanel: panel.panelSide === 'back' || panel.cabinetInfoKind === 'back'
+        })
+      }
+    }
+
+    return Array.from(hitsById.values())
+  } // End getPanelHitsByDragSampling
+
   //=================
   function getSelectedIdsByDragRect(selectRect) {
     if (!selectRect) {
@@ -158,7 +193,8 @@ export function useSelectDrag({
       ? rectTouchesRect
       : rectContainsRect
 
-    const panelHits = getVisiblePanels()
+    const sampledPanelHits = getPanelHitsByDragSampling(selectRect)
+    const rectPanelHits = getVisiblePanels()
       .map((panel) => {
         const rect = getPanelSelectRect(panel)
 
@@ -172,6 +208,7 @@ export function useSelectDrag({
         }
       })
       .filter(Boolean)
+    const panelHits = sampledPanelHits.length ? sampledPanelHits : rectPanelHits
     const hasNonBackPanelHit = panelHits.some((hit) => !hit.isBackPanel)
     const panelIds = panelHits
       .filter((hit) => !(hasNonBackPanelHit && hit.isBackPanel))
