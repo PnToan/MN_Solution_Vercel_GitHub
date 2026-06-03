@@ -532,8 +532,8 @@ function draw() {
     snapPreview: drawing.state.snapPreview,
     selectedPanelId: drawing.state.selectedPanelId,
     selectedPanelIds: drawing.state.selectedPanelIds,
-    selectedBoxId: box.state.selectedBoxId,
-    selectedBoxIds: box.state.selectedBoxIds,
+    selectedBoxId: app.state.currentTool === 'select' ? null : box.state.selectedBoxId,
+    selectedBoxIds: app.state.currentTool === 'select' ? [] : box.state.selectedBoxIds,
     selectDrag: selectDrag.value,
     dimensions: drawing.getRenderableDimensions(app.state.currentView),
     selectedDimensionIds: drawing.state.selectedDimensionIds,
@@ -5671,7 +5671,12 @@ function onPointerDown(event) {
     panOriginal = { x: app.state.viewport.panX, y: app.state.viewport.panY }
     return
   }
-  startSelectDrag(event)
+  const didStartSelectDrag = startSelectDrag(event)
+
+  if (didStartSelectDrag && app.state.currentTool === 'select') {
+    box.clearSelection()
+  }
+
   if (app.state.currentTool === 'move') {
     event.preventDefault()
     event.stopPropagation()
@@ -5774,6 +5779,7 @@ function onPointerMove(event) {
     selectDrag.value.mode = point.x >= selectDrag.value.start.x ? 'contain' : 'touch'
 
     if (moved) {
+      box.clearSelection()
       event.preventDefault()
       event.stopPropagation()
       draw()
