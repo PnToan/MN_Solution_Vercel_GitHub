@@ -187,24 +187,9 @@ export function useSelectDrag({
       })
       .map((dimension) => dimension.id)
 
-    const shouldCheckBoxes = !panelIds.length && !dimensionIds.length
-    const boxIds = shouldCheckBoxes && typeof getVisibleBoxes === 'function'
-      ? getVisibleBoxes()
-        .filter((targetBox) => {
-          const rect = typeof getBoxSelectRect === 'function'
-            ? getBoxSelectRect(targetBox)
-            : null
-
-          if (!rect || rect.width <= 0 || rect.height <= 0) return false
-
-          return checkRect(selectRect, rect)
-        })
-        .map((targetBox) => targetBox.id)
-      : []
-
     return {
       panelIds,
-      boxIds,
+      boxIds: [],
       dimensionIds
     }
   } // End getSelectedIdsByDragRect

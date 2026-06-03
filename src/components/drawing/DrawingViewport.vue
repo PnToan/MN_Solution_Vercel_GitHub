@@ -5746,15 +5746,6 @@ function onPointerDown(event) {
     return
   }
 
-  const boxFillHit = app.state.currentTool === 'select' ? hitTestBoxFill(rawLocal) : null
-
-  if (app.state.currentTool === 'select' && boxFillHit) {
-    selectBoxWithPanels(boxFillHit.id, event.shiftKey)
-
-    draw()
-    return
-  }
-
   if (app.state.currentTool === 'select' && !event.shiftKey) {
     drawing.clearSelection()
     box.clearSelection()
@@ -5904,25 +5895,12 @@ function onPointerUp(event) {
         ])
       ])
 
-      if (!hasDetailSelection && selectedIds.boxIds.length) {
-        box.selectBoxes([
-          ...new Set([
-            ...(Array.isArray(box.state.selectedBoxIds) ? box.state.selectedBoxIds : []),
-            ...selectedIds.boxIds
-          ])
-        ])
-      } else if (!event?.shiftKey) {
-        box.clearSelection()
-      }
+      box.clearSelection()
     } else {
       drawing.selectPanels(panelIds)
       drawing.selectDimensions(selectedIds.dimensionIds)
 
-      if (!hasDetailSelection && selectedIds.boxIds.length) {
-        box.selectBoxes(selectedIds.boxIds)
-      } else {
-        box.clearSelection()
-      }
+      box.clearSelection()
     }
 
     resetSelectDrag()
