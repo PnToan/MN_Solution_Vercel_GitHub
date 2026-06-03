@@ -71,6 +71,7 @@ import { useViewportKeyboard } from '../../composables/drawing/useViewportKeyboa
 import { useViewportCursor } from '../../composables/drawing/useViewportCursor'
 import { usePanelEditFooterText } from '../../composables/panel-edit/usePanelEditFooterText'
 import { usePanelEditState } from '../../composables/panel-edit/usePanelEditState'
+import { usePanelEditHistory } from '../../composables/panel-edit/usePanelEditHistory'
 import { PANEL_EDIT_TOOLS } from '../../constants/panelEditTools'
 import { useAppStore } from '../../stores/useAppStore'
 import { useCabinetStore } from '../../stores/useCabinetStore'
@@ -263,6 +264,26 @@ const {
   panelEditMove,
   panelEditHistory
 } = usePanelEditState()
+
+const {
+  clonePanelEditHistoryData,
+  pushPanelEditHistorySnapshot,
+  clearPanelEditHistory,
+  undoPanelEditHistory,
+  redoPanelEditHistory
+} = usePanelEditHistory({
+  app,
+  panelEditTape,
+  panelEditRect,
+  panelEditLine,
+  panelEditCircle,
+  panelEditArc,
+  panelEditHistory,
+  clearPanelEditSelection,
+  resetPanelEditMoveDraft,
+  resetPanelEditSelectDrag,
+  resizePanelEditCanvas
+})
 
 const panelEditTools = PANEL_EDIT_TOOLS
 const panelEditMoveController = createEditPanelMoveController({
@@ -1118,124 +1139,6 @@ function resetPanelEditCommandDrafts() {
   resetPanelEditMoveDraft()
   resetPanelEditSelectDrag()
 } // End resetPanelEditCommandDrafts
-
-//=================
-function clonePanelEditHistoryData(value) {
-  return JSON.parse(JSON.stringify(value || null))
-} // End clonePanelEditHistoryData
-
-//=================
-function createPanelEditHistorySnapshot() {
-  return {
-    guides: clonePanelEditHistoryData(panelEditTape.value.guides || []),
-    rectangles: clonePanelEditHistoryData(panelEditRect.value.rectangles || []),
-    lines: clonePanelEditHistoryData(panelEditLine.value.lines || []),
-    circles: clonePanelEditHistoryData(panelEditCircle.value.circles || [])
-  }
-} // End createPanelEditHistorySnapshot
-
-//=================
-function restorePanelEditHistorySnapshot(snapshot) {
-  panelEditTape.value = {
-    ...panelEditTape.value,
-    hoverSnap: null,
-    draft: null,
-    inputBuffer: '',
-    guides: clonePanelEditHistoryData(snapshot?.guides || [])
-  }
-  panelEditRect.value = {
-    ...panelEditRect.value,
-    hoverSnap: null,
-    draft: null,
-    pendingAction: null,
-    rectangles: clonePanelEditHistoryData(snapshot?.rectangles || [])
-  }
-  panelEditLine.value = {
-    ...panelEditLine.value,
-    hoverSnap: null,
-    hoverRegion: null,
-    hoverLine: null,
-    selectedLineId: null,
-    draft: null,
-    lines: clonePanelEditHistoryData(snapshot?.lines || [])
-  }
-  panelEditCircle.value = {
-    ...panelEditCircle.value,
-    hoverSnap: null,
-    draft: null,
-    inputBuffer: '',
-    circles: clonePanelEditHistoryData(snapshot?.circles || [])
-  }
-  panelEditArc.value = {
-    ...panelEditArc.value,
-    hoverSnap: null,
-    hoverPoint: null,
-    draft: null,
-    inputBuffer: ''
-  }
-  clearPanelEditSelection()
-  resetPanelEditMoveDraft()
-  resetPanelEditSelectDrag()
-} // End restorePanelEditHistorySnapshot
-
-//=================
-function pushPanelEditHistorySnapshot() {
-  const history = panelEditHistory.value
-
-  history.undoStack.push(createPanelEditHistorySnapshot())
-
-  if (history.undoStack.length > history.max) {
-    history.undoStack.shift()
-  }
-
-  history.redoStack = []
-} // End pushPanelEditHistorySnapshot
-
-//=================
-function clearPanelEditHistory() {
-  panelEditHistory.value = {
-    undoStack: [],
-    redoStack: [],
-    max: panelEditHistory.value.max || 80
-  }
-} // End clearPanelEditHistory
-
-//=================
-function undoPanelEditHistory() {
-  const history = panelEditHistory.value
-  const snapshot = history.undoStack.pop()
-
-  if (!snapshot) {
-    app.setStatus('Edit Panel: không còn bước để Undo')
-    return false
-  }
-
-  history.redoStack.push(createPanelEditHistorySnapshot())
-  restorePanelEditHistorySnapshot(snapshot)
-  app.setStatus('Edit Panel: Undo')
-  nextTick(resizePanelEditCanvas)
-
-  return true
-} // End undoPanelEditHistory
-
-//=================
-function redoPanelEditHistory() {
-  const history = panelEditHistory.value
-  const snapshot = history.redoStack.pop()
-
-  if (!snapshot) {
-    app.setStatus('Edit Panel: không còn bước để Redo')
-    return false
-  }
-
-  history.undoStack.push(createPanelEditHistorySnapshot())
-  restorePanelEditHistorySnapshot(snapshot)
-  app.setStatus('Edit Panel: Redo')
-  nextTick(resizePanelEditCanvas)
-
-  return true
-} // End redoPanelEditHistory
-
 
 //=================
 function getPanelEditSavedStateKey(context) {
