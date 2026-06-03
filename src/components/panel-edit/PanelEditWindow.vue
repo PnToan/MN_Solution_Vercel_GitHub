@@ -148,7 +148,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .mn-panel-edit-canvas.mn-cursor-move {
-  cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='4' y='4' width='24' height='24' rx='4' fill='%23111111' stroke='%23ffffff' stroke-width='1.8'/%3E%3Cpath d='M16 7 V25 M7 16 H25' stroke='%23ffffff' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M16 7 L12.5 10.5 M16 7 L19.5 10.5 M16 25 L12.5 21.5 M16 25 L19.5 21.5 M7 16 L10.5 12.5 M7 16 L10.5 19.5 M25 16 L21.5 12.5 M25 16 L21.5 19.5' stroke='%23ffffff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 16 16, move;
+  cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cg stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 6 V26 M6 16 H26' stroke='%23111111' stroke-width='5'/%3E%3Cpath d='M16 6 L11.5 10.5 M16 6 L20.5 10.5 M16 26 L11.5 21.5 M16 26 L20.5 21.5 M6 16 L10.5 11.5 M6 16 L10.5 20.5 M26 16 L21.5 11.5 M26 16 L21.5 20.5' stroke='%23111111' stroke-width='5'/%3E%3Cpath d='M16 6 V26 M6 16 H26' stroke='%23ffffff' stroke-width='2.4'/%3E%3Cpath d='M16 6 L11.5 10.5 M16 6 L20.5 10.5 M16 26 L11.5 21.5 M16 26 L20.5 21.5 M6 16 L10.5 11.5 M6 16 L10.5 20.5 M26 16 L21.5 11.5 M26 16 L21.5 20.5' stroke='%23ffffff' stroke-width='2.4'/%3E%3C/g%3E%3C/svg%3E") 16 16, move;
 }
 
 .mn-panel-edit-canvas.mn-cursor-crosshair {
