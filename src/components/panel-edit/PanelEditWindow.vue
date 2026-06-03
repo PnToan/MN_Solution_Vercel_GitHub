@@ -148,7 +148,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .mn-panel-edit-canvas.mn-cursor-move {
-  cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 2 L4 23 L9 18 L13 29 L17 27 L13 16 L21 16 Z' fill='white' stroke='%23111111' stroke-width='1.4' stroke-linejoin='round'/%3E%3Cg transform='translate(19 20)' stroke='%230077CC' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M0 4 H9 M5 0 L9 4 L5 8'/%3E%3Cpath d='M4 13 H-5 M-1 9 L-5 13 L-1 17'/%3E%3Cpath d='M2 1 V10 M-2 5 L2 1 L6 5'/%3E%3Cpath d='M2 16 V7 M-2 12 L2 16 L6 12'/%3E%3C/g%3E%3C/svg%3E") 4 2, move;
+  cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 3 V21 M3 12 H21' stroke='%23f1f1f1' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M12 3 L9 6 M12 3 L15 6 M12 21 L9 18 M12 21 L15 18 M3 12 L6 9 M3 12 L6 15 M21 12 L18 9 M21 12 L18 15' stroke='%23f1f1f1' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") 16 16, move;
 }
 
 .mn-panel-edit-canvas.mn-cursor-crosshair {
