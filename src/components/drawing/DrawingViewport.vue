@@ -70,6 +70,7 @@ import { useSelectDrag } from '../../composables/drawing/useSelectDrag'
 import { useViewportKeyboard } from '../../composables/drawing/useViewportKeyboard'
 import { useViewportCursor } from '../../composables/drawing/useViewportCursor'
 import { usePanelEditFooterText } from '../../composables/panel-edit/usePanelEditFooterText'
+import { usePanelEditState } from '../../composables/panel-edit/usePanelEditState'
 import { PANEL_EDIT_TOOLS } from '../../constants/panelEditTools'
 import { useAppStore } from '../../stores/useAppStore'
 import { useCabinetStore } from '../../stores/useCabinetStore'
@@ -250,75 +251,18 @@ let panelEditPanning = false
 let panelEditPanStart = null
 let panelEditPanOriginal = null
 
-const panelEditViewport = ref({
-  zoom: 1,
-  panX: 0,
-  panY: 0
-})
-
-const panelEditTape = ref({
-  hoverSnap: null,
-  draft: null,
-  guides: [],
-  inputBuffer: ''
-})
-
-const panelEditRect = ref({
-  hoverSnap: null,
-  draft: null,
-  pendingAction: null,
-  rectangles: []
-})
-
-const panelEditLine = ref({
-  hoverSnap: null,
-  hoverRegion: null,
-  hoverLine: null,
-  selectedLineId: null,
-  draft: null,
-  lines: []
-})
-
-const panelEditCircle = ref({
-  hoverSnap: null,
-  draft: null,
-  circles: [],
-  inputBuffer: ''
-})
-
-const panelEditArc = ref({
-  hoverSnap: null,
-  hoverPoint: null,
-  draft: null,
-  inputBuffer: ''
-})
-
-const panelEditSelection = ref({
-  items: [],
-  hoverItem: null
-})
-
-const panelEditSelectDrag = ref({
-  active: false,
-  start: null,
-  current: null,
-  moved: false
-})
-
-const panelEditMove = ref({
-  stage: 'idle',
-  start: null,
-  current: null,
-  hoverSnap: null,
-  baseItems: []
-})
-
-const panelEditHistory = ref({
-  undoStack: [],
-  redoStack: [],
-  max: 80
-})
-
+const {
+  panelEditViewport,
+  panelEditTape,
+  panelEditRect,
+  panelEditLine,
+  panelEditCircle,
+  panelEditArc,
+  panelEditSelection,
+  panelEditSelectDrag,
+  panelEditMove,
+  panelEditHistory
+} = usePanelEditState()
 
 const panelEditTools = PANEL_EDIT_TOOLS
 const panelEditMoveController = createEditPanelMoveController({
