@@ -15,6 +15,13 @@ import {
 import { getCameraConfig, projectBoxToCameraRect } from '../core/view/view-camera'
 import { buildPanelEditContext } from '../core/tools/editPanelTool'
 import {
+  getPanelEditCanonicalFaceSide,
+  transformPanelEditCircles,
+  transformPanelEditGuides,
+  transformPanelEditLines,
+  transformPanelEditRectangles
+} from '../core/panel-edit/panelEditFaceTransform'
+import {
   cancelMove,
   commitMoveToTarget,
   createMoveState,
@@ -2233,10 +2240,15 @@ const store = createSimpleStore({
 
     if (!panelId) return null
 
-    const faceSide = payload.faceSide || state.panelEdit?.context?.faceSide || null
+    const sourceFaceSide = payload.faceSide || state.panelEdit?.context?.faceSide || null
     const faceKey = payload.faceKey || state.panelEdit?.context?.faceKey || null
-    const faceStateGroup = getPanelEditStateGroupKey(faceKey, faceSide)
+    const faceSide = getPanelEditCanonicalFaceSide(faceKey) || sourceFaceSide
+    const faceStateGroup = getPanelEditStateGroupKey(faceKey, sourceFaceSide)
     const faceStateKey = faceStateGroup.physicalKey
+    const transformContext = {
+      width: state.panelEdit?.context?.width || payload.width || 0,
+      height: state.panelEdit?.context?.height || payload.height || 0
+    }
     const normalizePoint = (point) => ({
       x: Number(point?.x || 0),
       y: Number(point?.y || 0)
@@ -2244,10 +2256,10 @@ const store = createSimpleStore({
     const normalizePolygon = (polygon) => Array.isArray(polygon)
       ? polygon.map((point) => normalizePoint(point))
       : null
-    const rectangles = Array.isArray(payload.rectangles) ? payload.rectangles : []
-    const lines = Array.isArray(payload.lines) ? payload.lines : []
-    const circles = Array.isArray(payload.circles) ? payload.circles : []
-    const guides = Array.isArray(payload.guides) ? payload.guides : []
+    const rectangles = transformPanelEditRectangles(payload.rectangles, transformContext, sourceFaceSide, faceSide)
+    const lines = transformPanelEditLines(payload.lines, transformContext, sourceFaceSide, faceSide)
+    const circles = transformPanelEditCircles(payload.circles, transformContext, sourceFaceSide, faceSide)
+    const guides = transformPanelEditGuides(payload.guides, transformContext, sourceFaceSide, faceSide)
     const normalizedRectangles = rectangles.map((rectangle) => ({
       id: rectangle.id,
       start: normalizePoint(rectangle.start),

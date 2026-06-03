@@ -1,3 +1,10 @@
+import {
+  transformPanelEditCircles,
+  transformPanelEditGuides,
+  transformPanelEditLines,
+  transformPanelEditRectangles
+} from '../../core/panel-edit/panelEditFaceTransform'
+
 //=================
 function getPanelEditSavedStateKey(context) {
   if (!context) return null
@@ -122,12 +129,19 @@ export function usePanelEditSavedState(options = {}) {
       return
     }
 
+    const sourceFaceSide = savedState.faceSide || context.faceSide
+    const targetFaceSide = context.faceSide
+    const transformedGuides = transformPanelEditGuides(savedState.guides, context, sourceFaceSide, targetFaceSide)
+    const transformedRectangles = transformPanelEditRectangles(savedState.rectangles, context, sourceFaceSide, targetFaceSide)
+    const transformedLines = transformPanelEditLines(savedState.lines, context, sourceFaceSide, targetFaceSide)
+    const transformedCircles = transformPanelEditCircles(savedState.circles, context, sourceFaceSide, targetFaceSide)
+
     panelEditTape.value = {
       hoverSnap: null,
       draft: null,
       inputBuffer: '',
-      guides: Array.isArray(savedState.guides)
-        ? savedState.guides.map((guide) => ({
+      guides: Array.isArray(transformedGuides)
+        ? transformedGuides.map((guide) => ({
             id: guide.id || `guide-${Date.now()}-${Math.random()}`,
             axis: guide.axis,
             edge: guide.edge || null,
@@ -140,8 +154,8 @@ export function usePanelEditSavedState(options = {}) {
       hoverSnap: null,
       draft: null,
       pendingAction: null,
-      rectangles: Array.isArray(savedState.rectangles)
-        ? savedState.rectangles.map((rectangle) => ({
+      rectangles: Array.isArray(transformedRectangles)
+        ? transformedRectangles.map((rectangle) => ({
             id: rectangle.id || `rect-${Date.now()}-${Math.random()}`,
             start: clonePanelEditSavedPoint(rectangle.start),
             end: clonePanelEditSavedPoint(rectangle.end),
@@ -163,8 +177,8 @@ export function usePanelEditSavedState(options = {}) {
       hoverLine: null,
       selectedLineId: null,
       draft: null,
-      lines: Array.isArray(savedState.lines)
-        ? savedState.lines.map((line) => ({
+      lines: Array.isArray(transformedLines)
+        ? transformedLines.map((line) => ({
             id: line.id || `line-${Date.now()}-${Math.random()}`,
             groupId: line.groupId || null,
             groupType: line.groupType || null,
@@ -178,8 +192,8 @@ export function usePanelEditSavedState(options = {}) {
       hoverSnap: null,
       draft: null,
       inputBuffer: '',
-      circles: Array.isArray(savedState.circles)
-        ? savedState.circles.map((circle) => ({
+      circles: Array.isArray(transformedCircles)
+        ? transformedCircles.map((circle) => ({
             id: circle.id || `circle-${Date.now()}-${Math.random()}`,
             center: clonePanelEditSavedPoint(circle.center),
             radius: Number(circle.radius || 0)
