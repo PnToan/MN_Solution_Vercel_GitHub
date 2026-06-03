@@ -148,7 +148,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .mn-panel-edit-canvas.mn-cursor-move {
-  cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cg stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 6 V26 M6 16 H26' stroke='%23111111' stroke-width='5'/%3E%3Cpath d='M16 6 L11.5 10.5 M16 6 L20.5 10.5 M16 26 L11.5 21.5 M16 26 L20.5 21.5 M6 16 L10.5 11.5 M6 16 L10.5 20.5 M26 16 L21.5 11.5 M26 16 L21.5 20.5' stroke='%23111111' stroke-width='5'/%3E%3Cpath d='M16 6 V26 M6 16 H26' stroke='%23ffffff' stroke-width='2.4'/%3E%3Cpath d='M16 6 L11.5 10.5 M16 6 L20.5 10.5 M16 26 L11.5 21.5 M16 26 L20.5 21.5 M6 16 L10.5 11.5 M6 16 L10.5 20.5 M26 16 L21.5 11.5 M26 16 L21.5 20.5' stroke='%23ffffff' stroke-width='2.4'/%3E%3C/g%3E%3C/svg%3E") 16 16, move;
+  cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 5 V27 M5 16 H27' stroke='%23111111' stroke-width='5'/%3E%3Cpath d='M16 5 L12 9 M16 5 L20 9 M16 27 L12 23 M16 27 L20 23 M5 16 L9 12 M5 16 L9 20 M27 16 L23 12 M27 16 L23 20' stroke='%23111111' stroke-width='5'/%3E%3Cpath d='M16 5 V27 M5 16 H27' stroke='%23ffffff' stroke-width='2.2'/%3E%3Cpath d='M16 5 L12 9 M16 5 L20 9 M16 27 L12 23 M16 27 L20 23 M5 16 L9 12 M5 16 L9 20 M27 16 L23 12 M27 16 L23 20' stroke='%23ffffff' stroke-width='2.2'/%3E%3Ccircle cx='16' cy='16' r='1.4' fill='%23ffffff' stroke='%23111111' stroke-width='1.2'/%3E%3C/g%3E%3C/svg%3E") 16 16, move;
 }
 
 .mn-panel-edit-canvas.mn-cursor-crosshair {
