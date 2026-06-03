@@ -72,6 +72,7 @@ import { useViewportCursor } from '../../composables/drawing/useViewportCursor'
 import { usePanelEditFooterText } from '../../composables/panel-edit/usePanelEditFooterText'
 import { usePanelEditState } from '../../composables/panel-edit/usePanelEditState'
 import { usePanelEditHistory } from '../../composables/panel-edit/usePanelEditHistory'
+import { usePanelEditDraftReset } from '../../composables/panel-edit/usePanelEditDraftReset'
 import { PANEL_EDIT_TOOLS } from '../../constants/panelEditTools'
 import { useAppStore } from '../../stores/useAppStore'
 import { useCabinetStore } from '../../stores/useCabinetStore'
@@ -264,6 +265,24 @@ const {
   panelEditMove,
   panelEditHistory
 } = usePanelEditState()
+
+const {
+  resetPanelEditTapeDraft,
+  resetPanelEditRectDraft,
+  resetPanelEditLineDraft,
+  resetPanelEditCircleDraft,
+  resetPanelEditArcDraft,
+  resetPanelEditSelectDrag,
+  resetPanelEditCommandDrafts
+} = usePanelEditDraftReset({
+  panelEditTape,
+  panelEditRect,
+  panelEditLine,
+  panelEditCircle,
+  panelEditArc,
+  panelEditSelectDrag,
+  resetPanelEditMoveDraft
+})
 
 const {
   clonePanelEditHistoryData,
@@ -1063,82 +1082,9 @@ function drawPanelEditTapeSnap(targetContext, snap) {
 } // End drawPanelEditTapeSnap
 
 //=================
-function resetPanelEditTapeDraft() {
-  panelEditTape.value = {
-    ...panelEditTape.value,
-    draft: null,
-    inputBuffer: ''
-  }
-} // End resetPanelEditTapeDraft
-
-//=================
-function resetPanelEditRectDraft() {
-  panelEditRect.value = {
-    ...panelEditRect.value,
-    hoverSnap: null,
-    draft: null,
-    pendingAction: null
-  }
-} // End resetPanelEditRectDraft
-
-//=================
-function resetPanelEditLineDraft() {
-  panelEditLine.value = {
-    ...panelEditLine.value,
-    hoverSnap: null,
-    hoverRegion: null,
-    hoverLine: null,
-    selectedLineId: null,
-    draft: null
-  }
-} // End resetPanelEditLineDraft
-
-//=================
-function resetPanelEditCircleDraft() {
-  panelEditCircle.value = {
-    ...panelEditCircle.value,
-    hoverSnap: null,
-    draft: null,
-    inputBuffer: ''
-  }
-} // End resetPanelEditCircleDraft
-
-//=================
-function resetPanelEditArcDraft() {
-  panelEditArc.value = {
-    ...panelEditArc.value,
-    hoverSnap: null,
-    hoverPoint: null,
-    draft: null,
-    inputBuffer: ''
-  }
-} // End resetPanelEditArcDraft
-
-//=================
 function resetPanelEditMoveDraft() {
   panelEditMoveController.reset()
 } // End resetPanelEditMoveDraft
-
-//=================
-function resetPanelEditSelectDrag() {
-  panelEditSelectDrag.value = {
-    active: false,
-    start: null,
-    current: null,
-    moved: false
-  }
-} // End resetPanelEditSelectDrag
-
-//=================
-function resetPanelEditCommandDrafts() {
-  resetPanelEditTapeDraft()
-  resetPanelEditRectDraft()
-  resetPanelEditLineDraft()
-  resetPanelEditCircleDraft()
-  resetPanelEditArcDraft()
-  resetPanelEditMoveDraft()
-  resetPanelEditSelectDrag()
-} // End resetPanelEditCommandDrafts
 
 //=================
 function getPanelEditSavedStateKey(context) {
