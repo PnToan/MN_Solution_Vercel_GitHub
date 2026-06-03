@@ -63,6 +63,7 @@ import BoxHeightInput from './BoxHeightInput.vue'
 import PanelEditWindow from '../panel-edit/PanelEditWindow.vue'
 import Viewport3DPreview from './Viewport3DPreview.vue'
 import { useBoxHeightInput } from '../../composables/drawing/useBoxHeightInput'
+import { useViewportCanvas } from '../../composables/drawing/useViewportCanvas'
 import { useDimensionInput } from '../../composables/drawing/useDimensionInput'
 import { usePanelToolKeyboard } from '../../composables/drawing/usePanelToolKeyboard'
 import { useSelectDrag } from '../../composables/drawing/useSelectDrag'
@@ -87,13 +88,25 @@ const wall = useWallStore()
 const drawing = useDrawingStore()
 const box = useBoxStore()
 const viewportRef = ref(null)
-const canvasRef = ref(null)
 const panelEditCanvasRef = ref(null)
+let drawImpl = () => {}
+let resizeCanvasImpl = () => {}
+let onAppSettingsAppliedImpl = () => {}
 
 //=================
-function setCanvasRef(element) {
-  canvasRef.value = element
-} // End setCanvasRef
+function draw() {
+  return drawImpl()
+} // End draw
+
+//=================
+function resizeCanvas() {
+  return resizeCanvasImpl()
+} // End resizeCanvas
+
+//=================
+function onAppSettingsApplied() {
+  return onAppSettingsAppliedImpl()
+} // End onAppSettingsApplied
 
 //=================
 function setPanelEditCanvasRef(element) {
@@ -181,8 +194,6 @@ const {
   boxHeightInput,
   exitToSelect
 })
-let ctx = null
-let ratio = 1
 let panning = false
 let panStart = null
 let panOriginal = null
@@ -489,39 +500,13 @@ const canvasCursorClass = computed(() => {
 
   return 'mn-cursor-default'
 }) // End canvasCursorClass
-function resizeCanvas() {
-  const canvas = canvasRef.value
-  const host = viewportRef.value
-  if (!canvas || !host) return
-  const rect = host.getBoundingClientRect()
-  ratio = window.devicePixelRatio || 1
-  canvas.width = rect.width * ratio
-  canvas.height = rect.height * ratio
-  canvas.style.width = `${rect.width}px`
-  canvas.style.height = `${rect.height}px`
-  ctx = canvas.getContext('2d')
-  ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
-  app.setViewportSize(rect.width, rect.height)
-  draw()
-  nextTick(resizePanelEditCanvas)
-}
-
-//=================
-//=================
-function onAppSettingsApplied() {
-  drawing.rebuildZones()
-  draw()
-  nextTick(resizePanelEditCanvas)
-} // End onAppSettingsApplied
-
-function draw() {
-  if (!ctx || !canvasRef.value) return
-
-  const canvas = canvasRef.value
-  const width = canvas.clientWidth
-  const height = canvas.clientHeight
-
-  renderCanvas2D(ctx, {
+const viewportCanvas = useViewportCanvas({
+  viewportRef,
+  app,
+  drawing,
+  renderCanvas2D,
+  afterResize: resizePanelEditCanvas,
+  getRenderPayload: ({ width, height }) => ({
     width,
     height,
     viewport: app.state.viewport,
@@ -555,7 +540,12 @@ function draw() {
     editingDimensionId: dimInput.value.target === 'dimension' ? dimInput.value.dimensionId : null,
     showGrid: app.state.showGrid
   })
-} // End draw
+})
+const canvasRef = viewportCanvas.canvasRef
+const setCanvasRef = viewportCanvas.setCanvasRef
+drawImpl = viewportCanvas.draw
+resizeCanvasImpl = viewportCanvas.resizeCanvas
+onAppSettingsAppliedImpl = viewportCanvas.onAppSettingsApplied
 
 //=================
 function getCssVariable(variableName, fallback) {
