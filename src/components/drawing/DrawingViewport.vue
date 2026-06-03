@@ -70,6 +70,7 @@ import { useSelectDrag } from '../../composables/drawing/useSelectDrag'
 import { useViewportKeyboard } from '../../composables/drawing/useViewportKeyboard'
 import { useViewportCursor } from '../../composables/drawing/useViewportCursor'
 import { usePanelEditFooterText } from '../../composables/panel-edit/usePanelEditFooterText'
+import { PANEL_EDIT_TOOLS } from '../../constants/panelEditTools'
 import { useAppStore } from '../../stores/useAppStore'
 import { useCabinetStore } from '../../stores/useCabinetStore'
 import { useWallStore } from '../../stores/useWallStore'
@@ -319,20 +320,7 @@ const panelEditHistory = ref({
 })
 
 
-const views = [
-  { id: 'front', label: 'Trước' }, { id: 'back', label: 'Sau' }, { id: 'left', label: 'Trái' },
-  { id: 'right', label: 'Phải' }, { id: 'top', label: 'Trên' }, { id: 'bottom', label: 'Dưới' }
-]
-
-const panelEditTools = [
-  { id: 'editPanelSelect', label: 'Select', icon: '/icons/toolbar/select.svg' },
-  { id: 'editPanelMove', label: 'Move', icon: '/icons/toolbar/move.svg' },
-  { id: 'editPanelLine', label: 'Line', icon: '/icons/toolbar/line.svg' },
-  { id: 'editPanelRect', label: 'Vẽ hình chữ nhật', icon: '/icons/toolbar/rect.svg' },
-  { id: 'editPanelArc', label: 'Arc', icon: '/icons/toolbar/arc.svg' },
-  { id: 'editPanelCircle', label: 'Vẽ hình tròn', icon: '/icons/toolbar/circle.svg' },
-  { id: 'editPanelTape', label: 'Thước', icon: '/icons/toolbar/tape.svg' }
-]
+const panelEditTools = PANEL_EDIT_TOOLS
 const panelEditMoveController = createEditPanelMoveController({
   panelEditMove,
   panelEditSelection,
