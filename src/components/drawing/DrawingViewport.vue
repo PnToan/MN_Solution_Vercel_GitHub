@@ -77,6 +77,7 @@ import { usePanelEditSavedState } from '../../composables/panel-edit/usePanelEdi
 import { usePanelEditLayout } from '../../composables/panel-edit/usePanelEditLayout'
 import { usePanelEditApplyData } from '../../composables/panel-edit/usePanelEditApplyData'
 import { usePanelEditSelection } from '../../composables/panel-edit/usePanelEditSelection'
+import { usePanelEditApply } from '../../composables/panel-edit/usePanelEditApply'
 import { PANEL_EDIT_TOOLS } from '../../constants/panelEditTools'
 import { useAppStore } from '../../stores/useAppStore'
 import { useCabinetStore } from '../../stores/useCabinetStore'
@@ -3892,62 +3893,21 @@ function onPanelEditWheel(event) {
 } // End onPanelEditWheel
 
 
-//=================
-function applyPanelEdit() {
-  const context = activePanelEditContext.value
-
-  if (!context) return
-
-  const savedRectangles = getPanelEditSavedRectanglesForApply()
-  const savedLines = getPanelEditSavedLinesForApply()
-  const savedCircles = getPanelEditSavedCirclesForApply()
-  const savedGuides = getPanelEditSavedGuidesForApply()
-
-  drawing.applyPanelEditOperations({
-    panelId: context.panelId,
-    faceSide: context.faceSide,
-    faceKey: context.faceKey,
-    axisU: context.axisU,
-    axisV: context.axisV,
-    thicknessAxis: context.thicknessAxis,
-    rectangles: savedRectangles,
-    lines: savedLines,
-    circles: savedCircles,
-    guides: savedGuides
-  })
-
-  panelEditTape.value = {
-    hoverSnap: null,
-    draft: null,
-    guides: [],
-    inputBuffer: ''
-  }
-  panelEditRect.value = {
-    hoverSnap: null,
-    draft: null,
-    pendingAction: null,
-    rectangles: []
-  }
-  panelEditLine.value = {
-    hoverSnap: null,
-    hoverRegion: null,
-    hoverLine: null,
-    selectedLineId: null,
-    draft: null,
-    lines: []
-  }
-  panelEditCircle.value = {
-    hoverSnap: null,
-    draft: null,
-    circles: [],
-    inputBuffer: ''
-  }
-  clearPanelEditHistory()
-  drawing.clearPanelEdit()
-  app.setTool('select')
-  app.setStatus('Edit Panel: cập nhật thành công')
-  draw()
-} // End applyPanelEdit
+const { applyPanelEdit } = usePanelEditApply({
+  activePanelEditContext,
+  panelEditTape,
+  panelEditRect,
+  panelEditLine,
+  panelEditCircle,
+  drawing,
+  app,
+  draw,
+  clearPanelEditHistory,
+  getPanelEditSavedRectanglesForApply,
+  getPanelEditSavedLinesForApply,
+  getPanelEditSavedCirclesForApply,
+  getPanelEditSavedGuidesForApply
+})
 //=================
 function clampValue(value, min, max) {
   return Math.min(Math.max(value, min), max)
