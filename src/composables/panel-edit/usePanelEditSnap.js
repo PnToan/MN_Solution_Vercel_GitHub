@@ -20,10 +20,15 @@ export function usePanelEditSnap(options) {
   } = options
 
   //=================
+  function getPanelEditSafeArray(value) {
+    return Array.isArray(value) ? value : []
+  } // End getPanelEditSafeArray
+
+  //=================
   function getPanelEditGuideSegments(context) {
     if (!context) return []
 
-    return (panelEditTape.value.guides || []).map((guide) => {
+    return getPanelEditSafeArray(panelEditTape.value?.guides).map((guide) => {
       const value = Number(guide.value || 0)
 
       if (guide.axis === 'vertical') {
@@ -62,7 +67,7 @@ export function usePanelEditSnap(options) {
   function getPanelEditLineSegmentsForSnap(context, sourceLines = null) {
     if (!context) return []
 
-    const lines = Array.isArray(sourceLines) ? sourceLines : (panelEditLine.value.lines || [])
+    const lines = Array.isArray(sourceLines) ? sourceLines : getPanelEditSafeArray(panelEditLine.value?.lines)
 
     return lines.map((line) => ({
       id: line.id,
@@ -78,7 +83,7 @@ export function usePanelEditSnap(options) {
     if (!context) return []
 
     const segments = []
-    const rectangles = Array.isArray(sourceRectangles) ? sourceRectangles : (panelEditRect.value.rectangles || [])
+    const rectangles = Array.isArray(sourceRectangles) ? sourceRectangles : getPanelEditSafeArray(panelEditRect.value?.rectangles)
 
     rectangles.forEach((rectangle) => {
       const id = rectangle.id || `rect-${segments.length}`
@@ -112,28 +117,28 @@ export function usePanelEditSnap(options) {
   //=================
   function getPanelEditMoveSelectedSnapSource(options = {}) {
     const selectedLineKeys = getPanelEditSelectedLineKeySet()
-    const selectedRectIds = new Set(panelEditSelection.value.items.filter((item) => item.type === 'rect').map((item) => item.id))
-    const selectedCircleIds = new Set(panelEditSelection.value.items.filter((item) => item.type === 'circle').map((item) => item.id))
+    const selectedRectIds = new Set(getPanelEditSafeArray(panelEditSelection.value?.items).filter((item) => item.type === 'rect').map((item) => item.id))
+    const selectedCircleIds = new Set(getPanelEditSafeArray(panelEditSelection.value?.items).filter((item) => item.type === 'circle').map((item) => item.id))
     const preview = options.useMovePreview === true ? getPanelEditMovePreviewItems() : null
 
     return {
       lines: preview
         ? preview.lines
-        : (panelEditLine.value.lines || []).filter((line) => selectedLineKeys.has(getPanelEditLineSelectionKey(line))),
+        : getPanelEditSafeArray(panelEditLine.value?.lines).filter((line) => selectedLineKeys.has(getPanelEditLineSelectionKey(line))),
       rectangles: preview
         ? preview.rectangles
-        : (panelEditRect.value.rectangles || []).filter((rectangle) => selectedRectIds.has(rectangle.id)),
+        : getPanelEditSafeArray(panelEditRect.value?.rectangles).filter((rectangle) => selectedRectIds.has(rectangle.id)),
       circles: preview
         ? preview.circles
-        : (panelEditCircle.value.circles || []).filter((circle) => selectedCircleIds.has(circle.id))
+        : getPanelEditSafeArray(panelEditCircle.value?.circles).filter((circle) => selectedCircleIds.has(circle.id))
     }
   } // End getPanelEditMoveSelectedSnapSource
 
   //=================
   function getPanelEditCircleSnapCandidates(source = {}) {
     const candidates = []
-    const circles = Array.isArray(source.circles) ? source.circles : (panelEditCircle.value.circles || [])
-    const rectangles = Array.isArray(source.rectangles) ? source.rectangles : (panelEditRect.value.rectangles || [])
+    const circles = Array.isArray(source.circles) ? source.circles : getPanelEditSafeArray(panelEditCircle.value?.circles)
+    const rectangles = Array.isArray(source.rectangles) ? source.rectangles : getPanelEditSafeArray(panelEditRect.value?.rectangles)
 
     circles.forEach((circle) => {
       const radius = getPanelEditCircleRadius(circle)
@@ -184,7 +189,7 @@ export function usePanelEditSnap(options) {
     const snapSource = selectedMoveOnly ? getPanelEditMoveSelectedSnapSource(options) : null
     const includeGuides = !selectedMoveOnly && options.includeGuides !== false
     const includePanel = !selectedMoveOnly && options.includePanel !== false
-    const guides = includeGuides ? panelEditTape.value.guides : []
+    const guides = includeGuides ? getPanelEditSafeArray(panelEditTape.value?.guides) : []
     const candidates = []
 
     if (includePanel) {
@@ -202,7 +207,7 @@ export function usePanelEditSnap(options) {
 
     const verticalGuides = guides.filter((guide) => guide.axis === 'vertical')
     const horizontalGuides = guides.filter((guide) => guide.axis === 'horizontal')
-    const editLines = selectedMoveOnly ? snapSource.lines : (Array.isArray(panelEditLine.value.lines) ? panelEditLine.value.lines : [])
+    const editLines = selectedMoveOnly ? snapSource.lines : (getPanelEditSafeArray(panelEditLine.value?.lines))
     const verticalLines = editLines.filter((line) => line.axis === 'vertical')
     const horizontalLines = editLines.filter((line) => line.axis === 'horizontal')
 
@@ -472,8 +477,8 @@ export function usePanelEditSnap(options) {
       })
 
     const circleEdgeSources = [
-      ...(selectedMoveOnly ? snapSource.circles : (panelEditCircle.value.circles || [])),
-      ...(selectedMoveOnly ? snapSource.rectangles : (panelEditRect.value.rectangles || []))
+      ...(selectedMoveOnly ? snapSource.circles : getPanelEditSafeArray(panelEditCircle.value?.circles)),
+      ...(selectedMoveOnly ? snapSource.rectangles : getPanelEditSafeArray(panelEditRect.value?.rectangles))
         .filter((rectangle) => rectangle.shapeType === 'circle' && rectangle.center && Number(rectangle.radius || 0) > 0)
     ]
 

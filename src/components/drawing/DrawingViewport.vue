@@ -362,26 +362,6 @@ const {
 })
 
 const {
-  getPanelEditMoveSelectedSnapSource,
-  getPanelEditCircleSnapCandidates,
-  getPanelEditTapeSnap
-} = usePanelEditSnap({
-  panelEditTape,
-  panelEditRect,
-  panelEditLine,
-  panelEditCircle,
-  panelEditSelection,
-  getPanelEditPoint,
-  getPanelEditLocalFromScreen,
-  getClosestPointOnPanelEditLine,
-  getPanelEditLineSelectionKey,
-  getPanelEditSelectedLineKeySet,
-  getPanelEditMovePreviewItems,
-  getPanelEditRectPolygon,
-  getPanelEditCircleRadius
-})
-
-const {
   clonePanelEditHistoryData,
   pushPanelEditHistorySnapshot,
   clearPanelEditHistory,
@@ -448,6 +428,29 @@ const panelEditMoveController = createEditPanelMoveController({
   drawPanelEditRectangle,
   drawPanelEditCircle
 })
+
+const {
+  getPanelEditMoveSelectedSnapSource,
+  getPanelEditCircleSnapCandidates,
+  getPanelEditTapeSnap
+} = usePanelEditSnap({
+  panelEditTape,
+  panelEditRect,
+  panelEditLine,
+  panelEditCircle,
+  panelEditSelection,
+  getPanelEditPoint,
+  getPanelEditLocalFromScreen,
+  getClosestPointOnPanelEditLine,
+  getPanelEditLineSelectionKey,
+  getPanelEditSelectedLineKeySet,
+  getPanelEditMovePreviewItems,
+  getPanelEditRectPolygon,
+  getPanelEditCircleRadius
+})
+
+
+
 const zoomLabel = computed(() => `${Math.round(app.state.viewport.zoom * 100)}%`)
 const localX = computed(() => Math.round(app.state.mouse.localX))
 const localY = computed(() => Math.round(app.state.mouse.localY))
