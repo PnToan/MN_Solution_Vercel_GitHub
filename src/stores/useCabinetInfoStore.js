@@ -1,0 +1,321 @@
+import { createSimpleStore } from './createStore'
+import { useAppStore } from './useAppStore'
+import { useBoxStore } from './useBoxStore'
+import { useDrawingStore } from './useDrawingStore'
+import { createDefaultCabinetInfoState } from '../core/cabinet-info/cabinetInfoDefaults'
+import { buildCabinetInfoPanels } from '../core/cabinet-info/cabinetInfoBuilder'
+
+//=================
+function cloneValue(value) {
+  return JSON.parse(JSON.stringify(value))
+} // End cloneValue
+
+
+//=================
+function mergeCabinetInfo(baseInfo, savedInfo) {
+  const nextInfo = cloneValue(baseInfo)
+  const sourceInfo = savedInfo || {}
+
+  Object.keys(sourceInfo).forEach((key) => {
+    if (sourceInfo[key] && typeof sourceInfo[key] === 'object' && !Array.isArray(sourceInfo[key])) {
+      nextInfo[key] = {
+        ...(nextInfo[key] || {}),
+        ...sourceInfo[key]
+      }
+      return
+    }
+
+    nextInfo[key] = sourceInfo[key]
+  })
+
+  return nextInfo
+} // End mergeCabinetInfo
+
+//=================
+function toNumber(value, fallback = 0) {
+  const numberValue = Number(value)
+
+  if (!Number.isFinite(numberValue)) return fallback
+
+  return Math.round(numberValue * 10) / 10
+} // End toNumber
+
+//=================
+function setNestedValue(target, path, value) {
+  const keys = String(path || '').split('.').filter(Boolean)
+
+  if (!keys.length) return
+
+  let cursor = target
+
+  keys.slice(0, -1).forEach((key) => {
+    if (!cursor[key] || typeof cursor[key] !== 'object') {
+      cursor[key] = {}
+    }
+
+    cursor = cursor[key]
+  })
+
+  cursor[keys[keys.length - 1]] = value
+} // End setNestedValue
+//=================
+function normalizeInfoInputValue(path, value) {
+  if (typeof value === 'boolean') return value
+  if (path === 'general.panelThickness') return value
+
+  const numberPaths = [
+    'general.cabinetDepth',
+    'back.grooveDepth',
+    'back.thickness',
+    'back.inset',
+    'topStrip.size',
+    'topStrip.faceOffset',
+    'handleRail.frontCount',
+    'handleRail.size',
+    'handleRail.faceOffset',
+    'handleRail.rearCount',
+    'handleRail.middleCount',
+    'doorStop.size',
+    'doorStop.faceOffset',
+    'toeKick.height',
+    'toeKick.inset',
+    'toeKick.middleCount',
+    'filler.left',
+    'filler.right',
+    'filler.faceOffset',
+    'shelfInset.vertical',
+    'shelfInset.horizontal'
+  ]
+
+  if (!numberPaths.includes(path)) return value
+
+  const numberValue = toNumber(value, 0)
+
+  if (!Number.isFinite(numberValue)) return 0
+
+  return numberValue
+} // End normalizeInfoInputValue
+//=================
+function removeCabinetInfoPanelsForBox(panels, boxId) {
+  return panels.filter((panel) => {
+    const sameBox = panel.linkedFrameId === boxId
+      || panel.frameId === boxId
+      || panel.sourceBoxId === boxId
+      || panel.baseObjectId === boxId
+
+    return !(sameBox && panel.sourceType === 'cabinet-info')
+  })
+} // End removeCabinetInfoPanelsForBox
+
+const store = createSimpleStore({
+  info: createDefaultCabinetInfoState(),
+  openSections: {
+    general: false,
+    back: false,
+    topStrip: false,
+    handleRail: false,
+    doorStop: false,
+    toeKick: false,
+    filler: false,
+    shelfInset: false
+  },
+  autoApply: true
+}, (state) => ({
+  //=================
+  resetInfo() {
+    state.info = createDefaultCabinetInfoState()
+  }, // End resetInfo
+
+  //=================
+  toggleSection(key) {
+    state.openSections[key] = !state.openSections[key]
+  }, // End toggleSection
+
+  //=================
+  setAutoApply(value) {
+    state.autoApply = value === true
+  }, // End setAutoApply
+
+  //=================
+  setValue(path, value) {
+    const selectedBox = this.getSelectedBox()
+    const targetBoxId = selectedBox ? selectedBox.id : null
+    let nextValue = normalizeInfoInputValue(path, value)
+
+    if (path === 'topStrip.faceOffset' && Number(nextValue) < 0) {
+      const panelThickness = Math.max(0, toNumber(state.info?.general?.panelThickness, 18))
+      nextValue = Math.max(Number(nextValue), -panelThickness)
+    }
+
+    if (path === 'handleRail.middleCount' && Number(nextValue) === 1) {
+      nextValue = 2
+    }
+
+    setNestedValue(state.info, path, nextValue)
+
+    if (state.info?.topStrip?.inset === true && state.info?.general?.topOverlap === true) {
+      useAppStore().setStatus('Chỉnh Nóc Lọt')
+    }
+
+    if (path === 'general.cabinetDepth') {
+      this.applyDepthToSelectedBox()
+    }
+
+    if (state.autoApply) {
+      this.applyToSelectedBox(false)
+      this.restoreSelectedBox(targetBoxId)
+    }
+  }, // End setValue
+
+  //=================
+  getSelectedBox() {
+    const boxStore = useBoxStore()
+
+    if (typeof boxStore.getActiveBox === 'function') {
+      return boxStore.getActiveBox()
+    }
+
+    return boxStore.getSelectedBox ? boxStore.getSelectedBox() : null
+  }, // End getSelectedBox
+
+  //=================
+  syncSelectedBoxToInfo() {
+    const selectedBox = this.getSelectedBox()
+
+    if (!selectedBox) return false
+
+    this.restoreSelectedBox(selectedBox.id)
+
+    if (selectedBox.cabinetInfo) {
+      state.info = mergeCabinetInfo(createDefaultCabinetInfoState(), selectedBox.cabinetInfo)
+    }
+
+    state.info.groupName = selectedBox.name || state.info.groupName || 'Box 1'
+    state.info.general.cabinetDepth = toNumber(selectedBox.depth, state.info.general.cabinetDepth || 500)
+
+    return true
+  }, // End syncSelectedBoxToInfo
+
+  //=================
+  syncGroupNameFromSelectedBox() {
+    return this.syncSelectedBoxToInfo()
+  }, // End syncGroupNameFromSelectedBox
+
+  //=================
+  applyDepthToSelectedBox() {
+    const selectedBox = this.getSelectedBox()
+
+    if (!selectedBox) return false
+
+    const nextDepth = toNumber(state.info.general.cabinetDepth, selectedBox.depth)
+
+    if (!Number.isFinite(nextDepth) || nextDepth <= 0) return false
+    if (Math.abs(toNumber(selectedBox.depth, 0) - nextDepth) < 0.001) return true
+
+    const anchorY = toNumber(selectedBox.y, 0) + toNumber(selectedBox.depth, 0)
+
+    selectedBox.y = anchorY - nextDepth
+    selectedBox.depth = nextDepth
+
+    return true
+  }, // End applyDepthToSelectedBox
+  //=================
+  restoreSelectedBox(boxId) {
+    if (!boxId) return
+
+    const boxStore = useBoxStore()
+    const drawing = useDrawingStore()
+
+    if (typeof boxStore.selectBox === 'function') {
+      boxStore.selectBox(boxId)
+    }
+
+    if ('selectedBoxId' in boxStore) {
+      boxStore.selectedBoxId = boxId
+    }
+
+    if ('activeBoxId' in boxStore) {
+      boxStore.activeBoxId = boxId
+    }
+
+    if ('currentBoxId' in boxStore) {
+      boxStore.currentBoxId = boxId
+    }
+
+    if ('selectedId' in boxStore) {
+      boxStore.selectedId = boxId
+    }
+
+    drawing.state.selectedPanelId = null
+    drawing.state.selectedPanelIds = []
+  }, // End restoreSelectedBox
+
+  //=================
+  applyToSelectedBox(pushHistory = true) {
+    const selectedBox = this.getSelectedBox()
+    const drawing = useDrawingStore()
+    const app = useAppStore()
+
+    if (!selectedBox) {
+      app.setStatus('Info: chưa chọn Box')
+      return false
+    }
+
+    const targetBoxId = selectedBox.id
+
+    if (pushHistory) {
+      drawing.pushHistorySnapshot('MN Solution Info')
+    }
+
+    this.applyDepthToSelectedBox()
+
+    const targetBox = this.getSelectedBox()
+    const oldBox = { ...targetBox }
+
+    targetBox.cabinetInfo = cloneValue(state.info)
+
+    const nextPanels = buildCabinetInfoPanels(targetBox, cloneValue(state.info))
+    const oldPanels = removeCabinetInfoPanelsForBox(drawing.state.panels, targetBox.id)
+
+    drawing.state.panels = [
+      ...nextPanels,
+      ...oldPanels
+    ]
+
+    drawing.updatePanelsAfterBoxResize?.(oldBox, targetBox)
+
+    this.restoreSelectedBox(targetBoxId)
+
+    drawing.rebuildZones()
+    app.setStatus(`Info: đã tạo ${nextPanels.length} chi tiết cho ${targetBox.name || targetBox.id}`)
+
+    return true
+  }, // End applyToSelectedBox
+
+  //=================
+  clearSelectedBoxInfoPanels() {
+    const selectedBox = this.getSelectedBox()
+    const drawing = useDrawingStore()
+    const app = useAppStore()
+
+    if (!selectedBox) {
+      app.setStatus('Info: chưa chọn Box')
+      return false
+    }
+
+    drawing.pushHistorySnapshot('Xóa MN Solution Info')
+    delete selectedBox.cabinetInfo
+    drawing.state.panels = removeCabinetInfoPanelsForBox(drawing.state.panels, selectedBox.id)
+    drawing.state.selectedPanelId = null
+    drawing.state.selectedPanelIds = []
+    drawing.rebuildZones()
+    app.setStatus(`Info: đã xóa chi tiết Info của ${selectedBox.name || selectedBox.id}`)
+
+    return true
+  } // End clearSelectedBoxInfoPanels
+}))
+
+//=================
+export function useCabinetInfoStore() {
+  return store
+} // End useCabinetInfoStore
