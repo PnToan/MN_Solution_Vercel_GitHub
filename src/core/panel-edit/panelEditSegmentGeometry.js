@@ -108,3 +108,18 @@ export function getPanelEditSegmentParameter(segment, point) {
 
   return (((Number(point.x || 0) - Number(segment.start.x || 0)) * dx) + ((Number(point.y || 0) - Number(segment.start.y || 0)) * dy)) / lengthSq
 } // End getPanelEditSegmentParameter
+<<<<<<< HEAD
+=======
+
+//=================
+export function addPanelEditUniquePoint(points, point) {
+  const key = getPanelEditPointKey(point)
+
+  if (points.some((item) => getPanelEditPointKey(item) === key)) return
+
+  points.push({
+    x: Math.round(Number(point.x || 0) * 1000) / 1000,
+    y: Math.round(Number(point.y || 0) * 1000) / 1000
+  })
+} // End addPanelEditUniquePoint
+>>>>>>> f17630cdabf973c3cb80dd26093523a0a312485e
