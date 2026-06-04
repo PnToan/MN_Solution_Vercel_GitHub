@@ -308,26 +308,6 @@ const {
 })
 
 const {
-  getPanelEditMoveSelectedSnapSource,
-  getPanelEditCircleSnapCandidates,
-  getPanelEditTapeSnap
-} = usePanelEditSnap({
-  panelEditTape,
-  panelEditRect,
-  panelEditLine,
-  panelEditCircle,
-  panelEditSelection,
-  getPanelEditPoint,
-  getPanelEditLocalFromScreen,
-  getClosestPointOnPanelEditLine,
-  getPanelEditLineSelectionKey,
-  getPanelEditSelectedLineKeySet,
-  getPanelEditMovePreviewItems,
-  getPanelEditRectPolygon,
-  getPanelEditCircleRadius
-})
-
-const {
   resetPanelEditTapeDraft,
   resetPanelEditRectDraft,
   resetPanelEditLineDraft,
@@ -379,6 +359,26 @@ const {
   getPanelEditRectBounds,
   getPanelEditCircleRadius,
   getPanelEditCircleBounds
+})
+
+const {
+  getPanelEditMoveSelectedSnapSource,
+  getPanelEditCircleSnapCandidates,
+  getPanelEditTapeSnap
+} = usePanelEditSnap({
+  panelEditTape,
+  panelEditRect,
+  panelEditLine,
+  panelEditCircle,
+  panelEditSelection,
+  getPanelEditPoint,
+  getPanelEditLocalFromScreen,
+  getClosestPointOnPanelEditLine,
+  getPanelEditLineSelectionKey,
+  getPanelEditSelectedLineKeySet,
+  getPanelEditMovePreviewItems,
+  getPanelEditRectPolygon,
+  getPanelEditCircleRadius
 })
 
 const {
