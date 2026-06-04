@@ -79,6 +79,7 @@ import { usePanelEditApplyData } from '../../composables/panel-edit/usePanelEdit
 import { usePanelEditSelection } from '../../composables/panel-edit/usePanelEditSelection'
 import { usePanelEditApply } from '../../composables/panel-edit/usePanelEditApply'
 import { usePanelEditLineHit } from '../../composables/panel-edit/usePanelEditLineHit'
+import { usePanelEditRegionHit } from '../../composables/panel-edit/usePanelEditRegionHit'
 import { PANEL_EDIT_TOOLS } from '../../constants/panelEditTools'
 import { useAppStore } from '../../stores/useAppStore'
 import { useCabinetStore } from '../../stores/useCabinetStore'
@@ -95,9 +96,9 @@ import { getPanelEditArcData, getPanelEditArcDefaultBulge, getPanelEditArcDraftW
 import { findShortcutAction, loadShortcutSettings, shortcutEventToText } from '../../core/settings/shortcut-settings'
 import { clampValue, getDistance } from '../../core/geometry/number-utils'
 import { getClosestPointOnPanelEditCircleEdge, getPanelEditCircleBounds, getPanelEditCirclePolygon, getPanelEditCircleRadius } from '../../core/panel-edit/panelEditCircleGeometry'
-import { getPanelEditPolygonBounds, getPanelEditRectBounds, getPanelEditRectPolygon, getPanelEditRectangleRegion } from '../../core/panel-edit/panelEditRectangleGeometry'
+import { getPanelEditPolygonBounds, getPanelEditRectBounds, getPanelEditRectPolygon } from '../../core/panel-edit/panelEditRectangleGeometry'
 import { getPanelEditSegmentIntersection } from '../../core/panel-edit/panelEditSegmentGeometry'
-import { getPanelEditPlanarRegions, isPointInPanelEditPolygon } from '../../core/panel-edit/panelEditPlanarRegionGeometry'
+import { isPointInPanelEditPolygon } from '../../core/panel-edit/panelEditPlanarRegionGeometry'
 import { collectPanelEditPolygonBoundaryEraseSpans, getPanelEditBoundaryEdge, getPanelEditBoundaryEdgeLength, getPanelEditBoundaryPointFromCoord, getPanelEditCornerForEdges, isPanelEditBoundarySegment, isPanelEditCutoutBoundaryOnlySegment, mergePanelEditBoundaryEraseSpans } from '../../core/panel-edit/panelEditBoundaryGeometry'
 
 const app = useAppStore()
@@ -292,6 +293,17 @@ const {
 } = usePanelEditLineHit({
   panelEditLine,
   getPanelEditPoint,
+  getPanelEditLocalFromScreen
+})
+
+const {
+  getPanelEditLineRegions,
+  hitPanelEditLineRegion
+} = usePanelEditRegionHit({
+  panelEditCanvasRef,
+  panelEditRect,
+  panelEditLine,
+  panelEditCircle,
   getPanelEditLocalFromScreen
 })
 
@@ -2013,129 +2025,6 @@ function getPanelEditBoundaryCutoutPolygons() {
 } // End getPanelEditBoundaryCutoutPolygons
 
 
-
-//=================
-function getPanelEditCircleRegion(circle, index) {
-  const bounds = getPanelEditCircleBounds(circle)
-
-  if (!bounds) return null
-
-  return {
-    id: `circle-region-${circle.id || index}`,
-    source: 'circleRegion',
-    sourceId: circle.id || null,
-    regionKind: 'polygon',
-    shapeType: 'circle',
-    polygon: getPanelEditCirclePolygon(circle),
-    start: { x: bounds.x, y: bounds.y },
-    end: { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
-    center: { x: Number(circle.center.x || 0), y: Number(circle.center.y || 0) },
-    radius: getPanelEditCircleRadius(circle),
-    x: bounds.x,
-    y: bounds.y,
-    width: bounds.width,
-    height: bounds.height,
-    operation: 'none'
-  }
-} // End getPanelEditCircleRegion
-
-//=================
-function getPanelEditClosedShapeRegions() {
-  const rectangleRegions = (panelEditRect.value.rectangles || [])
-    .map((rectangle, index) => getPanelEditRectangleRegion(rectangle, index))
-    .filter(Boolean)
-  const circleRegions = (panelEditCircle.value.circles || [])
-    .map((circle, index) => getPanelEditCircleRegion(circle, index))
-    .filter(Boolean)
-
-  return [
-    ...rectangleRegions,
-    ...circleRegions
-  ]
-} // End getPanelEditClosedShapeRegions
-
-//=================
-function getPanelEditLineRegions(context) {
-  return [
-    ...getPanelEditClosedShapeRegions(context),
-    ...getPanelEditPlanarRegions(context, panelEditLine.value.lines || [])
-  ]
-} // End getPanelEditLineRegions
-
-//=================
-function drawPanelEditPolygonPath(targetContext, context, layout, polygon) {
-  if (!Array.isArray(polygon) || polygon.length < 3) return false
-
-  polygon.forEach((point, index) => {
-    const screenPoint = getPanelEditPoint(context, layout.left, layout.top, layout.scale, point.x, point.y)
-
-    if (index === 0) {
-      targetContext.moveTo(screenPoint.x, screenPoint.y)
-      return
-    }
-
-    targetContext.lineTo(screenPoint.x, screenPoint.y)
-  })
-  targetContext.closePath()
-
-  return true
-} // End drawPanelEditPolygonPath
-
-//=================
-function drawPanelEditLineRegions(targetContext, context, layout) {
-  const regions = getPanelEditLineRegions(context)
-  const hoverRegion = panelEditLine.value.hoverRegion
-
-  regions.forEach((region) => {
-    const isHover = hoverRegion?.id === region.id
-
-    if (!isHover) return
-
-    targetContext.save()
-    targetContext.fillStyle = 'rgba(255, 122, 0, 0.1)'
-    targetContext.strokeStyle = '#ff7a00'
-    targetContext.lineWidth = 1.5
-    targetContext.setLineDash([6, 4])
-
-    if (region.regionKind === 'polygon') {
-      targetContext.beginPath()
-      if (drawPanelEditPolygonPath(targetContext, context, layout, region.polygon)) {
-        targetContext.fill()
-        targetContext.stroke()
-      }
-      targetContext.restore()
-      return
-    }
-
-    const topLeft = getPanelEditPoint(context, layout.left, layout.top, layout.scale, region.x, region.y + region.height)
-
-    targetContext.fillRect(topLeft.x, topLeft.y, region.width * layout.scale, region.height * layout.scale)
-    targetContext.strokeRect(topLeft.x, topLeft.y, region.width * layout.scale, region.height * layout.scale)
-    targetContext.restore()
-  })
-} // End drawPanelEditLineRegions
-
-//=================
-function hitPanelEditLineRegion(context, layout, event) {
-  const canvas = panelEditCanvasRef.value
-
-  if (!canvas || !context || !layout) return null
-
-  const rect = canvas.getBoundingClientRect()
-  const local = getPanelEditLocalFromScreen(context, layout, event.clientX - rect.left, event.clientY - rect.top)
-  const regions = getPanelEditLineRegions(context)
-
-  return regions.find((region) => {
-    if (region.regionKind === 'polygon') {
-      return isPointInPanelEditPolygon(local, region.polygon)
-    }
-
-    return local.x >= region.x
-      && local.x <= region.x + region.width
-      && local.y >= region.y
-      && local.y <= region.y + region.height
-  }) || null
-} // End hitPanelEditLineRegion
 
 //=================
 function commitPanelEditLine() {
