@@ -74,6 +74,7 @@ import { usePanelEditState } from '../../composables/panel-edit/usePanelEditStat
 import { usePanelEditHistory } from '../../composables/panel-edit/usePanelEditHistory'
 import { usePanelEditDraftReset } from '../../composables/panel-edit/usePanelEditDraftReset'
 import { usePanelEditSavedState } from '../../composables/panel-edit/usePanelEditSavedState'
+import { usePanelEditLayout } from '../../composables/panel-edit/usePanelEditLayout'
 import { PANEL_EDIT_TOOLS } from '../../constants/panelEditTools'
 import { useAppStore } from '../../stores/useAppStore'
 import { useCabinetStore } from '../../stores/useCabinetStore'
@@ -268,6 +269,13 @@ const {
 } = usePanelEditState()
 
 const {
+  getPanelEditPoint,
+  getPanelEditZoomClamp,
+  getPanelEditLayout,
+  getPanelEditLocalFromScreen
+} = usePanelEditLayout({ panelEditViewport })
+
+const {
   resetPanelEditTapeDraft,
   resetPanelEditRectDraft,
   resetPanelEditLineDraft,
@@ -386,76 +394,6 @@ function getCssVariable(variableName, fallback) {
 
   return value || fallback
 } // End getCssVariable
-
-//=================
-function getPanelEditPoint(context, offsetX, offsetY, scale, x, y) {
-  return {
-    x: offsetX + x * scale,
-    y: offsetY + (context.height - y) * scale
-  }
-} // End getPanelEditPoint
-
-//=================
-function resizePanelEditCanvas() {
-  const canvas = panelEditCanvasRef.value
-
-  if (!canvas) return
-
-  const rect = canvas.getBoundingClientRect()
-  const deviceRatio = window.devicePixelRatio || 1
-  canvas.width = Math.max(1, rect.width * deviceRatio)
-  canvas.height = Math.max(1, rect.height * deviceRatio)
-  canvas.style.width = `${rect.width}px`
-  canvas.style.height = `${rect.height}px`
-  const editContext = canvas.getContext('2d')
-  editContext.setTransform(deviceRatio, 0, 0, deviceRatio, 0, 0)
-  drawPanelEditCanvas(editContext, rect.width, rect.height)
-} // End resizePanelEditCanvas
-
-//=================
-function getPanelEditZoomClamp(value) {
-  return Math.min(Math.max(value, 0.2), 8)
-} // End getPanelEditZoomClamp
-
-//=================
-function getPanelEditLayout(context, canvasWidth, canvasHeight) {
-  const marginLeft = 110
-  const marginRight = 72
-  const marginTop = 82
-  const marginBottom = 96
-  const availableWidth = Math.max(1, canvasWidth - marginLeft - marginRight)
-  const availableHeight = Math.max(1, canvasHeight - marginTop - marginBottom)
-  const baseScale = Math.min(
-    availableWidth / Math.max(1, context.width),
-    availableHeight / Math.max(1, context.height)
-  )
-  const zoom = getPanelEditZoomClamp(panelEditViewport.value.zoom)
-  const scale = baseScale * zoom
-  const faceWidth = context.width * scale
-  const faceHeight = context.height * scale
-  const offsetX = marginLeft + (availableWidth - faceWidth) / 2 + panelEditViewport.value.panX
-  const offsetY = marginTop + (availableHeight - faceHeight) / 2 + panelEditViewport.value.panY
-
-  return {
-    scale,
-    faceWidth,
-    faceHeight,
-    left: offsetX,
-    right: offsetX + faceWidth,
-    top: offsetY,
-    bottom: offsetY + faceHeight
-  }
-} // End getPanelEditLayout
-
-
-//=================
-function getPanelEditLocalFromScreen(context, layout, screenX, screenY) {
-  return {
-    x: (screenX - layout.left) / layout.scale,
-    y: context.height - ((screenY - layout.top) / layout.scale)
-  }
-} // End getPanelEditLocalFromScreen
-
 
 //=================
 function getClosestPointOnPanelEditLine(line, local) {
