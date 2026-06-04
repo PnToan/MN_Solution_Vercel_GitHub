@@ -4809,6 +4809,4 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', resizePanelEditCanvas)
   window.removeEventListener('mn-app-settings-applied', onAppSettingsApplied)
 })
-
-
 </script>
