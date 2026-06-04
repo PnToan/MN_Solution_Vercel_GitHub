@@ -77,3 +77,34 @@ export function isPanelEditPointInsidePolygon(point, polygon) {
 
   return inside
 } // End isPanelEditPointInsidePolygon
+
+//=================
+export function getPanelEditPointKey(point) {
+  return `${Math.round(Number(point.x || 0) * 1000) / 1000},${Math.round(Number(point.y || 0) * 1000) / 1000}`
+} // End getPanelEditPointKey
+
+//=================
+export function getPanelEditPolygonSignedArea(points) {
+  if (!Array.isArray(points) || points.length < 3) return 0
+
+  let area = 0
+
+  points.forEach((point, index) => {
+    const nextPoint = points[(index + 1) % points.length]
+
+    area += Number(point.x || 0) * Number(nextPoint.y || 0) - Number(nextPoint.x || 0) * Number(point.y || 0)
+  })
+
+  return area / 2
+} // End getPanelEditPolygonSignedArea
+
+//=================
+export function getPanelEditSegmentParameter(segment, point) {
+  const dx = Number(segment.end.x || 0) - Number(segment.start.x || 0)
+  const dy = Number(segment.end.y || 0) - Number(segment.start.y || 0)
+  const lengthSq = dx * dx + dy * dy
+
+  if (lengthSq <= 0.000001) return 0
+
+  return (((Number(point.x || 0) - Number(segment.start.x || 0)) * dx) + ((Number(point.y || 0) - Number(segment.start.y || 0)) * dy)) / lengthSq
+} // End getPanelEditSegmentParameter

@@ -96,7 +96,7 @@ import { findShortcutAction, loadShortcutSettings, shortcutEventToText } from '.
 import { clampValue, getDistance } from '../../core/geometry/number-utils'
 import { getClosestPointOnPanelEditCircleEdge, getPanelEditCircleBounds, getPanelEditCirclePolygon, getPanelEditCircleRadius } from '../../core/panel-edit/panelEditCircleGeometry'
 import { getPanelEditPolygonBounds, getPanelEditRectBounds, getPanelEditRectPolygon, getPanelEditRectangleRegion } from '../../core/panel-edit/panelEditRectangleGeometry'
-import { getPanelEditSegmentIntersection, isPanelEditPointInsidePolygon, isPanelEditPointOnSegment } from '../../core/panel-edit/panelEditSegmentGeometry'
+import { getPanelEditPointKey, getPanelEditPolygonSignedArea, getPanelEditSegmentIntersection, getPanelEditSegmentParameter, isPanelEditPointInsidePolygon, isPanelEditPointOnSegment } from '../../core/panel-edit/panelEditSegmentGeometry'
 
 const app = useAppStore()
 const cabinet = useCabinetStore()
@@ -2326,37 +2326,6 @@ function isPointInPanelEditPolygon(point, polygon) {
 
   return inside
 } // End isPointInPanelEditPolygon
-
-//=================
-function getPanelEditPointKey(point) {
-  return `${Math.round(Number(point.x || 0) * 1000) / 1000},${Math.round(Number(point.y || 0) * 1000) / 1000}`
-} // End getPanelEditPointKey
-
-//=================
-function getPanelEditPolygonSignedArea(points) {
-  if (!Array.isArray(points) || points.length < 3) return 0
-
-  let area = 0
-
-  points.forEach((point, index) => {
-    const nextPoint = points[(index + 1) % points.length]
-
-    area += Number(point.x || 0) * Number(nextPoint.y || 0) - Number(nextPoint.x || 0) * Number(point.y || 0)
-  })
-
-  return area / 2
-} // End getPanelEditPolygonSignedArea
-
-//=================
-function getPanelEditSegmentParameter(segment, point) {
-  const dx = Number(segment.end.x || 0) - Number(segment.start.x || 0)
-  const dy = Number(segment.end.y || 0) - Number(segment.start.y || 0)
-  const lengthSq = dx * dx + dy * dy
-
-  if (lengthSq <= 0.000001) return 0
-
-  return (((Number(point.x || 0) - Number(segment.start.x || 0)) * dx) + ((Number(point.y || 0) - Number(segment.start.y || 0)) * dy)) / lengthSq
-} // End getPanelEditSegmentParameter
 
 //=================
 function addPanelEditUniquePoint(points, point) {
