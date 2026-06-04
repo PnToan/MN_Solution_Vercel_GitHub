@@ -25,6 +25,18 @@ export function usePanelEditSnap(options) {
   } // End getPanelEditSafeArray
 
   //=================
+  function getPanelEditSafeSnapPoint(point) {
+    if (!point) return null
+
+    const x = Number(point.x)
+    const y = Number(point.y)
+
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+
+    return { x, y }
+  } // End getPanelEditSafeSnapPoint
+
+  //=================
   function getPanelEditGuideSegments(context) {
     if (!context) return []
 
@@ -69,13 +81,22 @@ export function usePanelEditSnap(options) {
 
     const lines = Array.isArray(sourceLines) ? sourceLines : getPanelEditSafeArray(panelEditLine.value?.lines)
 
-    return lines.map((line) => ({
-      id: line.id,
-      type: 'line',
-      axis: line.axis,
-      start: { x: Number(line.start?.x || 0), y: Number(line.start?.y || 0) },
-      end: { x: Number(line.end?.x || 0), y: Number(line.end?.y || 0) }
-    }))
+    return lines
+      .map((line) => {
+        const start = getPanelEditSafeSnapPoint(line?.start)
+        const end = getPanelEditSafeSnapPoint(line?.end || line?.current)
+
+        if (!start || !end) return null
+
+        return {
+          id: line.id || `line-${start.x}-${start.y}-${end.x}-${end.y}`,
+          type: 'line',
+          axis: line.axis || 'free',
+          start,
+          end
+        }
+      })
+      .filter(Boolean)
   } // End getPanelEditLineSegmentsForSnap
 
   //=================
@@ -87,9 +108,14 @@ export function usePanelEditSnap(options) {
 
     rectangles.forEach((rectangle) => {
       const id = rectangle.id || `rect-${segments.length}`
-      const polygon = Array.isArray(rectangle.polygon) && rectangle.polygon.length >= 3
-        ? rectangle.polygon.map((point) => ({ x: Number(point.x || 0), y: Number(point.y || 0) }))
+      const rawPolygon = Array.isArray(rectangle?.polygon) && rectangle.polygon.length >= 3
+        ? rectangle.polygon
         : getPanelEditRectPolygon(rectangle)
+      const polygon = getPanelEditSafeArray(rawPolygon)
+        .map(getPanelEditSafeSnapPoint)
+        .filter(Boolean)
+
+      if (polygon.length < 2) return
 
       polygon.forEach((point, index) => {
         const nextPoint = polygon[(index + 1) % polygon.length]
@@ -123,13 +149,13 @@ export function usePanelEditSnap(options) {
 
     return {
       lines: preview
-        ? preview.lines
+        ? getPanelEditSafeArray(preview.lines)
         : getPanelEditSafeArray(panelEditLine.value?.lines).filter((line) => selectedLineKeys.has(getPanelEditLineSelectionKey(line))),
       rectangles: preview
-        ? preview.rectangles
+        ? getPanelEditSafeArray(preview.rectangles)
         : getPanelEditSafeArray(panelEditRect.value?.rectangles).filter((rectangle) => selectedRectIds.has(rectangle.id)),
       circles: preview
-        ? preview.circles
+        ? getPanelEditSafeArray(preview.circles)
         : getPanelEditSafeArray(panelEditCircle.value?.circles).filter((circle) => selectedCircleIds.has(circle.id))
     }
   } // End getPanelEditMoveSelectedSnapSource
@@ -214,15 +240,19 @@ export function usePanelEditSnap(options) {
     candidates.push(...getPanelEditCircleSnapCandidates(selectedMoveOnly ? snapSource : {}))
 
     editLines.forEach((line) => {
-      ;[line.start, line.end].forEach((point, pointIndex) => {
+      ;[line?.start, line?.end || line?.current].forEach((point, pointIndex) => {
+        const safePoint = getPanelEditSafeSnapPoint(point)
+
+        if (!safePoint) return
+
         candidates.push({
-          key: `line-end-${line.id}-${pointIndex}`,
-          x: Number(point.x || 0),
-          y: Number(point.y || 0),
-          axis: line.axis,
+          key: `line-end-${line.id || 'line'}-${pointIndex}`,
+          x: safePoint.x,
+          y: safePoint.y,
+          axis: line.axis || 'free',
           edge: 'line-end',
           kind: 'circle',
-          lineId: line.id
+          lineId: line.id || null
         })
       })
     })
@@ -477,8 +507,8 @@ export function usePanelEditSnap(options) {
       })
 
     const circleEdgeSources = [
-      ...(selectedMoveOnly ? snapSource.circles : getPanelEditSafeArray(panelEditCircle.value?.circles)),
-      ...(selectedMoveOnly ? snapSource.rectangles : getPanelEditSafeArray(panelEditRect.value?.rectangles))
+      ...(selectedMoveOnly ? getPanelEditSafeArray(snapSource?.circles) : getPanelEditSafeArray(panelEditCircle.value?.circles)),
+      ...(selectedMoveOnly ? getPanelEditSafeArray(snapSource?.rectangles) : getPanelEditSafeArray(panelEditRect.value?.rectangles))
         .filter((rectangle) => rectangle.shapeType === 'circle' && rectangle.center && Number(rectangle.radius || 0) > 0)
     ]
 
