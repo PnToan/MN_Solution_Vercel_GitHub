@@ -1,110 +1,87 @@
 <template>
   <main class="mn-canvas-area" ref="viewportRef" tabindex="0" @keydown="onKeyDown">
-    <canvas
-      ref="canvasRef"
-      class="mn-draw-canvas"
-      :class="canvasCursorClass"
-      @pointerdown="onPointerDown"
-      @pointermove="onPointerMove"
-      @pointerup="onPointerUp"
-      @pointerleave="onPointerUp"
-      @wheel.prevent="onWheel"
-      @contextmenu.prevent
+    <DrawingCanvas
+      :canvas-cursor-class="canvasCursorClass"
+      :set-canvas-ref="setCanvasRef"
+      @pointer-down="onPointerDown"
+      @pointer-move="onPointerMove"
+      @pointer-up="onPointerUp"
+      @wheel="onWheel"
     />
-    <input
+    <DimensionInput
       v-if="dimInput.active"
-      ref="dimInputRef"
-      type="text"
-      inputmode="decimal"
-      class="mn-dim-input"
-      :style="dimInputStyle"
-      v-model="dimInput.value"
-      @pointerdown.stop
-      @click.stop
-      @keydown.stop="onDimInputKeyDown"
+      :model="dimInput"
+      :input-style="dimInputStyle"
+      :set-input-ref="setDimInputRef"
+      @update-value="updateDimInputValue"
+      @key-down="onDimInputKeyDown"
       @blur="cancelDimInput"
     />
 
-    <input
+    <BoxHeightInput
       v-if="boxHeightInput.active"
-      ref="boxHeightInputRef"
-      type="number"
-      class="mn-dim-input"
-      :style="boxHeightInputStyle"
-      v-model="boxHeightInput.value"
-      placeholder="Cao Box"
-      @keydown="onBoxHeightInputKeyDown"
+      :model="boxHeightInput"
+      :input-style="boxHeightInputStyle"
+      :set-input-ref="setBoxHeightInputRef"
+      @update-value="updateBoxHeightInputValue"
+      @key-down="onBoxHeightInputKeyDown"
       @blur="cancelBoxHeightInput"
     />
 
-    <section v-if="activePanelEditContext" class="mn-panel-edit-window">
-      <header class="mn-panel-edit-header">
-        <div class="mn-panel-edit-tools">
-          <button
-            v-for="tool in panelEditTools"
-            :key="tool.id"
-            type="button"
-            class="mn-panel-edit-tool-btn"
-            :class="{ active: drawing.state.panelEdit.shapeTool === tool.id || app.state.currentTool === tool.id }"
-            :title="tool.label"
-            @pointerdown.stop.prevent="selectPanelEditWindowTool(tool.id)"
-            @click.stop.prevent="selectPanelEditWindowTool(tool.id)"
-          >
-            <img :src="tool.icon" :alt="tool.label" class="mn-panel-edit-tool-icon" />
-          </button>
-        </div>
-        <div class="mn-panel-edit-face-switch">
-          <button
-            v-for="face in activePanelEditContext.faceOptions"
-            :key="face.id"
-            type="button"
-            class="mn-panel-edit-face-btn"
-            :class="{ active: activePanelEditContext.faceSide === face.id }"
-            @pointerdown.stop.prevent="selectPanelEditFace(face.id)"
-            @click.stop.prevent="selectPanelEditFace(face.id)"
-          >
-            {{ face.label }}
-          </button>
-        </div>
-        <div class="mn-panel-edit-title">
-          {{ activePanelEditContext.panelName }} · {{ activePanelEditContext.faceLabel }} · {{ activePanelEditContext.axesText }} · {{ activePanelEditContext.rearLabel }}
-        </div>
-        <button type="button" class="mn-panel-edit-apply" @click.stop.prevent="applyPanelEdit">Áp dụng</button>
-      </header>
-      <canvas
-        ref="panelEditCanvasRef"
-        tabindex="0"
-        class="mn-panel-edit-canvas"
-        :class="panelEditCanvasCursorClass"
-        @pointerdown.stop.prevent="onPanelEditPointerDown"
-        @pointermove.stop.prevent="onPanelEditPointerMove"
-        @pointerup.stop.prevent="onPanelEditPointerUp"
-        @pointerleave.stop.prevent="onPanelEditPointerUp"
-        @wheel.stop.prevent="onPanelEditWheel"
-        @contextmenu.prevent
-      />
-      <div
-        v-if="panelEditRect.pendingAction"
-        class="mn-panel-edit-action-dialog"
-        @pointerdown.stop.prevent
-        @click.stop.prevent
-      >
-        <button type="button" class="mn-panel-edit-action-btn" @click.stop.prevent="confirmPanelEditRectangleAction('none')">None</button>
-        <button type="button" class="mn-panel-edit-action-btn danger" @click.stop.prevent="confirmPanelEditRectangleAction('cutout')">Khấu</button>
-      </div>
-      <footer class="mn-panel-edit-footer">
-        {{ panelEditFooterText }}
-      </footer>
-    </section>
+    <PanelEditWindow
+      v-if="activePanelEditContext"
+      :active-context="activePanelEditContext"
+      :panel-edit-tools="panelEditTools"
+      :current-shape-tool="drawing.state.panelEdit.shapeTool"
+      :current-tool="app.state.currentTool"
+      :canvas-cursor-class="panelEditCanvasCursorClass"
+      :pending-action="panelEditRect.pendingAction"
+      :footer-text="panelEditFooterText"
+      :set-canvas-ref="setPanelEditCanvasRef"
+      :request-canvas-resize="requestPanelEditCanvasResize"
+      @select-tool="selectPanelEditWindowTool"
+      @select-face="selectPanelEditFace"
+      @apply="applyPanelEdit"
+      @panel-pointer-down="onPanelEditPointerDown"
+      @panel-pointer-move="onPanelEditPointerMove"
+      @panel-pointer-up="onPanelEditPointerUp"
+      @panel-wheel="onPanelEditWheel"
+      @confirm-action="confirmPanelEditRectangleAction"
+    />
 
-  <Mini3DPreview v-if="app.state.mini3DVisible" />
-  <button class="mn-preview-toggle" @click="app.toggleMini3D">{{ app.state.mini3DVisible ? 'Ẩn 3D' : 'Hiện 3D' }}</button>
+    <Viewport3DPreview
+      :visible="app.state.mini3DVisible"
+      @toggle="app.toggleMini3D"
+    />
   </main>
 </template>
 
 <script setup>
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue'
-import Mini3DPreview from '../preview/Mini3DPreview.vue'
+import DrawingCanvas from './DrawingCanvas.vue'
+import DimensionInput from './DimensionInput.vue'
+import BoxHeightInput from './BoxHeightInput.vue'
+import PanelEditWindow from '../panel-edit/PanelEditWindow.vue'
+import Viewport3DPreview from './Viewport3DPreview.vue'
+import { useBoxHeightInput } from '../../composables/drawing/useBoxHeightInput'
+import { useViewportCanvas } from '../../composables/drawing/useViewportCanvas'
+import { useDimensionInput } from '../../composables/drawing/useDimensionInput'
+import { usePanelToolKeyboard } from '../../composables/drawing/usePanelToolKeyboard'
+import { useSelectDrag } from '../../composables/drawing/useSelectDrag'
+import { useViewportKeyboard } from '../../composables/drawing/useViewportKeyboard'
+import { useViewportCursor } from '../../composables/drawing/useViewportCursor'
+import { usePanelEditFooterText } from '../../composables/panel-edit/usePanelEditFooterText'
+import { usePanelEditState } from '../../composables/panel-edit/usePanelEditState'
+import { usePanelEditHistory } from '../../composables/panel-edit/usePanelEditHistory'
+import { usePanelEditDraftReset } from '../../composables/panel-edit/usePanelEditDraftReset'
+import { usePanelEditSavedState } from '../../composables/panel-edit/usePanelEditSavedState'
+import { usePanelEditLayout } from '../../composables/panel-edit/usePanelEditLayout'
+import { usePanelEditApplyData } from '../../composables/panel-edit/usePanelEditApplyData'
+import { usePanelEditSelection } from '../../composables/panel-edit/usePanelEditSelection'
+import { usePanelEditApply } from '../../composables/panel-edit/usePanelEditApply'
+import { usePanelEditLineHit } from '../../composables/panel-edit/usePanelEditLineHit'
+import { usePanelEditRegionHit } from '../../composables/panel-edit/usePanelEditRegionHit'
+import { PANEL_EDIT_TOOLS } from '../../constants/panelEditTools'
 import { useAppStore } from '../../stores/useAppStore'
 import { useCabinetStore } from '../../stores/useCabinetStore'
 import { useWallStore } from '../../stores/useWallStore'
@@ -112,13 +89,18 @@ import { useDrawingStore } from '../../stores/useDrawingStore'
 import { useBoxStore } from '../../stores/useBoxStore'
 import { renderCanvas2D, getWallDimHit, getBoxDimHit, getDimensionHit } from '../../renderers/canvas-2d-renderer'
 import { screenToLocal, localToScreen } from '../../renderers/viewport-transform'
-import { projectBoxToCameraRect, cameraLocalToWorldPoint } from '../../core/view/view-camera'
+import { projectBoxToCameraRect, cameraLocalToWorldPoint, getCameraConfig } from '../../core/view/view-camera'
 import { hitTestPanel, hitTestZoneEdge } from '../../core/snap/snap-engine'
-import { handleViewportKey } from '../../commands/keyboard-controller'
 import { createPanelEditRectangleRecord, getEditPanelToolCursorClass, isEditPanelDrawTool, isEditPanelTool } from '../../core/tools/editPanelTool'
 import { createEditPanelMoveController } from '../../core/tools/editPanelMoveTool'
 import { getPanelEditArcData, getPanelEditArcDefaultBulge, getPanelEditArcDraftWithRadiusInput, getPanelEditArcPoints } from '../../core/tools/editPanelArcTool'
 import { findShortcutAction, loadShortcutSettings, shortcutEventToText } from '../../core/settings/shortcut-settings'
+import { clampValue, getDistance } from '../../core/geometry/number-utils'
+import { getClosestPointOnPanelEditCircleEdge, getPanelEditCircleBounds, getPanelEditCirclePolygon, getPanelEditCircleRadius } from '../../core/panel-edit/panelEditCircleGeometry'
+import { getPanelEditPolygonBounds, getPanelEditRectBounds, getPanelEditRectPolygon } from '../../core/panel-edit/panelEditRectangleGeometry'
+import { getPanelEditSegmentIntersection } from '../../core/panel-edit/panelEditSegmentGeometry'
+import { isPointInPanelEditPolygon } from '../../core/panel-edit/panelEditPlanarRegionGeometry'
+import { collectPanelEditPolygonBoundaryEraseSpans, getPanelEditBoundaryEdge, getPanelEditBoundaryEdgeLength, getPanelEditBoundaryPointFromCoord, getPanelEditCornerForEdges, isPanelEditBoundarySegment, isPanelEditCutoutBoundaryOnlySegment, mergePanelEditBoundaryEraseSpans } from '../../core/panel-edit/panelEditBoundaryGeometry'
 
 const app = useAppStore()
 const cabinet = useCabinetStore()
@@ -126,386 +108,55 @@ const wall = useWallStore()
 const drawing = useDrawingStore()
 const box = useBoxStore()
 const viewportRef = ref(null)
-const canvasRef = ref(null)
 const panelEditCanvasRef = ref(null)
-const dimInputRef = ref(null)
-const boxHeightInputRef = ref(null)
+let drawImpl = () => {}
+let resizeCanvasImpl = () => {}
+let onAppSettingsAppliedImpl = () => {}
 
-const dimInput = ref({
-  active: false,
-  key: null,
-  dimensionId: null,
-  x: 0,
-  y: 0,
-  value: ''
-})
+//=================
+function draw() {
+  return drawImpl()
+} // End draw
 
-const boxHeightInput = ref({
-  active: false,
-  x: 0,
-  y: 0,
-  value: ''
-})
+//=================
+function resizeCanvas() {
+  return resizeCanvasImpl()
+} // End resizeCanvas
+
+//=================
+function onAppSettingsApplied() {
+  return onAppSettingsAppliedImpl()
+} // End onAppSettingsApplied
+
+//=================
+function requestPanelEditCanvasResize() {
+  nextTick(() => {
+    resizePanelEditCanvas()
+
+    requestAnimationFrame(() => {
+      resizePanelEditCanvas()
+
+      requestAnimationFrame(resizePanelEditCanvas)
+    })
+  })
+} // End requestPanelEditCanvasResize
+
+//=================
+function setPanelEditCanvasRef(element) {
+  panelEditCanvasRef.value = element
+
+  if (element) requestPanelEditCanvasResize()
+} // End setPanelEditCanvasRef
 
 const hoverDim = ref(null)
 const moveCopyMode = ref(false)
-let ctx = null
-let ratio = 1
-let panning = false
-let panStart = null
-let panOriginal = null
-let panelEditPanning = false
-let panelEditPanStart = null
-let panelEditPanOriginal = null
-
-const panelEditViewport = ref({
-  zoom: 1,
-  panX: 0,
-  panY: 0
-})
-
-const panelEditTape = ref({
-  hoverSnap: null,
-  draft: null,
-  guides: [],
-  inputBuffer: ''
-})
-
-const panelEditRect = ref({
-  hoverSnap: null,
-  draft: null,
-  pendingAction: null,
-  rectangles: []
-})
-
-const panelEditLine = ref({
-  hoverSnap: null,
-  hoverRegion: null,
-  hoverLine: null,
-  selectedLineId: null,
-  draft: null,
-  lines: []
-})
-
-const panelEditCircle = ref({
-  hoverSnap: null,
-  draft: null,
-  circles: [],
-  inputBuffer: ''
-})
-
-const panelEditArc = ref({
-  hoverSnap: null,
-  hoverPoint: null,
-  draft: null,
-  inputBuffer: ''
-})
-
-const panelEditSelection = ref({
-  items: [],
-  hoverItem: null
-})
-
-const panelEditSelectDrag = ref({
-  active: false,
-  start: null,
-  current: null,
-  moved: false
-})
-
-const panelEditMove = ref({
-  stage: 'idle',
-  start: null,
-  current: null,
-  hoverSnap: null,
-  baseItems: []
-})
-
-const panelEditHistory = ref({
-  undoStack: [],
-  redoStack: [],
-  max: 80
-})
-
-const selectDrag = ref({
-  active: false,
-  start: null,
-  current: null,
-  moved: false,
-  mode: 'contain'
-})
-
-const views = [
-  { id: 'front', label: 'Trước' }, { id: 'back', label: 'Sau' }, { id: 'left', label: 'Trái' },
-  { id: 'right', label: 'Phải' }, { id: 'top', label: 'Trên' }, { id: 'bottom', label: 'Dưới' }
-]
-
-const panelEditTools = [
-  { id: 'editPanelSelect', label: 'Select', icon: '/icons/toolbar/select.svg' },
-  { id: 'editPanelMove', label: 'Move', icon: '/icons/toolbar/move.svg' },
-  { id: 'editPanelLine', label: 'Line', icon: '/icons/toolbar/line.svg' },
-  { id: 'editPanelRect', label: 'Vẽ hình chữ nhật', icon: '/icons/toolbar/rect.svg' },
-  { id: 'editPanelArc', label: 'Arc', icon: '/icons/toolbar/arc.svg' },
-  { id: 'editPanelCircle', label: 'Vẽ hình tròn', icon: '/icons/toolbar/circle.svg' },
-  { id: 'editPanelTape', label: 'Thước', icon: '/icons/toolbar/tape.svg' }
-]
-const panelEditMoveController = createEditPanelMoveController({
-  panelEditMove,
-  panelEditSelection,
-  panelEditLine,
-  panelEditRect,
-  panelEditCircle,
-  drawing,
+const viewportCanvas = useViewportCanvas({
+  viewportRef,
   app,
-  nextTick,
-  resizePanelEditCanvas,
-  getPanelEditSelectedLineKeySet,
-  getPanelEditLineSelectionKey,
-  clonePanelEditHistoryData,
-  pushPanelEditHistorySnapshot,
-  drawPanelEditLine,
-  drawPanelEditRectangle,
-  drawPanelEditCircle
-})
-const zoomLabel = computed(() => `${Math.round(app.state.viewport.zoom * 100)}%`)
-const localX = computed(() => Math.round(app.state.mouse.localX))
-const localY = computed(() => Math.round(app.state.mouse.localY))
-const activePanelEditContext = computed(() => drawing.state.panelEdit?.active ? drawing.state.panelEdit.context : null)
-const panelEditCanvasCursorClass = computed(() => getEditPanelToolCursorClass(drawing.state.panelEdit?.shapeTool))
-const panelEditFooterText = computed(() => {
-  if (!activePanelEditContext.value) return ''
-
-  const shapeTool = drawing.state.panelEdit?.shapeTool
-
-  if (!shapeTool || shapeTool === 'editPanelSelect') {
-    const hoverRegion = panelEditLine.value.hoverRegion
-    const hoverLine = panelEditLine.value.hoverLine
-    const selectedCount = panelEditSelection.value.items.length
-
-    if (panelEditSelectDrag.value.active) {
-      return 'Select: thả chuột để chọn toàn bộ line / hình chữ nhật / hình tròn trong vùng quét'
-    }
-
-    if (selectedCount > 0) {
-      return `Select: đã chọn ${selectedCount} chi tiết | M/Move để di chuyển | Delete để xóa`
-    }
-
-    if (hoverLine) {
-      return 'Select: đang nhận line | click để chọn toàn bộ line / arc'
-    }
-
-    if (panelEditRect.value.pendingAction?.source === 'lineRegion') {
-      return 'Select vùng: chọn None để bỏ qua hoặc Khấu để khấu xuyên vùng đã chọn'
-    }
-
-    if (hoverRegion) {
-      return `Select: vùng ${Math.round(hoverRegion.width * 10) / 10} x ${Math.round(hoverRegion.height * 10) / 10} mm | click để chọn vùng`
-    }
-
-    return `Select: ${activePanelEditContext.value.panelName} | ${activePanelEditContext.value.faceLabel} | Space để thoát lệnh hiện tại`
-  }
-
-  if (shapeTool === 'editPanelLine') {
-    const draft = panelEditLine.value.draft
-    const hoverSnap = panelEditLine.value.hoverSnap
-
-    if (draft) {
-      const end = draft.current || draft.start
-      const length = Math.hypot(Number(end.x || 0) - Number(draft.start.x || 0), Number(end.y || 0) - Number(draft.start.y || 0))
-      const snapText = hoverSnap ? ` | Snap: ${hoverSnap.kind === 'circle' ? 'điểm' : 'cạnh/guide'}` : ''
-
-      return `Line: dài ${Math.round(length * 10) / 10} mm${snapText} | click điểm cuối`
-    }
-
-    if (hoverSnap) {
-      return `Line: snap ${hoverSnap.kind === 'circle' ? 'điểm tròn' : 'cạnh/guide'} | click điểm đầu`
-    }
-
-    return 'Line: click điểm đầu, rê chuột preview, click điểm cuối để tạo line'
-  }
-
-  if (shapeTool === 'editPanelMove') {
-    const selectedCount = panelEditSelection.value.items.length
-
-    if (panelEditMove.value.stage === 'target') {
-      const snapText = panelEditMove.value.hoverSnap ? ` | Snap: ${panelEditMove.value.hoverSnap.kind === 'circle' ? 'điểm' : 'cạnh/guide'}` : ''
-
-      return `Move: đang preview ${selectedCount} chi tiết${snapText} | click điểm 2 để hoàn tất | Shift khóa trục | Esc hủy`
-    }
-
-    if (selectedCount > 0) {
-      const snapText = panelEditMove.value.hoverSnap ? ` | Snap: ${panelEditMove.value.hoverSnap.kind === 'circle' ? 'điểm' : 'cạnh/guide'}` : ''
-
-      return `Move: đã chọn ${selectedCount} chi tiết${snapText} | click điểm 1 để bắt đầu di chuyển`
-    }
-
-    return 'Move: chọn line / quét chọn hình trước, sau đó click điểm 1 để di chuyển'
-  }
-
-  if (shapeTool === 'editPanelTape') {
-    const draft = panelEditTape.value.draft
-    const hoverSnap = panelEditTape.value.hoverSnap
-    const input = panelEditTape.value.inputBuffer
-
-    if (draft) {
-      const distance = Math.abs(Number(draft.value || 0) - Number(draft.baseValue || 0))
-      const inputText = input ? ` | Nhập: ${input}` : ''
-
-      const snapText = hoverSnap ? ` | Snap: ${hoverSnap.kind === 'circle' ? 'giao/điểm' : 'đường'}` : ''
-
-      return `Thước: ${draft.axis === 'vertical' ? 'Guide đứng' : 'Guide ngang'} | Khoảng cách ${Math.round(distance * 10) / 10} mm${inputText}${snapText} | Enter để cố định hoặc click lần nữa`
-    }
-
-    if (hoverSnap) {
-      return `Thước: snap ${hoverSnap.kind === 'circle' ? 'điểm tròn' : 'cạnh'} | click để tạo guide ${hoverSnap.axis === 'vertical' ? 'đứng' : 'ngang'}`
-    }
-
-    return 'Thước: rê chuột gần cạnh để bắt snap, click để tạo đường guide'
-  }
-
-  if (shapeTool === 'editPanelRect') {
-    const draft = panelEditRect.value.draft
-    const hoverSnap = panelEditRect.value.hoverSnap
-
-    if (panelEditRect.value.pendingAction) {
-      return 'Vẽ hình chữ nhật: chọn None để giữ nét vẽ hoặc Khấu để push thủng panel'
-    }
-
-    if (draft) {
-      const width = Math.abs(Number(draft.current?.x || 0) - Number(draft.start?.x || 0))
-      const height = Math.abs(Number(draft.current?.y || 0) - Number(draft.start?.y || 0))
-      const snapText = hoverSnap ? ` | Snap: ${hoverSnap.kind === 'circle' ? 'điểm' : 'cạnh/guide'}` : ''
-
-      return `Vẽ hình chữ nhật: ${Math.round(width * 10) / 10} x ${Math.round(height * 10) / 10} mm${snapText} | click điểm góc chéo để hoàn tất`
-    }
-
-    if (hoverSnap) {
-      return `Vẽ hình chữ nhật: snap ${hoverSnap.kind === 'circle' ? 'điểm tròn' : 'cạnh/guide'} | click điểm đầu`
-    }
-
-    return 'Vẽ hình chữ nhật: click điểm đầu, click điểm góc chéo để tạo hình chữ nhật'
-  }
-
-  if (shapeTool === 'editPanelArc') {
-    const draft = panelEditArc.value.draft
-    const hoverSnap = panelEditArc.value.hoverSnap
-
-    if (draft?.stage === 'end') {
-      const arcData = getPanelEditArcData(getEffectivePanelEditArcDraft(draft))
-      const radiusText = panelEditArc.value.inputBuffer || (arcData ? `${Math.round(arcData.radius * 10) / 10}` : '')
-      const snapText = hoverSnap ? ` | Snap: ${hoverSnap.kind === 'circle' ? 'điểm' : 'cạnh/guide'}` : ''
-      const inputText = radiusText ? ` | R: ${radiusText} mm` : ''
-
-      return `Arc: preview cung 1/4${inputText}${snapText} | click điểm 2 hoặc nhập R + Enter`
-    }
-
-    if (draft?.stage === 'bulge') {
-      const arcData = getPanelEditArcData(getEffectivePanelEditArcDraft(draft))
-      const radiusText = panelEditArc.value.inputBuffer || (arcData ? `${Math.round(arcData.radius * 10) / 10}` : '')
-      const angleText = arcData ? ` | góc ${Math.round(arcData.sweep * 180 / Math.PI)}°` : ''
-      const radiusDisplay = radiusText ? ` | R: ${radiusText} mm` : ''
-      const redText = arcData?.isQuarterOrHalf ? ' | đỏ = cung 1/4 hoặc 1/2' : ''
-
-      return `Arc: chọn điểm đỉnh để đổi độ cong${radiusDisplay}${angleText}${redText} | Enter hoặc click đúp điểm 2 để OK | click điểm đỉnh để vẽ`
-    }
-
-    if (hoverSnap) {
-      return `Arc: snap ${hoverSnap.kind === 'circle' ? 'điểm tròn' : 'cạnh/guide'} | click điểm 1`
-    }
-
-    return 'Arc: click điểm 1, rê chuột preview, click điểm 2, Enter để OK hoặc click điểm đỉnh'
-  }
-
-  if (shapeTool === 'editPanelCircle') {
-    const draft = panelEditCircle.value.draft
-    const hoverSnap = panelEditCircle.value.hoverSnap
-    const input = panelEditCircle.value.inputBuffer
-
-    if (draft) {
-      const previewRadius = input ? Number(input) : getPanelEditCircleRadius(draft)
-      const radiusText = Number.isFinite(previewRadius) && previewRadius > 0
-        ? Math.round(previewRadius * 10) / 10
-        : input
-      const inputText = input ? ` | Nhập R: ${input} mm` : ''
-      const snapText = hoverSnap ? ` | Snap: ${hoverSnap.kind === 'circle' ? 'điểm' : 'cạnh/guide'}` : ''
-
-      return `Vẽ hình tròn: R${radiusText} mm${inputText}${snapText} | click điểm bán kính hoặc Enter`
-    }
-
-    if (hoverSnap) {
-      return `Vẽ hình tròn: snap ${hoverSnap.kind === 'circle' ? 'điểm tròn' : 'cạnh/guide'} | click tâm`
-    }
-
-    return 'Vẽ hình tròn: click tâm, rê chuột preview, click điểm bán kính hoặc nhập số + Enter'
-  }
-
-  const toolName = panelEditTools.find((tool) => tool.id === shapeTool)?.label || 'Edit Panel'
-
-  return `${toolName}: ${activePanelEditContext.value.panelName} | ${activePanelEditContext.value.faceLabel}`
-})
-
-//=================
-function getWallBox3D() {
-  return wall.getBox3D()
-} // End getWallBox3D
-const activeViewConfig = computed(() => app.getViewConfig(app.state.currentView))
-const axisHorizontal = computed(() => activeViewConfig.value.axisA || 'X')
-const axisVertical = computed(() => activeViewConfig.value.axisB || 'Y')
-
-const dimInputStyle = computed(() => ({
-  left: `${dimInput.value.x}px`,
-  top: `${dimInput.value.y}px`
-}))
-
-const boxHeightInputStyle = computed(() => ({
-  left: `${boxHeightInput.value.x}px`,
-  top: `${boxHeightInput.value.y}px`
-}))
-//=================
-const canvasCursorClass = computed(() => {
-  if (app.state.currentTool === 'move') return 'mn-cursor-move'
-  if (app.state.currentTool === 'dimensions') return 'mn-cursor-dimensions'
-  if (hoverDim.value && app.state.currentTool === 'select') return 'mn-cursor-pointer'
-  if (app.state.currentTool === 'box') return 'mn-cursor-box'
-  if (app.state.currentTool === 'panel') return 'mn-cursor-crosshair'
-  if (isEditPanelTool(app.state.currentTool) || isEditPanelDrawTool(app.state.currentTool)) return 'mn-cursor-crosshair'
-  if (app.state.currentTool === 'select') return 'mn-cursor-select'
-
-  return 'mn-cursor-default'
-}) // End canvasCursorClass
-function resizeCanvas() {
-  const canvas = canvasRef.value
-  const host = viewportRef.value
-  if (!canvas || !host) return
-  const rect = host.getBoundingClientRect()
-  ratio = window.devicePixelRatio || 1
-  canvas.width = rect.width * ratio
-  canvas.height = rect.height * ratio
-  canvas.style.width = `${rect.width}px`
-  canvas.style.height = `${rect.height}px`
-  ctx = canvas.getContext('2d')
-  ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
-  app.setViewportSize(rect.width, rect.height)
-  draw()
-  nextTick(resizePanelEditCanvas)
-}
-
-//=================
-//=================
-function onAppSettingsApplied() {
-  drawing.rebuildZones()
-  draw()
-  nextTick(resizePanelEditCanvas)
-} // End onAppSettingsApplied
-
-function draw() {
-  if (!ctx || !canvasRef.value) return
-
-  const canvas = canvasRef.value
-  const width = canvas.clientWidth
-  const height = canvas.clientHeight
-
-  renderCanvas2D(ctx, {
+  drawing,
+  renderCanvas2D,
+  afterResize: resizePanelEditCanvas,
+  getRenderPayload: ({ width, height }) => ({
     width,
     height,
     viewport: app.state.viewport,
@@ -530,8 +181,8 @@ function draw() {
     snapPreview: drawing.state.snapPreview,
     selectedPanelId: drawing.state.selectedPanelId,
     selectedPanelIds: drawing.state.selectedPanelIds,
-    selectedBoxId: box.state.selectedBoxId,
-    selectedBoxIds: box.state.selectedBoxIds,
+    selectedBoxId: app.state.currentTool === 'select' ? null : box.state.selectedBoxId,
+    selectedBoxIds: app.state.currentTool === 'select' ? [] : box.state.selectedBoxIds,
     selectDrag: selectDrag.value,
     dimensions: drawing.getRenderableDimensions(app.state.currentView),
     selectedDimensionIds: drawing.state.selectedDimensionIds,
@@ -539,7 +190,296 @@ function draw() {
     editingDimensionId: dimInput.value.target === 'dimension' ? dimInput.value.dimensionId : null,
     showGrid: app.state.showGrid
   })
-} // End draw
+})
+const canvasRef = viewportCanvas.canvasRef
+const setCanvasRef = viewportCanvas.setCanvasRef
+drawImpl = viewportCanvas.draw
+resizeCanvasImpl = viewportCanvas.resizeCanvas
+onAppSettingsAppliedImpl = viewportCanvas.onAppSettingsApplied
+const {
+  dimInput,
+  dimInputStyle,
+  setDimInputRef,
+  updateDimInputValue,
+  openDimInput,
+  cancelDimInput,
+  onDimInputKeyDown
+} = useDimensionInput({
+  wall,
+  box,
+  drawing,
+  app,
+  draw,
+  getWallBox3D,
+  getWallDimInputInfo,
+  getBoxDimInputInfo
+})
+const {
+  boxHeightInput,
+  boxHeightInputStyle,
+  setBoxHeightInputRef,
+  updateBoxHeightInputValue,
+  openBoxHeightInput,
+  cancelBoxHeightInput,
+  onBoxHeightInputKeyDown
+} = useBoxHeightInput({
+  canvasRef,
+  wall,
+  box,
+  drawing,
+  app,
+  draw,
+  exitToSelect
+})
+const {
+  selectDrag,
+  getScreenPointFromEvent,
+  startSelectDrag,
+  resetSelectDrag,
+  getSelectDragRect,
+  localRectToScreenRect,
+  getSelectedIdsByDragRect
+} = useSelectDrag({
+  canvasRef,
+  app,
+  drawing,
+  draw,
+  getVisiblePanels,
+  getVisibleBoxes,
+  getPanelLocalRect,
+  getPanelSelectRect,
+  getBoxLocalRect,
+  getBoxSelectRect,
+  getDimensionSelectRect,
+  hitTestVisiblePanel
+})
+const {
+  handlePanelToolKey
+} = usePanelToolKeyboard({
+  app,
+  drawing,
+  draw
+})
+const {
+  handleViewportKeyboard
+} = useViewportKeyboard({
+  app,
+  drawing,
+  box,
+  wall,
+  draw,
+  moveCopyMode,
+  dimInput,
+  boxHeightInput,
+  exitToSelect
+})
+let panning = false
+let panStart = null
+let panOriginal = null
+let panelEditPanning = false
+let panelEditPanStart = null
+let panelEditPanOriginal = null
+
+const {
+  panelEditViewport,
+  panelEditTape,
+  panelEditRect,
+  panelEditLine,
+  panelEditCircle,
+  panelEditArc,
+  panelEditSelection,
+  panelEditSelectDrag,
+  panelEditMove,
+  panelEditHistory
+} = usePanelEditState()
+
+const {
+  getPanelEditPoint,
+  getPanelEditZoomClamp,
+  getPanelEditLayout,
+  getPanelEditLocalFromScreen
+} = usePanelEditLayout({ panelEditViewport })
+
+const {
+  getClosestPointOnPanelEditLine,
+  getPanelEditLineSelectionKey,
+  getPanelEditLineHit
+} = usePanelEditLineHit({
+  panelEditLine,
+  getPanelEditPoint,
+  getPanelEditLocalFromScreen
+})
+
+const {
+  getPanelEditLineRegions,
+  hitPanelEditLineRegion
+} = usePanelEditRegionHit({
+  panelEditCanvasRef,
+  panelEditRect,
+  panelEditLine,
+  panelEditCircle,
+  getPanelEditLocalFromScreen
+})
+
+const {
+  resetPanelEditTapeDraft,
+  resetPanelEditRectDraft,
+  resetPanelEditLineDraft,
+  resetPanelEditCircleDraft,
+  resetPanelEditArcDraft,
+  resetPanelEditSelectDrag,
+  resetPanelEditCommandDrafts
+} = usePanelEditDraftReset({
+  panelEditTape,
+  panelEditRect,
+  panelEditLine,
+  panelEditCircle,
+  panelEditArc,
+  panelEditSelectDrag,
+  resetPanelEditMoveDraft
+})
+
+const {
+  getPanelEditSelectionItemKey,
+  normalizePanelEditSelectionItems,
+  setPanelEditSelection,
+  clearPanelEditSelection,
+  getPanelEditSelectedLineKeySet,
+  isPanelEditRectangleSelected,
+  isPanelEditCircleSelected,
+  isPanelEditSelectionItemEqual,
+  isPanelEditRectangleHovered,
+  isPanelEditCircleHovered,
+  setPanelEditHoverItem,
+  getPanelEditRectangleHit,
+  getPanelEditCircleHit,
+  getPanelEditHoverItem,
+  getPanelEditPointerLocal,
+  getPanelEditSelectDragRectFromPoints,
+  getPanelEditSelectDragRect,
+  panelEditBoundsTouch,
+  getPanelEditLineBounds,
+  getPanelEditSelectionByRect
+} = usePanelEditSelection({
+  panelEditCanvasRef,
+  panelEditSelection,
+  panelEditSelectDrag,
+  panelEditLine,
+  panelEditRect,
+  panelEditCircle,
+  getPanelEditLocalFromScreen,
+  getPanelEditLineSelectionKey,
+  getPanelEditPolygonBounds,
+  getPanelEditRectBounds,
+  getPanelEditCircleRadius,
+  getPanelEditCircleBounds
+})
+
+const {
+  clonePanelEditHistoryData,
+  pushPanelEditHistorySnapshot,
+  clearPanelEditHistory,
+  undoPanelEditHistory,
+  redoPanelEditHistory
+} = usePanelEditHistory({
+  app,
+  panelEditTape,
+  panelEditRect,
+  panelEditLine,
+  panelEditCircle,
+  panelEditArc,
+  panelEditHistory,
+  clearPanelEditSelection,
+  resetPanelEditMoveDraft,
+  resetPanelEditSelectDrag,
+  resizePanelEditCanvas
+})
+
+const {
+  loadPanelEditSavedState
+} = usePanelEditSavedState({
+  drawing,
+  panelEditTape,
+  panelEditRect,
+  panelEditLine,
+  panelEditCircle,
+  panelEditArc,
+  clearPanelEditSelection,
+  resetPanelEditMoveDraft,
+  resetPanelEditSelectDrag,
+  clearPanelEditHistory
+})
+
+
+const {
+  getPanelEditSavedRectanglesForApply,
+  getPanelEditSavedLinesForApply,
+  getPanelEditSavedCirclesForApply,
+  getPanelEditSavedGuidesForApply
+} = usePanelEditApplyData({
+  panelEditTape,
+  panelEditRect,
+  panelEditLine,
+  panelEditCircle
+})
+
+const panelEditTools = PANEL_EDIT_TOOLS
+const panelEditMoveController = createEditPanelMoveController({
+  panelEditMove,
+  panelEditSelection,
+  panelEditLine,
+  panelEditRect,
+  panelEditCircle,
+  drawing,
+  app,
+  nextTick,
+  resizePanelEditCanvas,
+  getPanelEditSelectedLineKeySet,
+  getPanelEditLineSelectionKey,
+  clonePanelEditHistoryData,
+  pushPanelEditHistorySnapshot,
+  drawPanelEditLine,
+  drawPanelEditRectangle,
+  drawPanelEditCircle
+})
+const zoomLabel = computed(() => `${Math.round(app.state.viewport.zoom * 100)}%`)
+const localX = computed(() => Math.round(app.state.mouse.localX))
+const localY = computed(() => Math.round(app.state.mouse.localY))
+const activePanelEditContext = computed(() => drawing.state.panelEdit?.active ? drawing.state.panelEdit.context : null)
+const panelEditCanvasCursorClass = computed(() => getEditPanelToolCursorClass(drawing.state.panelEdit?.shapeTool))
+const panelEditFooterText = usePanelEditFooterText({
+  activePanelEditContext,
+  drawing,
+  panelEditLine,
+  panelEditSelection,
+  panelEditSelectDrag,
+  panelEditRect,
+  panelEditMove,
+  panelEditTape,
+  panelEditArc,
+  panelEditCircle,
+  panelEditTools,
+  getPanelEditArcData,
+  getEffectivePanelEditArcDraft,
+  getPanelEditCircleRadius
+})
+
+//=================
+function getWallBox3D() {
+  return wall.getBox3D()
+} // End getWallBox3D
+const activeViewConfig = computed(() => app.getViewConfig(app.state.currentView))
+const axisHorizontal = computed(() => activeViewConfig.value.axisA || 'X')
+const axisVertical = computed(() => activeViewConfig.value.axisB || 'Y')
+
+const {
+  canvasCursorClass
+} = useViewportCursor({
+  app,
+  hoverDim,
+  isEditPanelTool,
+  isEditPanelDrawTool
+})
 
 //=================
 function getCssVariable(variableName, fallback) {
@@ -549,14 +489,6 @@ function getCssVariable(variableName, fallback) {
 
   return value || fallback
 } // End getCssVariable
-
-//=================
-function getPanelEditPoint(context, offsetX, offsetY, scale, x, y) {
-  return {
-    x: offsetX + x * scale,
-    y: offsetY + (context.height - y) * scale
-  }
-} // End getPanelEditPoint
 
 //=================
 function resizePanelEditCanvas() {
@@ -575,146 +507,6 @@ function resizePanelEditCanvas() {
   drawPanelEditCanvas(editContext, rect.width, rect.height)
 } // End resizePanelEditCanvas
 
-//=================
-function getPanelEditZoomClamp(value) {
-  return Math.min(Math.max(value, 0.2), 8)
-} // End getPanelEditZoomClamp
-
-//=================
-function getPanelEditLayout(context, canvasWidth, canvasHeight) {
-  const marginLeft = 110
-  const marginRight = 72
-  const marginTop = 82
-  const marginBottom = 96
-  const availableWidth = Math.max(1, canvasWidth - marginLeft - marginRight)
-  const availableHeight = Math.max(1, canvasHeight - marginTop - marginBottom)
-  const baseScale = Math.min(
-    availableWidth / Math.max(1, context.width),
-    availableHeight / Math.max(1, context.height)
-  )
-  const zoom = getPanelEditZoomClamp(panelEditViewport.value.zoom)
-  const scale = baseScale * zoom
-  const faceWidth = context.width * scale
-  const faceHeight = context.height * scale
-  const offsetX = marginLeft + (availableWidth - faceWidth) / 2 + panelEditViewport.value.panX
-  const offsetY = marginTop + (availableHeight - faceHeight) / 2 + panelEditViewport.value.panY
-
-  return {
-    scale,
-    faceWidth,
-    faceHeight,
-    left: offsetX,
-    right: offsetX + faceWidth,
-    top: offsetY,
-    bottom: offsetY + faceHeight
-  }
-} // End getPanelEditLayout
-
-
-//=================
-function getPanelEditLocalFromScreen(context, layout, screenX, screenY) {
-  return {
-    x: (screenX - layout.left) / layout.scale,
-    y: context.height - ((screenY - layout.top) / layout.scale)
-  }
-} // End getPanelEditLocalFromScreen
-
-
-//=================
-function getClosestPointOnPanelEditLine(line, local) {
-  if (!line || !local) return null
-
-  const x1 = Number(line.start?.x || 0)
-  const y1 = Number(line.start?.y || 0)
-  const x2 = Number(line.end?.x || 0)
-  const y2 = Number(line.end?.y || 0)
-  const dx = x2 - x1
-  const dy = y2 - y1
-  const lengthSq = dx * dx + dy * dy
-
-  if (lengthSq <= 0.0001) return { x: x1, y: y1, distance: Math.hypot(local.x - x1, local.y - y1) }
-
-  const t = Math.max(0, Math.min(1, ((local.x - x1) * dx + (local.y - y1) * dy) / lengthSq))
-  const x = x1 + dx * t
-  const y = y1 + dy * t
-
-  return {
-    x,
-    y,
-    distance: Math.hypot(local.x - x, local.y - y)
-  }
-} // End getClosestPointOnPanelEditLine
-
-//=================
-function getPanelEditLineSelectionKey(line) {
-  if (!line) return null
-
-  return line.groupId || line.id || null
-} // End getPanelEditLineSelectionKey
-
-//=================
-function getPanelEditLineHit(context, layout, screenX, screenY) {
-  if (!context || !layout) return null
-
-  const tolerance = 8
-  const local = getPanelEditLocalFromScreen(context, layout, screenX, screenY)
-  let best = null
-
-  panelEditLine.value.lines.forEach((line) => {
-    const closest = getClosestPointOnPanelEditLine(line, local)
-
-    if (!closest) return
-
-    const screenPoint = getPanelEditPoint(context, layout.left, layout.top, layout.scale, closest.x, closest.y)
-    const screenDistance = Math.hypot(screenPoint.x - screenX, screenPoint.y - screenY)
-
-    if (screenDistance > tolerance) return
-    if (best && screenDistance >= best.distance) return
-
-    best = {
-      ...line,
-      distance: screenDistance,
-      local: { x: closest.x, y: closest.y },
-      screen: screenPoint
-    }
-  })
-
-  return best
-} // End getPanelEditLineHit
-
-
-//=================
-function getPanelEditSegmentIntersection(segmentA, segmentB) {
-  if (!segmentA || !segmentB) return null
-
-  const x1 = Number(segmentA.start?.x || 0)
-  const y1 = Number(segmentA.start?.y || 0)
-  const x2 = Number(segmentA.end?.x || 0)
-  const y2 = Number(segmentA.end?.y || 0)
-  const x3 = Number(segmentB.start?.x || 0)
-  const y3 = Number(segmentB.start?.y || 0)
-  const x4 = Number(segmentB.end?.x || 0)
-  const y4 = Number(segmentB.end?.y || 0)
-  const denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-  const tolerance = 0.001
-
-  if (Math.abs(denominator) <= tolerance) return null
-
-  const px = (((x1 * y2 - y1 * x2) * (x3 - x4)) - ((x1 - x2) * (x3 * y4 - y3 * x4))) / denominator
-  const py = (((x1 * y2 - y1 * x2) * (y3 - y4)) - ((y1 - y2) * (x3 * y4 - y3 * x4))) / denominator
-  const withinA = px >= Math.min(x1, x2) - tolerance
-    && px <= Math.max(x1, x2) + tolerance
-    && py >= Math.min(y1, y2) - tolerance
-    && py <= Math.max(y1, y2) + tolerance
-  const withinB = px >= Math.min(x3, x4) - tolerance
-    && px <= Math.max(x3, x4) + tolerance
-    && py >= Math.min(y3, y4) - tolerance
-    && py <= Math.max(y3, y4) + tolerance
-
-  if (!withinA || !withinB) return null
-
-  return { x: px, y: py }
-} // End getPanelEditSegmentIntersection
 
 //=================
 function getPanelEditGuideSegments(context) {
@@ -1261,346 +1053,9 @@ function drawPanelEditTapeSnap(targetContext, snap) {
 } // End drawPanelEditTapeSnap
 
 //=================
-function resetPanelEditTapeDraft() {
-  panelEditTape.value = {
-    ...panelEditTape.value,
-    draft: null,
-    inputBuffer: ''
-  }
-} // End resetPanelEditTapeDraft
-
-//=================
-function resetPanelEditRectDraft() {
-  panelEditRect.value = {
-    ...panelEditRect.value,
-    hoverSnap: null,
-    draft: null,
-    pendingAction: null
-  }
-} // End resetPanelEditRectDraft
-
-//=================
-function resetPanelEditLineDraft() {
-  panelEditLine.value = {
-    ...panelEditLine.value,
-    hoverSnap: null,
-    hoverRegion: null,
-    hoverLine: null,
-    selectedLineId: null,
-    draft: null
-  }
-} // End resetPanelEditLineDraft
-
-//=================
-function resetPanelEditCircleDraft() {
-  panelEditCircle.value = {
-    ...panelEditCircle.value,
-    hoverSnap: null,
-    draft: null,
-    inputBuffer: ''
-  }
-} // End resetPanelEditCircleDraft
-
-//=================
-function resetPanelEditArcDraft() {
-  panelEditArc.value = {
-    ...panelEditArc.value,
-    hoverSnap: null,
-    hoverPoint: null,
-    draft: null,
-    inputBuffer: ''
-  }
-} // End resetPanelEditArcDraft
-
-//=================
 function resetPanelEditMoveDraft() {
   panelEditMoveController.reset()
 } // End resetPanelEditMoveDraft
-
-//=================
-function resetPanelEditSelectDrag() {
-  panelEditSelectDrag.value = {
-    active: false,
-    start: null,
-    current: null,
-    moved: false
-  }
-} // End resetPanelEditSelectDrag
-
-//=================
-function resetPanelEditCommandDrafts() {
-  resetPanelEditTapeDraft()
-  resetPanelEditRectDraft()
-  resetPanelEditLineDraft()
-  resetPanelEditCircleDraft()
-  resetPanelEditArcDraft()
-  resetPanelEditMoveDraft()
-  resetPanelEditSelectDrag()
-} // End resetPanelEditCommandDrafts
-
-//=================
-function clonePanelEditHistoryData(value) {
-  return JSON.parse(JSON.stringify(value || null))
-} // End clonePanelEditHistoryData
-
-//=================
-function createPanelEditHistorySnapshot() {
-  return {
-    guides: clonePanelEditHistoryData(panelEditTape.value.guides || []),
-    rectangles: clonePanelEditHistoryData(panelEditRect.value.rectangles || []),
-    lines: clonePanelEditHistoryData(panelEditLine.value.lines || []),
-    circles: clonePanelEditHistoryData(panelEditCircle.value.circles || [])
-  }
-} // End createPanelEditHistorySnapshot
-
-//=================
-function restorePanelEditHistorySnapshot(snapshot) {
-  panelEditTape.value = {
-    ...panelEditTape.value,
-    hoverSnap: null,
-    draft: null,
-    inputBuffer: '',
-    guides: clonePanelEditHistoryData(snapshot?.guides || [])
-  }
-  panelEditRect.value = {
-    ...panelEditRect.value,
-    hoverSnap: null,
-    draft: null,
-    pendingAction: null,
-    rectangles: clonePanelEditHistoryData(snapshot?.rectangles || [])
-  }
-  panelEditLine.value = {
-    ...panelEditLine.value,
-    hoverSnap: null,
-    hoverRegion: null,
-    hoverLine: null,
-    selectedLineId: null,
-    draft: null,
-    lines: clonePanelEditHistoryData(snapshot?.lines || [])
-  }
-  panelEditCircle.value = {
-    ...panelEditCircle.value,
-    hoverSnap: null,
-    draft: null,
-    inputBuffer: '',
-    circles: clonePanelEditHistoryData(snapshot?.circles || [])
-  }
-  panelEditArc.value = {
-    ...panelEditArc.value,
-    hoverSnap: null,
-    hoverPoint: null,
-    draft: null,
-    inputBuffer: ''
-  }
-  clearPanelEditSelection()
-  resetPanelEditMoveDraft()
-  resetPanelEditSelectDrag()
-} // End restorePanelEditHistorySnapshot
-
-//=================
-function pushPanelEditHistorySnapshot() {
-  const history = panelEditHistory.value
-
-  history.undoStack.push(createPanelEditHistorySnapshot())
-
-  if (history.undoStack.length > history.max) {
-    history.undoStack.shift()
-  }
-
-  history.redoStack = []
-} // End pushPanelEditHistorySnapshot
-
-//=================
-function clearPanelEditHistory() {
-  panelEditHistory.value = {
-    undoStack: [],
-    redoStack: [],
-    max: panelEditHistory.value.max || 80
-  }
-} // End clearPanelEditHistory
-
-//=================
-function undoPanelEditHistory() {
-  const history = panelEditHistory.value
-  const snapshot = history.undoStack.pop()
-
-  if (!snapshot) {
-    app.setStatus('Edit Panel: không còn bước để Undo')
-    return false
-  }
-
-  history.redoStack.push(createPanelEditHistorySnapshot())
-  restorePanelEditHistorySnapshot(snapshot)
-  app.setStatus('Edit Panel: Undo')
-  nextTick(resizePanelEditCanvas)
-
-  return true
-} // End undoPanelEditHistory
-
-//=================
-function redoPanelEditHistory() {
-  const history = panelEditHistory.value
-  const snapshot = history.redoStack.pop()
-
-  if (!snapshot) {
-    app.setStatus('Edit Panel: không còn bước để Redo')
-    return false
-  }
-
-  history.undoStack.push(createPanelEditHistorySnapshot())
-  restorePanelEditHistorySnapshot(snapshot)
-  app.setStatus('Edit Panel: Redo')
-  nextTick(resizePanelEditCanvas)
-
-  return true
-} // End redoPanelEditHistory
-
-
-//=================
-function getPanelEditSavedStateKey(context) {
-  if (!context) return null
-
-  return `${context.faceKey || 'face'}:${context.faceSide || 'side'}`
-} // End getPanelEditSavedStateKey
-
-//=================
-function clonePanelEditSavedPoint(point) {
-  return {
-    x: Number(point?.x || 0),
-    y: Number(point?.y || 0)
-  }
-} // End clonePanelEditSavedPoint
-
-//=================
-function loadPanelEditSavedState(context) {
-  const resetState = () => {
-    panelEditTape.value = {
-      hoverSnap: null,
-      draft: null,
-      guides: [],
-      inputBuffer: ''
-    }
-    panelEditRect.value = {
-      hoverSnap: null,
-      draft: null,
-      pendingAction: null,
-      rectangles: []
-    }
-    panelEditLine.value = {
-      hoverSnap: null,
-      hoverRegion: null,
-      hoverLine: null,
-      selectedLineId: null,
-      draft: null,
-      lines: []
-    }
-    panelEditCircle.value = {
-      hoverSnap: null,
-      draft: null,
-      circles: [],
-      inputBuffer: ''
-    }
-    panelEditArc.value = {
-      hoverSnap: null,
-      hoverPoint: null,
-      draft: null,
-      inputBuffer: ''
-    }
-    clearPanelEditSelection()
-    resetPanelEditMoveDraft()
-    resetPanelEditSelectDrag()
-    clearPanelEditHistory()
-  }
-
-  if (!context) {
-    resetState()
-    return
-  }
-
-  const panel = drawing.state.panels.find((item) => item.id === context.panelId) || null
-  const stateKey = getPanelEditSavedStateKey(context)
-  const savedState = stateKey ? panel?.editPanelData?.[stateKey] : null
-
-  if (!savedState) {
-    resetState()
-    return
-  }
-
-  panelEditTape.value = {
-    hoverSnap: null,
-    draft: null,
-    inputBuffer: '',
-    guides: Array.isArray(savedState.guides)
-      ? savedState.guides.map((guide) => ({
-          id: guide.id || `guide-${Date.now()}-${Math.random()}`,
-          axis: guide.axis,
-          edge: guide.edge || null,
-          baseValue: Number(guide.baseValue || 0),
-          value: Number(guide.value || 0)
-        }))
-      : []
-  }
-  panelEditRect.value = {
-    hoverSnap: null,
-    draft: null,
-    pendingAction: null,
-    rectangles: Array.isArray(savedState.rectangles)
-      ? savedState.rectangles.map((rectangle) => ({
-          id: rectangle.id || `rect-${Date.now()}-${Math.random()}`,
-          start: clonePanelEditSavedPoint(rectangle.start),
-          end: clonePanelEditSavedPoint(rectangle.end),
-          operation: rectangle.operation || 'none',
-          source: rectangle.source || 'rectangle',
-          regionKind: rectangle.regionKind || 'rect',
-          shapeType: rectangle.shapeType || null,
-          center: rectangle.center ? clonePanelEditSavedPoint(rectangle.center) : null,
-          radius: Number(rectangle.radius || 0),
-          polygon: Array.isArray(rectangle.polygon)
-            ? rectangle.polygon.map((point) => clonePanelEditSavedPoint(point))
-            : null
-        }))
-      : []
-  }
-  panelEditLine.value = {
-    hoverSnap: null,
-    hoverRegion: null,
-    hoverLine: null,
-    selectedLineId: null,
-    draft: null,
-    lines: Array.isArray(savedState.lines)
-      ? savedState.lines.map((line) => ({
-          id: line.id || `line-${Date.now()}-${Math.random()}`,
-          groupId: line.groupId || null,
-          groupType: line.groupType || null,
-          axis: line.axis || 'free',
-          start: clonePanelEditSavedPoint(line.start),
-          end: clonePanelEditSavedPoint(line.end)
-        }))
-      : []
-  }
-  panelEditCircle.value = {
-    hoverSnap: null,
-    draft: null,
-    inputBuffer: '',
-    circles: Array.isArray(savedState.circles)
-      ? savedState.circles.map((circle) => ({
-          id: circle.id || `circle-${Date.now()}-${Math.random()}`,
-          center: clonePanelEditSavedPoint(circle.center),
-          radius: Number(circle.radius || 0)
-        })).filter((circle) => circle.radius > 0)
-      : []
-  }
-  panelEditArc.value = {
-    hoverSnap: null,
-    hoverPoint: null,
-    draft: null,
-    inputBuffer: ''
-  }
-  clearPanelEditSelection()
-  resetPanelEditMoveDraft()
-  resetPanelEditSelectDrag()
-  clearPanelEditHistory()
-} // End loadPanelEditSavedState
 
 //=================
 function exitPanelEditCommandToSelect() {
@@ -1709,48 +1164,6 @@ function getPanelEditCirclePointFromPointer(context, layout, event) {
 } // End getPanelEditCirclePointFromPointer
 
 //=================
-function getPanelEditCircleRadius(circle) {
-  if (!circle?.center) return 0
-
-  if (Number.isFinite(Number(circle.radius)) && Number(circle.radius) > 0) {
-    return Number(circle.radius)
-  }
-
-  const current = circle.current || circle.center
-
-  return Math.hypot(
-    Number(current.x || 0) - Number(circle.center.x || 0),
-    Number(current.y || 0) - Number(circle.center.y || 0)
-  )
-} // End getPanelEditCircleRadius
-
-//=================
-
-function getClosestPointOnPanelEditCircleEdge(circle, local) {
-  if (!circle?.center || !local) return null
-
-  const radius = getPanelEditCircleRadius(circle)
-
-  if (radius <= 0) return null
-
-  const centerX = Number(circle.center.x || 0)
-  const centerY = Number(circle.center.y || 0)
-  const dx = Number(local.x || 0) - centerX
-  const dy = Number(local.y || 0) - centerY
-  const length = Math.hypot(dx, dy)
-  const unitX = length <= 0.0001 ? 1 : dx / length
-  const unitY = length <= 0.0001 ? 0 : dy / length
-  const x = centerX + unitX * radius
-  const y = centerY + unitY * radius
-
-  return {
-    x,
-    y,
-    distance: Math.hypot(Number(local.x || 0) - x, Number(local.y || 0) - y)
-  }
-} // End getClosestPointOnPanelEditCircleEdge
-
-//=================
 function drawPanelEditCircle(targetContext, context, layout, circle, options = {}) {
   if (!circle?.center) return
 
@@ -1788,20 +1201,6 @@ function drawPanelEditCircle(targetContext, context, layout, circle, options = {
   targetContext.restore()
 } // End drawPanelEditCircle
 
-//=================
-function getPanelEditRectBounds(rectangle) {
-  const x1 = Number(rectangle?.start?.x || 0)
-  const y1 = Number(rectangle?.start?.y || 0)
-  const x2 = Number(rectangle?.end?.x ?? rectangle?.current?.x ?? x1)
-  const y2 = Number(rectangle?.end?.y ?? rectangle?.current?.y ?? y1)
-
-  return {
-    x: Math.min(x1, x2),
-    y: Math.min(y1, y2),
-    width: Math.abs(x2 - x1),
-    height: Math.abs(y2 - y1)
-  }
-} // End getPanelEditRectBounds
 
 //=================
 function drawPanelEditRectangle(targetContext, context, layout, rectangle, options = {}) {
@@ -1975,297 +1374,21 @@ function drawPanelEditCutoutEdges(targetContext, context, layout, bounds) {
 } // End drawPanelEditCutoutEdges
 
 
-//=================
-function isPanelEditBoundarySegment(context, pointA, pointB) {
-  const edgeA = getPanelEditBoundaryEdge(context, pointA)
-  const edgeB = getPanelEditBoundaryEdge(context, pointB)
 
-  return edgeA && edgeA === edgeB
-} // End isPanelEditBoundarySegment
 
-//=================
-function isPanelEditCutoutBoundaryOnlySegment(context, pointA, pointB) {
-  return isPanelEditSegmentOnPanelBoundaryLine(context, pointA, pointB)
-} // End isPanelEditCutoutBoundaryOnlySegment
 
-//=================
-function isPanelEditSegmentOnPanelBoundaryLine(context, pointA, pointB) {
-  if (!context || !pointA || !pointB) return false
 
-  const tolerance = 0.01
-  const x1 = Number(pointA.x || 0)
-  const y1 = Number(pointA.y || 0)
-  const x2 = Number(pointB.x || 0)
-  const y2 = Number(pointB.y || 0)
-  const width = Number(context.width || 0)
-  const height = Number(context.height || 0)
 
-  if (Math.abs(x1) <= tolerance && Math.abs(x2) <= tolerance) return true
-  if (Math.abs(x1 - width) <= tolerance && Math.abs(x2 - width) <= tolerance) return true
-  if (Math.abs(y1) <= tolerance && Math.abs(y2) <= tolerance) return true
-  if (Math.abs(y1 - height) <= tolerance && Math.abs(y2 - height) <= tolerance) return true
 
-  return false
-} // End isPanelEditSegmentOnPanelBoundaryLine
 
-//=================
-function getPanelEditBoundaryCornerBetweenEdges(context, edgeA, edgeB) {
-  if (!context || !edgeA || !edgeB || edgeA === edgeB) return null
 
-  const key = [edgeA, edgeB].sort().join('-')
 
-  if (key === 'left-top') return { x: 0, y: context.height }
-  if (key === 'bottom-left') return { x: 0, y: 0 }
-  if (key === 'right-top') return { x: context.width, y: context.height }
-  if (key === 'bottom-right') return { x: context.width, y: 0 }
 
-  return null
-} // End getPanelEditBoundaryCornerBetweenEdges
 
-//=================
-function getPanelEditBoundaryPointCoord(edge, point) {
-  if (!edge || !point) return 0
 
-  if (edge === 'left' || edge === 'right') return Number(point.y || 0)
 
-  return Number(point.x || 0)
-} // End getPanelEditBoundaryPointCoord
 
-//=================
-function getPanelEditBoundaryEdgeLength(context, edge) {
-  if (!context || !edge) return 0
 
-  if (edge === 'left' || edge === 'right') return Number(context.height || 0)
-
-  return Number(context.width || 0)
-} // End getPanelEditBoundaryEdgeLength
-
-//=================
-function getPanelEditBoundaryPointFromCoord(context, edge, coord) {
-  const value = Number(coord || 0)
-
-  if (edge === 'left') return { x: 0, y: value }
-  if (edge === 'right') return { x: context.width, y: value }
-  if (edge === 'bottom') return { x: value, y: 0 }
-  if (edge === 'top') return { x: value, y: context.height }
-
-  return { x: 0, y: 0 }
-} // End getPanelEditBoundaryPointFromCoord
-
-//=================
-function addPanelEditBoundaryEraseSpan(spans, context, edge, pointA, pointB) {
-  if (!spans || !context || !edge || !pointA || !pointB) return
-
-  const length = getPanelEditBoundaryEdgeLength(context, edge)
-  const coordA = Math.max(0, Math.min(length, getPanelEditBoundaryPointCoord(edge, pointA)))
-  const coordB = Math.max(0, Math.min(length, getPanelEditBoundaryPointCoord(edge, pointB)))
-  const start = Math.min(coordA, coordB)
-  const end = Math.max(coordA, coordB)
-
-  if (end - start <= 0.01) return
-
-  spans[edge].push({ start, end })
-} // End addPanelEditBoundaryEraseSpan
-
-//=================
-function isPanelEditPointOnSegment(point, start, end) {
-  if (!point || !start || !end) return false
-
-  const tolerance = 0.5
-  const cross = (Number(point.y || 0) - Number(start.y || 0)) * (Number(end.x || 0) - Number(start.x || 0)) - (Number(point.x || 0) - Number(start.x || 0)) * (Number(end.y || 0) - Number(start.y || 0))
-
-  if (Math.abs(cross) > tolerance) return false
-
-  const minX = Math.min(Number(start.x || 0), Number(end.x || 0)) - tolerance
-  const maxX = Math.max(Number(start.x || 0), Number(end.x || 0)) + tolerance
-  const minY = Math.min(Number(start.y || 0), Number(end.y || 0)) - tolerance
-  const maxY = Math.max(Number(start.y || 0), Number(end.y || 0)) + tolerance
-
-  return Number(point.x || 0) >= minX && Number(point.x || 0) <= maxX && Number(point.y || 0) >= minY && Number(point.y || 0) <= maxY
-} // End isPanelEditPointOnSegment
-
-//=================
-function isPanelEditPointInsidePolygon(point, polygon) {
-  if (!point || !Array.isArray(polygon) || polygon.length < 3) return false
-
-  for (let index = 0; index < polygon.length; index += 1) {
-    const start = polygon[index]
-    const end = polygon[(index + 1) % polygon.length]
-
-    if (isPanelEditPointOnSegment(point, start, end)) return true
-  }
-
-  let inside = false
-  const x = Number(point.x || 0)
-  const y = Number(point.y || 0)
-
-  for (let index = 0, previousIndex = polygon.length - 1; index < polygon.length; previousIndex = index, index += 1) {
-    const pointA = polygon[index]
-    const pointB = polygon[previousIndex]
-    const xi = Number(pointA.x || 0)
-    const yi = Number(pointA.y || 0)
-    const xj = Number(pointB.x || 0)
-    const yj = Number(pointB.y || 0)
-    const intersects = ((yi > y) !== (yj > y)) && (x < ((xj - xi) * (y - yi)) / ((yj - yi) || 1e-9) + xi)
-
-    if (intersects) inside = !inside
-  }
-
-  return inside
-} // End isPanelEditPointInsidePolygon
-
-//=================
-function addPanelEditBoundarySplitCoord(values, coord, length) {
-  if (!Array.isArray(values) || !Number.isFinite(coord) || !Number.isFinite(length)) return
-
-  const value = Math.max(0, Math.min(length, coord))
-
-  if (values.some((item) => Math.abs(item - value) <= 0.01)) return
-
-  values.push(value)
-} // End addPanelEditBoundarySplitCoord
-
-//=================
-function getPanelEditBoundaryProbePoint(context, edge, coord) {
-  const epsilon = 0.25
-  const value = Number(coord || 0)
-
-  if (edge === 'left') return { x: epsilon, y: value }
-  if (edge === 'right') return { x: Number(context.width || 0) - epsilon, y: value }
-  if (edge === 'bottom') return { x: value, y: epsilon }
-  if (edge === 'top') return { x: value, y: Number(context.height || 0) - epsilon }
-
-  return { x: 0, y: 0 }
-} // End getPanelEditBoundaryProbePoint
-
-//=================
-function addPanelEditBoundarySegmentIntersection(values, context, edge, pointA, pointB) {
-  if (!values || !context || !edge || !pointA || !pointB) return
-
-  const x1 = Number(pointA.x || 0)
-  const y1 = Number(pointA.y || 0)
-  const x2 = Number(pointB.x || 0)
-  const y2 = Number(pointB.y || 0)
-  const width = Number(context.width || 0)
-  const height = Number(context.height || 0)
-  const length = getPanelEditBoundaryEdgeLength(context, edge)
-  let t = null
-  let coord = null
-
-  if (edge === 'left' || edge === 'right') {
-    const x = edge === 'left' ? 0 : width
-
-    if (Math.abs(x2 - x1) <= 1e-9) return
-
-    t = (x - x1) / (x2 - x1)
-    if (t < -0.0001 || t > 1.0001) return
-
-    coord = y1 + (y2 - y1) * t
-    if (coord < -0.01 || coord > height + 0.01) return
-  } else {
-    const y = edge === 'bottom' ? 0 : height
-
-    if (Math.abs(y2 - y1) <= 1e-9) return
-
-    t = (y - y1) / (y2 - y1)
-    if (t < -0.0001 || t > 1.0001) return
-
-    coord = x1 + (x2 - x1) * t
-    if (coord < -0.01 || coord > width + 0.01) return
-  }
-
-  addPanelEditBoundarySplitCoord(values, coord, length)
-} // End addPanelEditBoundarySegmentIntersection
-
-//=================
-function collectPanelEditBoundarySplitCoords(context, edge, polygon) {
-  const length = getPanelEditBoundaryEdgeLength(context, edge)
-  const values = [0, length]
-
-  polygon.forEach((point, index) => {
-    const nextPoint = polygon[(index + 1) % polygon.length]
-
-    if (getPanelEditBoundaryEdge(context, point) === edge) {
-      addPanelEditBoundarySplitCoord(values, getPanelEditBoundaryPointCoord(edge, point), length)
-    }
-
-    addPanelEditBoundarySegmentIntersection(values, context, edge, point, nextPoint)
-  })
-
-  return values.sort((a, b) => a - b)
-} // End collectPanelEditBoundarySplitCoords
-
-//=================
-function collectPanelEditPolygonBoundaryEraseSpans(context, polygon) {
-  const spans = {
-    left: [],
-    right: [],
-    bottom: [],
-    top: []
-  }
-
-  if (!context || !Array.isArray(polygon) || polygon.length < 3) return spans
-
-  Object.keys(spans).forEach((edge) => {
-    const values = collectPanelEditBoundarySplitCoords(context, edge, polygon)
-
-    for (let index = 0; index < values.length - 1; index += 1) {
-      const start = values[index]
-      const end = values[index + 1]
-
-      if (end - start <= 0.01) continue
-
-      const mid = (start + end) / 2
-      const probe = getPanelEditBoundaryProbePoint(context, edge, mid)
-
-      if (!isPanelEditPointInsidePolygon(probe, polygon)) continue
-
-      spans[edge].push({ start, end })
-    }
-  })
-
-  polygon.forEach((point, index) => {
-    const nextPoint = polygon[(index + 1) % polygon.length]
-    const edgeA = getPanelEditBoundaryEdge(context, point)
-    const edgeB = getPanelEditBoundaryEdge(context, nextPoint)
-
-    if (!edgeA || !edgeB || edgeA === edgeB) return
-
-    const corner = getPanelEditBoundaryCornerBetweenEdges(context, edgeA, edgeB)
-
-    if (!corner) return
-
-    const cornerProbe = {
-      x: corner.x + (corner.x <= 0 ? 0.25 : -0.25),
-      y: corner.y + (corner.y <= 0 ? 0.25 : -0.25)
-    }
-
-    if (!isPanelEditPointInsidePolygon(corner, polygon) && !isPanelEditPointInsidePolygon(cornerProbe, polygon)) return
-
-    addPanelEditBoundaryEraseSpan(spans, context, edgeA, point, corner)
-    addPanelEditBoundaryEraseSpan(spans, context, edgeB, nextPoint, corner)
-  })
-
-  return spans
-} // End collectPanelEditPolygonBoundaryEraseSpans
-
-//=================
-function mergePanelEditBoundaryEraseSpans(spans) {
-  return spans
-    .filter((span) => span && Number.isFinite(span.start) && Number.isFinite(span.end) && span.end - span.start > 0.01)
-    .sort((a, b) => a.start - b.start)
-    .reduce((merged, span) => {
-      const last = merged[merged.length - 1]
-
-      if (!last || span.start > last.end + 0.01) {
-        merged.push({ start: span.start, end: span.end })
-        return merged
-      }
-
-      last.end = Math.max(last.end, span.end)
-      return merged
-    }, [])
-} // End mergePanelEditBoundaryEraseSpans
 
 //=================
 function drawPanelEditVisibleBoundarySegment(targetContext, context, layout, edge, startCoord, endCoord) {
@@ -2897,64 +2020,9 @@ function getSortedPanelEditCuts(values, maxValue) {
   return result.sort((a, b) => a - b)
 } // End getSortedPanelEditCuts
 
-//=================
-function getPanelEditBoundaryEdge(context, point) {
-  if (!context || !point) return null
 
-  const tolerance = 0.01
-  const x = Number(point.x || 0)
-  const y = Number(point.y || 0)
 
-  if (Math.abs(x) <= tolerance) return 'left'
-  if (Math.abs(x - context.width) <= tolerance) return 'right'
-  if (Math.abs(y) <= tolerance) return 'bottom'
-  if (Math.abs(y - context.height) <= tolerance) return 'top'
 
-  return null
-} // End getPanelEditBoundaryEdge
-
-//=================
-function getPanelEditCornerForEdges(context, edgeA, edgeB) {
-  const key = [edgeA, edgeB].sort().join('-')
-
-  if (key === 'left-top') return { x: 0, y: context.height }
-  if (key === 'bottom-left') return { x: 0, y: 0 }
-  if (key === 'right-top') return { x: context.width, y: context.height }
-  if (key === 'bottom-right') return { x: context.width, y: 0 }
-
-  return null
-} // End getPanelEditCornerForEdges
-
-//=================
-function getPanelEditPolygonBounds(points) {
-  const xs = points.map((point) => Number(point.x || 0))
-  const ys = points.map((point) => Number(point.y || 0))
-  const minX = Math.min(...xs)
-  const maxX = Math.max(...xs)
-  const minY = Math.min(...ys)
-  const maxY = Math.max(...ys)
-
-  return {
-    x: minX,
-    y: minY,
-    width: maxX - minX,
-    height: maxY - minY
-  }
-} // End getPanelEditPolygonBounds
-
-//=================
-function getPanelEditRectPolygon(rectangle) {
-  const bounds = getPanelEditRectBounds(rectangle)
-
-  if (bounds.width <= 0.01 || bounds.height <= 0.01) return []
-
-  return [
-    { x: bounds.x, y: bounds.y },
-    { x: bounds.x + bounds.width, y: bounds.y },
-    { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
-    { x: bounds.x, y: bounds.y + bounds.height }
-  ]
-} // End getPanelEditRectPolygon
 
 //=================
 function getPanelEditBoundaryCutoutPolygons() {
@@ -2971,432 +2039,6 @@ function getPanelEditBoundaryCutoutPolygons() {
 } // End getPanelEditBoundaryCutoutPolygons
 
 
-//=================
-function getPanelEditCircleBounds(circle) {
-  const radius = getPanelEditCircleRadius(circle)
-
-  if (!circle?.center || radius <= 0) return null
-
-  return {
-    x: Number(circle.center.x || 0) - radius,
-    y: Number(circle.center.y || 0) - radius,
-    width: radius * 2,
-    height: radius * 2
-  }
-} // End getPanelEditCircleBounds
-
-//=================
-function getPanelEditCirclePolygon(circle, segmentCount = 72) {
-  const radius = getPanelEditCircleRadius(circle)
-
-  if (!circle?.center || radius <= 0) return []
-
-  const centerX = Number(circle.center.x || 0)
-  const centerY = Number(circle.center.y || 0)
-  const count = Math.max(24, Number(segmentCount || 72))
-  const points = []
-
-  for (let index = 0; index < count; index += 1) {
-    const angle = (Math.PI * 2 * index) / count
-
-    points.push({
-      x: Math.round((centerX + Math.cos(angle) * radius) * 1000) / 1000,
-      y: Math.round((centerY + Math.sin(angle) * radius) * 1000) / 1000
-    })
-  }
-
-  return points
-} // End getPanelEditCirclePolygon
-
-//=================
-function getPanelEditRectangleRegion(rectangle, index) {
-  const bounds = Array.isArray(rectangle?.polygon) && rectangle.polygon.length >= 3
-    ? getPanelEditPolygonBounds(rectangle.polygon)
-    : getPanelEditRectBounds(rectangle)
-
-  if (bounds.width <= 0.01 || bounds.height <= 0.01) return null
-
-  return {
-    id: `rectangle-region-${rectangle.id || index}`,
-    source: 'rectangleRegion',
-    sourceId: rectangle.id || null,
-    regionKind: Array.isArray(rectangle?.polygon) && rectangle.polygon.length >= 3 ? 'polygon' : 'rect',
-    polygon: Array.isArray(rectangle?.polygon) && rectangle.polygon.length >= 3
-      ? rectangle.polygon.map((point) => ({ x: Number(point.x || 0), y: Number(point.y || 0) }))
-      : null,
-    start: { x: bounds.x, y: bounds.y },
-    end: { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
-    x: bounds.x,
-    y: bounds.y,
-    width: bounds.width,
-    height: bounds.height,
-    operation: rectangle.operation || 'none'
-  }
-} // End getPanelEditRectangleRegion
-
-//=================
-function getPanelEditCircleRegion(circle, index) {
-  const bounds = getPanelEditCircleBounds(circle)
-
-  if (!bounds) return null
-
-  return {
-    id: `circle-region-${circle.id || index}`,
-    source: 'circleRegion',
-    sourceId: circle.id || null,
-    regionKind: 'polygon',
-    shapeType: 'circle',
-    polygon: getPanelEditCirclePolygon(circle),
-    start: { x: bounds.x, y: bounds.y },
-    end: { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
-    center: { x: Number(circle.center.x || 0), y: Number(circle.center.y || 0) },
-    radius: getPanelEditCircleRadius(circle),
-    x: bounds.x,
-    y: bounds.y,
-    width: bounds.width,
-    height: bounds.height,
-    operation: 'none'
-  }
-} // End getPanelEditCircleRegion
-
-//=================
-function getPanelEditClosedShapeRegions() {
-  const rectangleRegions = (panelEditRect.value.rectangles || [])
-    .map((rectangle, index) => getPanelEditRectangleRegion(rectangle, index))
-    .filter(Boolean)
-  const circleRegions = (panelEditCircle.value.circles || [])
-    .map((circle, index) => getPanelEditCircleRegion(circle, index))
-    .filter(Boolean)
-
-  return [
-    ...rectangleRegions,
-    ...circleRegions
-  ]
-} // End getPanelEditClosedShapeRegions
-
-//=================
-function isPointInPanelEditPolygon(point, polygon) {
-  if (!point || !Array.isArray(polygon) || polygon.length < 3) return false
-
-  let inside = false
-
-  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index, index += 1) {
-    const currentPoint = polygon[index]
-    const previousPoint = polygon[previous]
-    const intersects = ((currentPoint.y > point.y) !== (previousPoint.y > point.y))
-      && (point.x < ((previousPoint.x - currentPoint.x) * (point.y - currentPoint.y)) / ((previousPoint.y - currentPoint.y) || 0.000001) + currentPoint.x)
-
-    if (intersects) inside = !inside
-  }
-
-  return inside
-} // End isPointInPanelEditPolygon
-
-//=================
-function getPanelEditPointKey(point) {
-  return `${Math.round(Number(point.x || 0) * 1000) / 1000},${Math.round(Number(point.y || 0) * 1000) / 1000}`
-} // End getPanelEditPointKey
-
-//=================
-function getPanelEditPolygonSignedArea(points) {
-  if (!Array.isArray(points) || points.length < 3) return 0
-
-  let area = 0
-
-  points.forEach((point, index) => {
-    const nextPoint = points[(index + 1) % points.length]
-
-    area += Number(point.x || 0) * Number(nextPoint.y || 0) - Number(nextPoint.x || 0) * Number(point.y || 0)
-  })
-
-  return area / 2
-} // End getPanelEditPolygonSignedArea
-
-//=================
-function getPanelEditSegmentParameter(segment, point) {
-  const dx = Number(segment.end.x || 0) - Number(segment.start.x || 0)
-  const dy = Number(segment.end.y || 0) - Number(segment.start.y || 0)
-  const lengthSq = dx * dx + dy * dy
-
-  if (lengthSq <= 0.000001) return 0
-
-  return (((Number(point.x || 0) - Number(segment.start.x || 0)) * dx) + ((Number(point.y || 0) - Number(segment.start.y || 0)) * dy)) / lengthSq
-} // End getPanelEditSegmentParameter
-
-//=================
-function addPanelEditUniquePoint(points, point) {
-  const key = getPanelEditPointKey(point)
-
-  if (points.some((item) => getPanelEditPointKey(item) === key)) return
-
-  points.push({
-    x: Math.round(Number(point.x || 0) * 1000) / 1000,
-    y: Math.round(Number(point.y || 0) * 1000) / 1000
-  })
-} // End addPanelEditUniquePoint
-
-//=================
-function getPanelEditPlanarSegments(context) {
-  if (!context) return []
-
-  const userSegments = (panelEditLine.value.lines || []).map((line) => ({
-    id: line.id,
-    type: 'line',
-    start: { x: Number(line.start?.x || 0), y: Number(line.start?.y || 0) },
-    end: { x: Number(line.end?.x || 0), y: Number(line.end?.y || 0) }
-  }))
-  const boundarySegments = [
-    { id: 'boundary-bottom', type: 'boundary', start: { x: 0, y: 0 }, end: { x: context.width, y: 0 } },
-    { id: 'boundary-right', type: 'boundary', start: { x: context.width, y: 0 }, end: { x: context.width, y: context.height } },
-    { id: 'boundary-top', type: 'boundary', start: { x: context.width, y: context.height }, end: { x: 0, y: context.height } },
-    { id: 'boundary-left', type: 'boundary', start: { x: 0, y: context.height }, end: { x: 0, y: 0 } }
-  ]
-  const baseSegments = [...boundarySegments, ...userSegments]
-  const splitPointsBySegment = baseSegments.map((segment) => [{ ...segment.start }, { ...segment.end }])
-
-  for (let firstIndex = 0; firstIndex < baseSegments.length; firstIndex += 1) {
-    for (let secondIndex = firstIndex + 1; secondIndex < baseSegments.length; secondIndex += 1) {
-      const intersection = getPanelEditSegmentIntersection(baseSegments[firstIndex], baseSegments[secondIndex])
-
-      if (!intersection) continue
-
-      addPanelEditUniquePoint(splitPointsBySegment[firstIndex], intersection)
-      addPanelEditUniquePoint(splitPointsBySegment[secondIndex], intersection)
-    }
-  }
-
-  const result = []
-
-  baseSegments.forEach((segment, segmentIndex) => {
-    const points = splitPointsBySegment[segmentIndex]
-      .sort((pointA, pointB) => getPanelEditSegmentParameter(segment, pointA) - getPanelEditSegmentParameter(segment, pointB))
-
-    for (let pointIndex = 0; pointIndex < points.length - 1; pointIndex += 1) {
-      const startPoint = points[pointIndex]
-      const endPoint = points[pointIndex + 1]
-      const length = Math.hypot(endPoint.x - startPoint.x, endPoint.y - startPoint.y)
-
-      if (length <= 0.01) continue
-
-      result.push({
-        id: `${segment.id}-part-${pointIndex}`,
-        type: segment.type,
-        start: startPoint,
-        end: endPoint
-      })
-    }
-  })
-
-  return result
-} // End getPanelEditPlanarSegments
-
-//=================
-function getPanelEditPlanarRegions(context) {
-  if (!context || !(panelEditLine.value.lines || []).length) return []
-
-  const segments = getPanelEditPlanarSegments(context)
-  const vertices = new Map()
-  const adjacency = new Map()
-  const edgeKeys = new Set()
-
-  function ensureVertex(point) {
-    const key = getPanelEditPointKey(point)
-
-    if (!vertices.has(key)) {
-      vertices.set(key, {
-        key,
-        x: Math.round(Number(point.x || 0) * 1000) / 1000,
-        y: Math.round(Number(point.y || 0) * 1000) / 1000
-      })
-    }
-
-    if (!adjacency.has(key)) adjacency.set(key, [])
-
-    return key
-  }
-
-  segments.forEach((segment) => {
-    const startKey = ensureVertex(segment.start)
-    const endKey = ensureVertex(segment.end)
-
-    if (startKey === endKey) return
-
-    const edgeKey = [startKey, endKey].sort().join('|')
-
-    if (edgeKeys.has(edgeKey)) return
-
-    edgeKeys.add(edgeKey)
-    adjacency.get(startKey).push(endKey)
-    adjacency.get(endKey).push(startKey)
-  })
-
-  adjacency.forEach((neighbors, key) => {
-    const vertex = vertices.get(key)
-
-    neighbors.sort((neighborA, neighborB) => {
-      const pointA = vertices.get(neighborA)
-      const pointB = vertices.get(neighborB)
-      const angleA = Math.atan2(pointA.y - vertex.y, pointA.x - vertex.x)
-      const angleB = Math.atan2(pointB.y - vertex.y, pointB.x - vertex.x)
-
-      return angleA - angleB
-    })
-  })
-
-  const visited = new Set()
-  const regions = []
-  const panelArea = context.width * context.height
-
-  vertices.forEach((_vertex, startKey) => {
-    const neighbors = adjacency.get(startKey) || []
-
-    neighbors.forEach((nextKey) => {
-      const directedKey = `${startKey}->${nextKey}`
-
-      if (visited.has(directedKey)) return
-
-      const faceKeys = []
-      let fromKey = startKey
-      let toKey = nextKey
-
-      for (let guard = 0; guard < 10000; guard += 1) {
-        const currentDirectedKey = `${fromKey}->${toKey}`
-
-        if (visited.has(currentDirectedKey)) break
-
-        visited.add(currentDirectedKey)
-        faceKeys.push(fromKey)
-
-        const toNeighbors = adjacency.get(toKey) || []
-        const reverseIndex = toNeighbors.indexOf(fromKey)
-
-        if (reverseIndex < 0 || !toNeighbors.length) break
-
-        const followingKey = toNeighbors[(reverseIndex - 1 + toNeighbors.length) % toNeighbors.length]
-
-        fromKey = toKey
-        toKey = followingKey
-
-        if (fromKey === startKey && toKey === nextKey) break
-      }
-
-      const polygon = faceKeys.map((key) => {
-        const point = vertices.get(key)
-
-        return { x: point.x, y: point.y }
-      })
-      const area = getPanelEditPolygonSignedArea(polygon)
-      const absoluteArea = Math.abs(area)
-
-      if (polygon.length < 3) return
-      if (area <= 0.01) return
-      if (absoluteArea >= panelArea - 0.01 && (panelEditLine.value.lines || []).length) return
-
-      const bounds = getPanelEditPolygonBounds(polygon)
-
-      if (bounds.width <= 0.01 || bounds.height <= 0.01) return
-
-      regions.push({
-        id: `planar-region-${regions.length + 1}`,
-        source: 'lineRegion',
-        regionKind: 'polygon',
-        polygon,
-        start: { x: bounds.x, y: bounds.y },
-        end: { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
-        x: bounds.x,
-        y: bounds.y,
-        width: bounds.width,
-        height: bounds.height,
-        operation: 'none'
-      })
-    })
-  })
-
-  return regions
-} // End getPanelEditPlanarRegions
-
-//=================
-function getPanelEditLineRegions(context) {
-  return [
-    ...getPanelEditClosedShapeRegions(context),
-    ...getPanelEditPlanarRegions(context)
-  ]
-} // End getPanelEditLineRegions
-
-//=================
-function drawPanelEditPolygonPath(targetContext, context, layout, polygon) {
-  if (!Array.isArray(polygon) || polygon.length < 3) return false
-
-  polygon.forEach((point, index) => {
-    const screenPoint = getPanelEditPoint(context, layout.left, layout.top, layout.scale, point.x, point.y)
-
-    if (index === 0) {
-      targetContext.moveTo(screenPoint.x, screenPoint.y)
-      return
-    }
-
-    targetContext.lineTo(screenPoint.x, screenPoint.y)
-  })
-  targetContext.closePath()
-
-  return true
-} // End drawPanelEditPolygonPath
-
-//=================
-function drawPanelEditLineRegions(targetContext, context, layout) {
-  const regions = getPanelEditLineRegions(context)
-  const hoverRegion = panelEditLine.value.hoverRegion
-
-  regions.forEach((region) => {
-    const isHover = hoverRegion?.id === region.id
-
-    if (!isHover) return
-
-    targetContext.save()
-    targetContext.fillStyle = 'rgba(255, 122, 0, 0.1)'
-    targetContext.strokeStyle = '#ff7a00'
-    targetContext.lineWidth = 1.5
-    targetContext.setLineDash([6, 4])
-
-    if (region.regionKind === 'polygon') {
-      targetContext.beginPath()
-      if (drawPanelEditPolygonPath(targetContext, context, layout, region.polygon)) {
-        targetContext.fill()
-        targetContext.stroke()
-      }
-      targetContext.restore()
-      return
-    }
-
-    const topLeft = getPanelEditPoint(context, layout.left, layout.top, layout.scale, region.x, region.y + region.height)
-
-    targetContext.fillRect(topLeft.x, topLeft.y, region.width * layout.scale, region.height * layout.scale)
-    targetContext.strokeRect(topLeft.x, topLeft.y, region.width * layout.scale, region.height * layout.scale)
-    targetContext.restore()
-  })
-} // End drawPanelEditLineRegions
-
-//=================
-function hitPanelEditLineRegion(context, layout, event) {
-  const canvas = panelEditCanvasRef.value
-
-  if (!canvas || !context || !layout) return null
-
-  const rect = canvas.getBoundingClientRect()
-  const local = getPanelEditLocalFromScreen(context, layout, event.clientX - rect.left, event.clientY - rect.top)
-  const regions = getPanelEditLineRegions(context)
-
-  return regions.find((region) => {
-    if (region.regionKind === 'polygon') {
-      return isPointInPanelEditPolygon(local, region.polygon)
-    }
-
-    return local.x >= region.x
-      && local.x <= region.x + region.width
-      && local.y >= region.y
-      && local.y <= region.y + region.height
-  }) || null
-} // End hitPanelEditLineRegion
 
 //=================
 function commitPanelEditLine() {
@@ -3481,257 +2123,6 @@ function commitPanelEditCircle(radiusOverride = null) {
   nextTick(resizePanelEditCanvas)
 } // End commitPanelEditCircle
 
-
-//=================
-function getPanelEditSelectionItemKey(item) {
-  if (!item) return null
-
-  return `${item.type}:${item.key || item.id}`
-} // End getPanelEditSelectionItemKey
-
-//=================
-function normalizePanelEditSelectionItems(items = []) {
-  const seen = new Set()
-  const output = []
-
-  items.forEach((item) => {
-    const key = getPanelEditSelectionItemKey(item)
-
-    if (!key || seen.has(key)) return
-
-    seen.add(key)
-    output.push({ ...item })
-  })
-
-  return output
-} // End normalizePanelEditSelectionItems
-
-//=================
-function setPanelEditSelection(items = []) {
-  const nextItems = normalizePanelEditSelectionItems(items)
-  const firstLine = nextItems.find((item) => item.type === 'line')
-
-  panelEditSelection.value = {
-    ...panelEditSelection.value,
-    items: nextItems
-  }
-  panelEditLine.value = {
-    ...panelEditLine.value,
-    selectedLineId: firstLine?.key || null
-  }
-} // End setPanelEditSelection
-
-//=================
-function clearPanelEditSelection() {
-  panelEditSelection.value = {
-    ...panelEditSelection.value,
-    items: []
-  }
-  panelEditLine.value = {
-    ...panelEditLine.value,
-    selectedLineId: null
-  }
-} // End clearPanelEditSelection
-
-//=================
-function getPanelEditSelectedLineKeySet() {
-  return new Set(
-    panelEditSelection.value.items
-      .filter((item) => item.type === 'line')
-      .map((item) => item.key)
-  )
-} // End getPanelEditSelectedLineKeySet
-
-//=================
-function isPanelEditRectangleSelected(rectangle) {
-  return panelEditSelection.value.items.some((item) => item.type === 'rect' && item.id === rectangle?.id)
-} // End isPanelEditRectangleSelected
-
-//=================
-function isPanelEditCircleSelected(circle) {
-  return panelEditSelection.value.items.some((item) => item.type === 'circle' && item.id === circle?.id)
-} // End isPanelEditCircleSelected
-
-//=================
-function isPanelEditSelectionItemEqual(a, b) {
-  if (!a || !b || a.type !== b.type) return false
-
-  if (a.type === 'line') return a.key === b.key
-
-  return a.id === b.id
-} // End isPanelEditSelectionItemEqual
-
-//=================
-function isPanelEditRectangleHovered(rectangle) {
-  return isPanelEditSelectionItemEqual(panelEditSelection.value.hoverItem, { type: 'rect', id: rectangle?.id })
-} // End isPanelEditRectangleHovered
-
-//=================
-function isPanelEditCircleHovered(circle) {
-  return isPanelEditSelectionItemEqual(panelEditSelection.value.hoverItem, { type: 'circle', id: circle?.id })
-} // End isPanelEditCircleHovered
-
-//=================
-function setPanelEditHoverItem(item = null) {
-  panelEditSelection.value = {
-    ...panelEditSelection.value,
-    hoverItem: item ? { ...item } : null
-  }
-} // End setPanelEditHoverItem
-
-//=================
-function getPanelEditRectangleHit(local) {
-  if (!local) return null
-
-  for (let index = panelEditRect.value.rectangles.length - 1; index >= 0; index -= 1) {
-    const rectangle = panelEditRect.value.rectangles[index]
-    const bounds = Array.isArray(rectangle?.polygon) && rectangle.polygon.length >= 3
-      ? getPanelEditPolygonBounds(rectangle.polygon)
-      : getPanelEditRectBounds(rectangle)
-
-    if (!bounds) continue
-
-    const inside = local.x >= bounds.x
-      && local.x <= bounds.x + bounds.width
-      && local.y >= bounds.y
-      && local.y <= bounds.y + bounds.height
-
-    if (inside) return { type: 'rect', id: rectangle.id }
-  }
-
-  return null
-} // End getPanelEditRectangleHit
-
-//=================
-function getPanelEditCircleHit(local) {
-  if (!local) return null
-
-  for (let index = panelEditCircle.value.circles.length - 1; index >= 0; index -= 1) {
-    const circle = panelEditCircle.value.circles[index]
-    const radius = getPanelEditCircleRadius(circle)
-
-    if (!circle?.center || radius <= 0) continue
-
-    const distance = Math.hypot(local.x - Number(circle.center.x || 0), local.y - Number(circle.center.y || 0))
-
-    if (distance <= radius) return { type: 'circle', id: circle.id }
-  }
-
-  return null
-} // End getPanelEditCircleHit
-
-//=================
-function getPanelEditHoverItem(context, layout, event, lineHit = null) {
-  if (lineHit) return { type: 'line', key: getPanelEditLineSelectionKey(lineHit) }
-
-  const local = getPanelEditPointerLocal(context, layout, event)
-
-  return getPanelEditCircleHit(local) || getPanelEditRectangleHit(local)
-} // End getPanelEditHoverItem
-
-//=================
-function getPanelEditPointerLocal(context, layout, event) {
-  const canvas = panelEditCanvasRef.value
-
-  if (!canvas || !context || !layout || !event) return null
-
-  const rect = canvas.getBoundingClientRect()
-  const rawLocal = getPanelEditLocalFromScreen(context, layout, event.clientX - rect.left, event.clientY - rect.top)
-
-  return {
-    x: Math.max(0, Math.min(context.width, rawLocal.x)),
-    y: Math.max(0, Math.min(context.height, rawLocal.y))
-  }
-} // End getPanelEditPointerLocal
-
-//=================
-function getPanelEditSelectDragRectFromPoints(start, current) {
-  if (!start || !current) return null
-
-  const x1 = Number(start.x || 0)
-  const y1 = Number(start.y || 0)
-  const x2 = Number(current.x || 0)
-  const y2 = Number(current.y || 0)
-
-  return {
-    x: Math.min(x1, x2),
-    y: Math.min(y1, y2),
-    width: Math.abs(x2 - x1),
-    height: Math.abs(y2 - y1)
-  }
-} // End getPanelEditSelectDragRectFromPoints
-
-//=================
-function getPanelEditSelectDragRect() {
-  const drag = panelEditSelectDrag.value
-
-  return getPanelEditSelectDragRectFromPoints(drag.start, drag.current)
-} // End getPanelEditSelectDragRect
-
-//=================
-function panelEditBoundsTouch(boundsA, boundsB) {
-  if (!boundsA || !boundsB) return false
-
-  return boundsA.x <= boundsB.x + boundsB.width
-    && boundsA.x + boundsA.width >= boundsB.x
-    && boundsA.y <= boundsB.y + boundsB.height
-    && boundsA.y + boundsA.height >= boundsB.y
-} // End panelEditBoundsTouch
-
-//=================
-function getPanelEditLineBounds(line) {
-  if (!line?.start || !line?.end) return null
-
-  const x1 = Number(line.start.x || 0)
-  const y1 = Number(line.start.y || 0)
-  const x2 = Number(line.end.x || 0)
-  const y2 = Number(line.end.y || 0)
-
-  return {
-    x: Math.min(x1, x2),
-    y: Math.min(y1, y2),
-    width: Math.abs(x2 - x1),
-    height: Math.abs(y2 - y1)
-  }
-} // End getPanelEditLineBounds
-
-//=================
-function getPanelEditSelectionByRect(selectionRect) {
-  if (!selectionRect || selectionRect.width <= 0.01 || selectionRect.height <= 0.01) return []
-
-  const items = []
-
-  panelEditLine.value.lines.forEach((line) => {
-    const lineBounds = getPanelEditLineBounds(line)
-
-    if (!panelEditBoundsTouch(selectionRect, lineBounds)) return
-
-    items.push({
-      type: 'line',
-      key: getPanelEditLineSelectionKey(line)
-    })
-  })
-
-  panelEditRect.value.rectangles.forEach((rectangle) => {
-    const bounds = Array.isArray(rectangle?.polygon) && rectangle.polygon.length >= 3
-      ? getPanelEditPolygonBounds(rectangle.polygon)
-      : getPanelEditRectBounds(rectangle)
-
-    if (!panelEditBoundsTouch(selectionRect, bounds)) return
-
-    items.push({ type: 'rect', id: rectangle.id })
-  })
-
-  panelEditCircle.value.circles.forEach((circle) => {
-    const bounds = getPanelEditCircleBounds(circle)
-
-    if (!panelEditBoundsTouch(selectionRect, bounds)) return
-
-    items.push({ type: 'circle', id: circle.id })
-  })
-
-  return normalizePanelEditSelectionItems(items)
-} // End getPanelEditSelectionByRect
 
 //=================
 function getPanelEditMoveSnapHintCandidates() {
@@ -4637,133 +3028,21 @@ function onPanelEditWheel(event) {
 } // End onPanelEditWheel
 
 
-//=================
-function clonePanelEditApplyPoint(point) {
-  return {
-    x: Number(point?.x || 0),
-    y: Number(point?.y || 0)
-  }
-} // End clonePanelEditApplyPoint
-
-//=================
-function getPanelEditSavedRectanglesForApply() {
-  return (panelEditRect.value.rectangles || []).map((rectangle) => ({
-    id: rectangle.id,
-    start: clonePanelEditApplyPoint(rectangle.start),
-    end: clonePanelEditApplyPoint(rectangle.end),
-    operation: rectangle.operation || 'none',
-    source: rectangle.source || 'rectangle',
-    regionKind: rectangle.regionKind || 'rect',
-    shapeType: rectangle.shapeType || null,
-    center: rectangle.center ? clonePanelEditApplyPoint(rectangle.center) : null,
-    radius: Number(rectangle.radius || 0),
-    polygon: Array.isArray(rectangle.polygon)
-      ? rectangle.polygon.map((point) => clonePanelEditApplyPoint(point))
-      : null
-  }))
-} // End getPanelEditSavedRectanglesForApply
-
-//=================
-function getPanelEditSavedLinesForApply() {
-  return (panelEditLine.value.lines || []).map((line) => ({
-    id: line.id,
-    groupId: line.groupId || null,
-    groupType: line.groupType || null,
-    axis: line.axis || 'free',
-    start: clonePanelEditApplyPoint(line.start),
-    end: clonePanelEditApplyPoint(line.end)
-  }))
-} // End getPanelEditSavedLinesForApply
-
-//=================
-function getPanelEditSavedCirclesForApply() {
-  return (panelEditCircle.value.circles || []).map((circle) => ({
-    id: circle.id,
-    center: clonePanelEditApplyPoint(circle.center),
-    radius: Number(circle.radius || 0)
-  })).filter((circle) => circle.radius > 0)
-} // End getPanelEditSavedCirclesForApply
-
-//=================
-function getPanelEditSavedGuidesForApply() {
-  return (panelEditTape.value.guides || []).map((guide) => ({
-    id: guide.id,
-    axis: guide.axis,
-    edge: guide.edge || null,
-    baseValue: Number(guide.baseValue || 0),
-    value: Number(guide.value || 0)
-  }))
-} // End getPanelEditSavedGuidesForApply
-
-//=================
-function applyPanelEdit() {
-  const context = activePanelEditContext.value
-
-  if (!context) return
-
-  const savedRectangles = getPanelEditSavedRectanglesForApply()
-  const savedLines = getPanelEditSavedLinesForApply()
-  const savedCircles = getPanelEditSavedCirclesForApply()
-  const savedGuides = getPanelEditSavedGuidesForApply()
-
-  drawing.applyPanelEditOperations({
-    panelId: context.panelId,
-    faceSide: context.faceSide,
-    faceKey: context.faceKey,
-    axisU: context.axisU,
-    axisV: context.axisV,
-    thicknessAxis: context.thicknessAxis,
-    rectangles: savedRectangles,
-    lines: savedLines,
-    circles: savedCircles,
-    guides: savedGuides
-  })
-
-  panelEditTape.value = {
-    hoverSnap: null,
-    draft: null,
-    guides: [],
-    inputBuffer: ''
-  }
-  panelEditRect.value = {
-    hoverSnap: null,
-    draft: null,
-    pendingAction: null,
-    rectangles: []
-  }
-  panelEditLine.value = {
-    hoverSnap: null,
-    hoverRegion: null,
-    hoverLine: null,
-    selectedLineId: null,
-    draft: null,
-    lines: []
-  }
-  panelEditCircle.value = {
-    hoverSnap: null,
-    draft: null,
-    circles: [],
-    inputBuffer: ''
-  }
-  clearPanelEditHistory()
-  drawing.clearPanelEdit()
-  app.setTool('select')
-  app.setStatus('Edit Panel: cập nhật thành công')
-  draw()
-} // End applyPanelEdit
-//=================
-function clampValue(value, min, max) {
-  return Math.min(Math.max(value, min), max)
-} // End clampValue
-
-//=================
-function getDistance(a, b) {
-  const dx = a.x - b.x
-  const dy = a.y - b.y
-
-  return Math.sqrt(dx * dx + dy * dy)
-} // End getDistance
-
+const { applyPanelEdit } = usePanelEditApply({
+  activePanelEditContext,
+  panelEditTape,
+  panelEditRect,
+  panelEditLine,
+  panelEditCircle,
+  drawing,
+  app,
+  draw,
+  clearPanelEditHistory,
+  getPanelEditSavedRectanglesForApply,
+  getPanelEditSavedLinesForApply,
+  getPanelEditSavedCirclesForApply,
+  getPanelEditSavedGuidesForApply
+})
 //=================
 function getVisiblePanels() {
   return drawing.state.panels.filter((panel) => panel.hidden !== true)
@@ -5041,148 +3320,70 @@ function zoomAtPoint(screenX, screenY, nextZoom) {
   app.setPan(nextPanX, nextPanY)
 } // End zoomAtPoint
 //=================
-function getScreenPointFromEvent(event) {
-  const rect = canvasRef.value.getBoundingClientRect()
+function getPanelAxisMin(panel, axis) {
+  if (axis === 'x') return Number(panel.x || 0)
+  if (axis === 'y') return Number((panel.y3d ?? panel.worldY ?? panel.depthY ?? panel.y) || 0)
+  if (axis === 'z') return Number(panel.z ?? panel.y ?? 0)
 
-  return {
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top
-  }
-} // End getScreenPointFromEvent
-
-//=================
-function startSelectDrag(event) {
-  if (app.state.currentTool !== 'select') return false
-  if (event.button !== 0) return false
-  if (event.shiftKey) return false
-
-  const point = getScreenPointFromEvent(event)
-
-  selectDrag.value = {
-    active: false,
-    start: point,
-    current: point,
-    moved: false,
-    mode: 'contain'
-  }
-
-  return true
-} // End startSelectDrag
-//=================
-function resetSelectDrag() {
-  selectDrag.value = {
-    active: false,
-    start: null,
-    current: null,
-    moved: false,
-    mode: 'contain'
-  }
-
-  draw()
-} // End resetSelectDrag
-//=================
-function getSelectDragRect() {
-  if (!selectDrag.value.start || !selectDrag.value.current) return null
-
-  const start = selectDrag.value.start
-  const current = selectDrag.value.current
-
-  return {
-    x: Math.min(start.x, current.x),
-    y: Math.min(start.y, current.y),
-    width: Math.abs(current.x - start.x),
-    height: Math.abs(current.y - start.y),
-    mode: selectDrag.value.mode
-  }
-} // End getSelectDragRect
-//=================
-function localRectToScreenRect(rect) {
-  if (!rect) return null
-
-  const viewport = app.state.viewport
-  const p1 = localToScreen(viewport, rect.x, rect.y)
-  const p2 = localToScreen(viewport, rect.x + rect.width, rect.y + rect.height)
-
-  return {
-    x: Math.min(p1.x, p2.x),
-    y: Math.min(p1.y, p2.y),
-    width: Math.abs(p2.x - p1.x),
-    height: Math.abs(p2.y - p1.y)
-  }
-} // End localRectToScreenRect
-//=================
-function getRectRight(rect) {
-  return rect.x + rect.width
-} // End getRectRight
+  return 0
+} // End getPanelAxisMin
 
 //=================
-function getRectBottom(rect) {
-  return rect.y + rect.height
-} // End getRectBottom
+function getPanelAxisSize(panel, axis) {
+  if (axis === 'x') return Number(panel.xSize ?? panel.width ?? 0)
+  if (axis === 'y') return Number(panel.ySize ?? panel.depth ?? 0)
+  if (axis === 'z') return Number(panel.zSize ?? panel.height ?? panel.thickness ?? 0)
+
+  return 0
+} // End getPanelAxisSize
 
 //=================
-function rectContainsRect(outer, inner) {
-  return (
-    inner.x >= outer.x &&
-    getRectRight(inner) <= getRectRight(outer) &&
-    inner.y >= outer.y &&
-    getRectBottom(inner) <= getRectBottom(outer)
-  )
-} // End rectContainsRect
+function projectPanelAxisValue(value, size, reverse, origin = 0) {
+  if (reverse) return origin - value - size
+
+  return value - origin
+} // End projectPanelAxisValue
 
 //=================
-function rectTouchesRect(a, b) {
-  return !(
-    getRectRight(a) < b.x ||
-    getRectRight(b) < a.x ||
-    getRectBottom(a) < b.y ||
-    getRectBottom(b) < a.y
-  )
-} // End rectTouchesRect
-//=================
-function getPanelSelectRect(panel) {
+function getPanelLocalRect(panel) {
   if (!panel) return null
 
-  const view = app.getViewConfig(app.state.currentView)
-  const axisU = String(view.axisA || 'X').toLowerCase()
-  const axisV = String(view.axisB || 'Z').toLowerCase()
-
-  const getAxisMin = (target, axis) => {
-    if (axis === 'x') return Number(target.x || 0)
-    if (axis === 'y') return Number((target.y3d ?? target.worldY ?? target.depthY ?? target.y) || 0)
-    if (axis === 'z') return Number(target.z ?? target.y ?? 0)
-
-    return 0
-  }
-
-  const getAxisSize = (target, axis) => {
-    if (axis === 'x') return Number(target.xSize ?? target.width ?? 0)
-    if (axis === 'y') return Number(target.ySize ?? target.depth ?? 0)
-    if (axis === 'z') return Number(target.zSize ?? target.height ?? target.thickness ?? 0)
-
-    return 0
-  }
-
-  const projectAxisValue = (value, size, reverse) => {
-    if (reverse) return -(value + size)
-
-    return value
-  }
-
-  const uMin = getAxisMin(panel, axisU)
-  const vMin = getAxisMin(panel, axisV)
-  const uSize = getAxisSize(panel, axisU)
-  const vSize = getAxisSize(panel, axisV)
+  const camera = getCameraConfig(app.state.currentView)
+  const uMin = getPanelAxisMin(panel, camera.axisU)
+  const vMin = getPanelAxisMin(panel, camera.axisV)
+  const uSize = getPanelAxisSize(panel, camera.axisU)
+  const vSize = getPanelAxisSize(panel, camera.axisV)
 
   if (uSize <= 0 || vSize <= 0) return null
 
-  return localRectToScreenRect({
-    x: projectAxisValue(uMin, uSize, view.reverseHorizontal),
-    y: projectAxisValue(vMin, vSize, view.reverseVertical),
+  return {
+    x: projectPanelAxisValue(uMin, uSize, camera.reverseU, camera.originU || 0),
+    y: projectPanelAxisValue(vMin, vSize, camera.reverseV, camera.originV || 0),
     width: uSize,
     height: vSize
-  })
+  }
+} // End getPanelLocalRect
+
+//=================
+function getPanelSelectRect(panel) {
+  return localRectToScreenRect(getPanelLocalRect(panel))
 } // End getPanelSelectRect
+//=================
+function getBoxLocalRect(targetBox) {
+  const rect = projectBoxToCameraRect(targetBox, app.state.currentView)
+
+  if (!rect || rect.width <= 0 || rect.height <= 0) return null
+
+  return rect
+} // End getBoxLocalRect
+//=================
+function getBoxSelectRect(targetBox) {
+  const rect = getBoxLocalRect(targetBox)
+
+  if (!rect) return null
+
+  return localRectToScreenRect(rect)
+} // End getBoxSelectRect
 //=================
 function getPanelOwnerBoxId(panel) {
   if (!panel) return null
@@ -5198,7 +3399,7 @@ function getPanelIdsInBox(boxId) {
   if (!boxId) return []
 
   return getVisiblePanels()
-    .filter((panel) => getPanelOwnerBoxId(panel) === boxId)
+    .filter((panel) => String(getPanelOwnerBoxId(panel)) === String(boxId))
     .map((panel) => panel.id)
 } // End getPanelIdsInBox
 
@@ -5256,51 +3457,6 @@ function hitTestBoxFill(local) {
 
   return null
 } // End hitTestBoxFill
-
-//=================
-function getPanelLocalRect(panel) {
-  if (!panel) return null
-
-  const view = app.getViewConfig(app.state.currentView)
-  const axisU = String(view.axisA || 'X').toLowerCase()
-  const axisV = String(view.axisB || 'Z').toLowerCase()
-
-  const getAxisMin = (target, axis) => {
-    if (axis === 'x') return Number(target.x || 0)
-    if (axis === 'y') return Number((target.y3d ?? target.worldY ?? target.depthY ?? target.y) || 0)
-    if (axis === 'z') return Number(target.z ?? target.y ?? 0)
-
-    return 0
-  }
-
-  const getAxisSize = (target, axis) => {
-    if (axis === 'x') return Number(target.xSize ?? target.width ?? 0)
-    if (axis === 'y') return Number(target.ySize ?? target.depth ?? 0)
-    if (axis === 'z') return Number(target.zSize ?? target.height ?? target.thickness ?? 0)
-
-    return 0
-  }
-
-  const projectAxisValue = (value, size, reverse) => {
-    if (reverse) return -(value + size)
-
-    return value
-  }
-
-  const uMin = getAxisMin(panel, axisU)
-  const vMin = getAxisMin(panel, axisV)
-  const uSize = getAxisSize(panel, axisU)
-  const vSize = getAxisSize(panel, axisV)
-
-  if (uSize <= 0 || vSize <= 0) return null
-
-  return {
-    x: projectAxisValue(uMin, uSize, view.reverseHorizontal),
-    y: projectAxisValue(vMin, vSize, view.reverseVertical),
-    width: uSize,
-    height: vSize
-  }
-} // End getPanelLocalRect
 
 //=================
 function hitTestVisiblePanel(local) {
@@ -5486,55 +3642,6 @@ function refreshDimensionSnapFromMouse() {
 } // End refreshDimensionSnapFromMouse
 
 //=================
-function getSelectedIdsByDragRect(selectRect) {
-  if (!selectRect) {
-    return {
-      panelIds: [],
-      boxIds: [],
-      dimensionIds: []
-    }
-  }
-
-  const checkRect = selectRect.mode === 'touch'
-    ? rectTouchesRect
-    : rectContainsRect
-
-  const panelHits = getVisiblePanels()
-    .map((panel) => {
-      const rect = getPanelSelectRect(panel)
-
-      if (!rect || rect.width <= 0 || rect.height <= 0) return null
-      if (!checkRect(selectRect, rect)) return null
-
-      return {
-        panel,
-        rect,
-        isBackPanel: panel.panelSide === 'back' || panel.cabinetInfoKind === 'back'
-      }
-    })
-    .filter(Boolean)
-  const hasNonBackPanelHit = panelHits.some((hit) => !hit.isBackPanel)
-  const panelIds = panelHits
-    .filter((hit) => !(hasNonBackPanelHit && hit.isBackPanel))
-    .map((hit) => hit.panel.id)
-
-  const dimensionIds = drawing.getRenderableDimensions(app.state.currentView)
-    .filter((dimension) => {
-      const rect = getDimensionSelectRect(dimension)
-
-      if (!rect || rect.width <= 0 || rect.height <= 0) return false
-
-      return checkRect(selectRect, rect)
-    })
-    .map((dimension) => dimension.id)
-
-  return {
-    panelIds,
-    boxIds: [],
-    dimensionIds
-  }
-} // End getSelectedIdsByDragRect
-//=================
 function mergeIds(oldIds, newId) {
   const ids = Array.isArray(oldIds) ? oldIds.slice() : []
 
@@ -5679,74 +3786,6 @@ function getBoxDimInputInfo(dimHit) {
   return null
 } // End getBoxDimInputInfo
 //=================
-function openDimInput(dimHit) {
-  const info = dimHit?.target === 'dimension'
-    ? dimHit
-    : typeof dimHit === 'string'
-      ? getWallDimInputInfo(dimHit)
-      : getBoxDimInputInfo(dimHit)
-  if (!info) return
-  dimInput.value = {
-    active: true,
-    target: info.target || 'wall',
-    boxId: info.boxId || null,
-    dimensionId: info.dimensionId || null,
-    key: info.key,
-    x: info.x,
-    y: info.y,
-    value: info.value
-  }
-  if (dimInput.value.target === 'dimension') {
-    drawing.setDimensionValue(dimInput.value.dimensionId, numberValue)
-    wall.clearEditingDim()
-    box.clearEditingDim()
-  } else if (dimInput.value.target === 'box') {
-    box.selectBox(info.boxId)
-    box.setEditingDim(info.key)
-    wall.clearEditingDim()
-    app.setStatus(`Nhập kích thước Box: ${info.key}`)
-  } else {
-    wall.setEditingDim(info.editKey)
-    box.clearEditingDim()
-    app.setStatus(`Nhập kích thước Wall: ${info.key}`)
-  }
-  app.clearCommand()
-  nextTick(() => {
-    const input = dimInputRef.value
-    if (!input) return
-
-    input.focus()
-    input.select()
-
-    if (typeof input.setSelectionRange === 'function') {
-      input.setSelectionRange(0, String(dimInput.value.value).length)
-    }
-  })
-
-  draw()
-} // End openDimInput
-//=================
-function cancelDimInput() {
-  dimInput.value.active = false
-  wall.clearEditingDim()
-  box.clearEditingDim()
-  draw()
-} // End cancelDimInput
-//=================
-function openBoxHeightInput(event) {
-  const rect = canvasRef.value.getBoundingClientRect()
-
-  boxHeightInput.value.active = true
-  boxHeightInput.value.x = event.clientX - rect.left + 12
-  boxHeightInput.value.y = event.clientY - rect.top + 12
-  boxHeightInput.value.value = String(wall.state.height || 600)
-
-  nextTick(() => {
-    boxHeightInputRef.value?.focus()
-    boxHeightInputRef.value?.select()
-  })
-} // End openBoxHeightInput
-//=================
 function exitToSelect() {
   panning = false
   panStart = null
@@ -5783,111 +3822,6 @@ function exitToSelect() {
   draw()
 } // End exitToSelect
 
-//=================
-function cancelBoxHeightInput() {
-  if (!boxHeightInput.value.active) {
-    return
-  }
-
-  exitToSelect()
-} // End cancelBoxHeightInput
-
-//=================
-function commitBoxHeightInput() {
-  const height = Number(boxHeightInput.value.value)
-
-  if (!Number.isFinite(height) || height <= 0) {
-    cancelBoxHeightInput()
-    return
-  }
-
-  const newBox = box.commitDraft(height)
-
-  boxHeightInput.value.active = false
-  boxHeightInput.value.value = ''
-
-  if (newBox) {
-    drawing.rebuildZones()
-    app.setStatus(`Đã tạo ${newBox.name}`)
-  } else {
-    app.setStatus('Box quá nhỏ, chưa tạo')
-  }
-
-  draw()
-} // End commitBoxHeightInput
-// End commitBoxHeightInput
-
-//=================
-function onBoxHeightInputKeyDown(event) {
-  const isSpace = event.key === ' ' || event.key === 'Spacebar' || event.code === 'Space'
-
-  if (isSpace) {
-    event.preventDefault()
-    event.stopPropagation()
-    exitToSelect()
-    return
-  }
-
-  if (event.key === 'Enter') {
-    event.preventDefault()
-    event.stopPropagation()
-    commitBoxHeightInput()
-    return
-  }
-
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    event.stopPropagation()
-    exitToSelect()
-  }
-} // End onBoxHeightInputKeyDown
-//=================
-function commitDimInput() {
-  const rawValue = String(dimInput.value.value || '').trim()
-  const numberValue = Number(rawValue)
-
-  if (!Number.isFinite(numberValue) || numberValue <= 0) {
-    cancelDimInput()
-    return
-  }
-
-  if (dimInput.value.target === 'wall') {
-    wall.setSize(dimInput.value.key, numberValue)
-    drawing.rebuildZones()
-  }
-
-  if (dimInput.value.target === 'dimension') {
-    wall.clearEditingDim()
-    box.clearEditingDim()
-  } else if (dimInput.value.target === 'box') {
-    box.setBoxSize(
-      dimInput.value.boxId,
-      dimInput.value.key,
-      numberValue,
-      getWallBox3D()
-    )
-
-    drawing.rebuildZones()
-  }
-
-  cancelDimInput()
-  draw()
-} // End commitDimInput
-//=================
-function onDimInputKeyDown(event) {
-  if (event.key === 'Enter') {
-    event.preventDefault()
-    event.stopPropagation()
-    commitDimInput()
-    return
-  }
-
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    event.stopPropagation()
-    cancelDimInput()
-  }
-} // End onDimInputKeyDown
 //=================
 function onPointerDown(event) {
   viewportRef.value.focus()
@@ -6014,7 +3948,12 @@ function onPointerDown(event) {
     panOriginal = { x: app.state.viewport.panX, y: app.state.viewport.panY }
     return
   }
-  startSelectDrag(event)
+  const didStartSelectDrag = startSelectDrag(event)
+
+  if (didStartSelectDrag && app.state.currentTool === 'select') {
+    box.clearSelection()
+  }
+
   if (app.state.currentTool === 'move') {
     event.preventDefault()
     event.stopPropagation()
@@ -6089,15 +4028,6 @@ function onPointerDown(event) {
     return
   }
 
-  const boxFillHit = app.state.currentTool === 'select' ? hitTestBoxFill(rawLocal) : null
-
-  if (app.state.currentTool === 'select' && boxFillHit) {
-    selectBoxWithPanels(boxFillHit.id, event.shiftKey)
-
-    draw()
-    return
-  }
-
   if (app.state.currentTool === 'select' && !event.shiftKey) {
     drawing.clearSelection()
     box.clearSelection()
@@ -6126,6 +4056,7 @@ function onPointerMove(event) {
     selectDrag.value.mode = point.x >= selectDrag.value.start.x ? 'contain' : 'touch'
 
     if (moved) {
+      box.clearSelection()
       event.preventDefault()
       event.stopPropagation()
       draw()
@@ -6229,11 +4160,14 @@ function onPointerUp(event) {
     const selectRect = getSelectDragRect()
     const selectedIds = getSelectedIdsByDragRect(selectRect)
 
+    const panelIds = selectedIds.panelIds
+    const hasDetailSelection = panelIds.length > 0 || selectedIds.dimensionIds.length > 0
+
     if (event?.shiftKey) {
       drawing.selectPanels([
         ...new Set([
           ...(Array.isArray(drawing.state.selectedPanelIds) ? drawing.state.selectedPanelIds : []),
-          ...selectedIds.panelIds
+          ...panelIds
         ])
       ])
 
@@ -6243,9 +4177,12 @@ function onPointerUp(event) {
           ...selectedIds.dimensionIds
         ])
       ])
+
+      box.clearSelection()
     } else {
-      drawing.selectPanels(selectedIds.panelIds)
+      drawing.selectPanels(panelIds)
       drawing.selectDimensions(selectedIds.dimensionIds)
+
       box.clearSelection()
     }
 
@@ -6659,23 +4596,6 @@ function deleteSelectedPanelEditLine() {
 } // End deleteSelectedPanelEditLine
 
 //=================
-function deleteCurrentSelection() {
-  const hasPanels = Array.isArray(drawing.state.selectedPanelIds) && drawing.state.selectedPanelIds.length > 0
-  const hasBoxes = Array.isArray(box.state.selectedBoxIds) && box.state.selectedBoxIds.length > 0
-  const hasDimensions = Array.isArray(drawing.state.selectedDimensionIds) && drawing.state.selectedDimensionIds.length > 0
-
-  if (!hasPanels && !hasBoxes && !hasDimensions) return false
-
-  drawing.pushHistorySnapshot('Xóa selection')
-  drawing.deleteSelectedPanels()
-  drawing.deleteSelectedDimensions()
-  box.deleteSelectedBoxes()
-  drawing.rebuildZones()
-  draw()
-
-  return true
-} // End deleteCurrentSelection
-//=================
 function runPanelEditShortcutAction(action) {
   if (!action || action.type !== 'editPanelTool') return false
   if (!activePanelEditContext.value) return false
@@ -6705,68 +4625,6 @@ function handlePanelEditShortcutKey(event) {
   event.stopPropagation()
   return true
 } // End handlePanelEditShortcutKey
-
-//=================
-function handlePanelToolKey(event) {
-  if (app.state.currentTool !== 'panel') return false
-
-  const key = event.key
-  const isInputKey = /^[0-9]$/.test(key) || key === '/' || key === 'Backspace' || key === 'Enter' || key === 'Escape'
-
-  if (!isInputKey) return false
-
-  event.preventDefault()
-  event.stopPropagation()
-
-  if (key === 'Escape') {
-    drawing.clearPanelInput()
-    app.clearCommand()
-    app.setStatus('Vẽ Tấm: đã hủy nhập số')
-    draw()
-    return true
-  }
-
-  if (key === 'Backspace') {
-    drawing.backspacePanelInput()
-    const nextBuffer = drawing.state.panelInputBuffer
-    app.setStatus(nextBuffer ? `Vẽ Tấm: ${nextBuffer}` : 'Vẽ Tấm: chọn cạnh Zone')
-    draw()
-    return true
-  }
-
-  if (key === 'Enter') {
-    const input = drawing.getPanelInputMode()
-
-    if (input.mode === 'divide' && !input.value) {
-      app.setStatus('Vẽ Tấm: nhập /N hợp lệ, ví dụ /2 hoặc /3')
-      draw()
-      return true
-    }
-
-    if (!drawing.state.hover || drawing.state.hover.type !== 'zone-edge') {
-      app.setStatus('Vẽ Tấm: rê chuột vào cạnh Zone để tạo tấm')
-      draw()
-      return true
-    }
-
-    drawing.addPanelFromHover()
-    draw()
-    return true
-  }
-
-  drawing.appendPanelInput(key)
-  const nextBuffer = drawing.state.panelInputBuffer
-  const input = drawing.getPanelInputMode()
-
-  if (input.mode === 'divide') {
-    app.setStatus(nextBuffer ? `Vẽ Tấm: chia zone ${nextBuffer}` : 'Vẽ Tấm: nhập /N')
-  } else {
-    app.setStatus(nextBuffer ? `Vẽ Tấm: offset ${nextBuffer}mm` : 'Vẽ Tấm: chọn cạnh Zone')
-  }
-
-  draw()
-  return true
-} // End handlePanelToolKey
 
 //=================
 function onKeyDown(event) {
@@ -6811,57 +4669,7 @@ function onKeyDown(event) {
 
   if (handlePanelToolKey(event)) return
 
-  if (event.key === 'Delete') {
-    if (deleteCurrentSelection()) {
-      event.preventDefault()
-      event.stopPropagation()
-    }
-
-    return
-  }
-
-  if (isSpace) {
-    event.preventDefault()
-    event.stopPropagation()
-    exitToSelect()
-    return
-  }
-
-  if (dimInput.value.active || boxHeightInput.value.active) {
-    return
-  }
-
-  if (event.ctrlKey && !event.shiftKey && (key === 'z' || key === 'Z')) {
-    event.preventDefault()
-    event.stopPropagation()
-    drawing.undo()
-    draw()
-    return
-  }
-
-  if (event.ctrlKey && !event.shiftKey && (key === 'y' || key === 'Y')) {
-    event.preventDefault()
-    event.stopPropagation()
-    drawing.redo()
-    draw()
-    return
-  }
-
-  if (app.state.currentTool === 'move' && event.ctrlKey && !event.shiftKey && !event.altKey) {
-    event.preventDefault()
-    event.stopPropagation()
-    moveCopyMode.value = !moveCopyMode.value
-    app.setStatus(moveCopyMode.value ? 'Move Copy: ON' : 'Move Copy: OFF')
-    draw()
-    return
-  }
-
-  if (key === 'Escape') {
-    exitToSelect()
-    return
-  }
-
-  handleViewportKey(event, { app, drawing, box, wall, draw })
+  handleViewportKeyboard(event)
 } // End onKeyDown
 
 watch(() => [cabinet.state.width, cabinet.state.depth, cabinet.state.height, cabinet.state.panelThickness, app.state.currentView], () => {
@@ -7002,238 +4810,3 @@ onBeforeUnmount(() => {
   window.removeEventListener('mn-app-settings-applied', onAppSettingsApplied)
 })
 </script>
-<style scoped>
-
-.mn-cursor-move {
-  cursor: none;
-}
-
-.mn-cursor-dimensions {
-  cursor: url("data:image/svg+xml,%3Csvg width='34' height='34' viewBox='0 0 34 34' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 2 L3 23 L8 18 L12 29 L16 27 L12 16 L20 16 Z' fill='white' stroke='%23111111' stroke-width='1.4' stroke-linejoin='round'/%3E%3Cline x1='17' y1='24' x2='31' y2='24' stroke='%230077CC' stroke-width='2'/%3E%3Cline x1='17' y1='20' x2='17' y2='28' stroke='%230077CC' stroke-width='2'/%3E%3Cline x1='31' y1='20' x2='31' y2='28' stroke='%230077CC' stroke-width='2'/%3E%3Ctext x='24' y='19' font-size='8' text-anchor='middle' fill='%230077CC'%3EDIM%3C/text%3E%3C/svg%3E") 3 2, crosshair;
-}
-.mn-cursor-box {
-  cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 2 L4 22 L9 17 L13 27 L17 25 L13 15 L20 15 Z' fill='white' stroke='%23111111' stroke-width='1.4' stroke-linejoin='round'/%3E%3Crect x='13' y='21' width='14' height='8' rx='1.5' fill='%23dbefff' stroke='%230077CC' stroke-width='1.5'/%3E%3C/svg%3E") 4 2, crosshair;
-}
-
-.mn-cursor-select {
-  cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 2 L4 23 L9 18 L13 29 L17 27 L13 16 L21 16 Z' fill='white' stroke='%23111111' stroke-width='1.4' stroke-linejoin='round'/%3E%3Ccircle cx='23' cy='24' r='4' fill='%23ffffff' stroke='%230077CC' stroke-width='1.5'/%3E%3C/svg%3E") 4 2, default;
-}
-
-.mn-cursor-crosshair {
-  cursor: crosshair;
-}
-
-.mn-cursor-default {
-  cursor: default;
-}
-.mn-cursor-pointer {
-  cursor: pointer;
-}
-.mn-dim-input {
-  position: absolute;
-  width: 72px;
-  height: 26px;
-  transform: translate(-50%, -50%);
-  z-index: 20;
-  border: 1px solid #1a73e8;
-  border-radius: 3px;
-  background: #ffffff;
-  color: #111111;
-  font-size: 13px;
-  text-align: center;
-  outline: none;
-  box-shadow: none;
-}
-
-.mn-panel-edit-window {
-  position: absolute;
-  inset: 18px;
-  z-index: 25;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--mn-border-main);
-  border-radius: 8px;
-  background: var(--mn-bg-panel);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, .32);
-  overflow: hidden;
-}
-
-.mn-panel-edit-header {
-  height: 42px;
-  display: grid;
-  grid-template-columns: auto auto 1fr 92px;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 8px;
-  border-bottom: 1px solid var(--mn-border-main);
-  background: var(--mn-bg-top);
-}
-
-.mn-panel-edit-tools {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.mn-panel-edit-tool-btn {
-  width: 32px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 1px solid var(--mn-border-main);
-  border-radius: 5px;
-  background: var(--mn-bg-panel-soft);
-  color: var(--mn-text-main);
-  font-size: 11px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.mn-panel-edit-tool-btn:hover,
-.mn-panel-edit-tool-btn.active {
-  border-color: var(--mn-accent);
-  color: var(--mn-accent);
-}
-
-.mn-panel-edit-tool-icon {
-  width: 15px;
-  height: 15px;
-  object-fit: contain;
-  pointer-events: none;
-}
-
-.mn-panel-edit-face-switch {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.mn-panel-edit-face-btn {
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--mn-border-main);
-  border-radius: 5px;
-  background: var(--mn-bg-panel-soft);
-  color: var(--mn-text-main);
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.mn-panel-edit-face-btn:hover,
-.mn-panel-edit-face-btn.active {
-  border-color: var(--mn-accent);
-  color: var(--mn-accent);
-}
-
-.mn-panel-edit-title {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--mn-text-sub);
-  font-size: 11px;
-  text-align: right;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mn-panel-edit-apply {
-  height: 28px;
-  border: 1px solid var(--mn-accent);
-  border-radius: 5px;
-  background: var(--mn-accent);
-  color: #ffffff;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.mn-panel-edit-canvas {
-  width: 100%;
-  height: calc(100% - 72px);
-  display: block;
-  background: var(--mn-bg-canvas);
-  touch-action: none;
-  cursor: crosshair;
-}
-
-.mn-cursor-panel-tape {
-  cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 2 L4 23 L9 18 L13 29 L17 27 L13 16 L21 16 Z' fill='white' stroke='%23111111' stroke-width='1.4' stroke-linejoin='round'/%3E%3Cg transform='translate(15 21) rotate(-18)'%3E%3Crect x='0' y='0' width='15' height='5' rx='1' fill='%23fff7c2' stroke='%23111111' stroke-width='1'/%3E%3Cpath d='M3 0 L3 3 M6 0 L6 2 M9 0 L9 3 M12 0 L12 2' stroke='%23111111' stroke-width='1'/%3E%3C/g%3E%3C/svg%3E") 4 2, crosshair;
-}
-
-.mn-cursor-panel-rect {
-  cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 2 L4 22 L9 17 L13 27 L17 25 L13 15 L20 15 Z' fill='white' stroke='%23111111' stroke-width='1.4' stroke-linejoin='round'/%3E%3Crect x='13' y='21' width='14' height='8' rx='1.5' fill='%23dbefff' stroke='%230077CC' stroke-width='1.5'/%3E%3C/svg%3E") 4 2, crosshair;
-}
-
-.mn-cursor-panel-circle {
-  cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 2 L4 22 L9 17 L13 27 L17 25 L13 15 L20 15 Z' fill='white' stroke='%23111111' stroke-width='1.4' stroke-linejoin='round'/%3E%3Ccircle cx='22' cy='24' r='6' fill='%23ffffff' stroke='%230077CC' stroke-width='1.7'/%3E%3Ccircle cx='22' cy='24' r='1.5' fill='%230077CC'/%3E%3C/svg%3E") 4 2, crosshair;
-}
-
-.mn-cursor-panel-line {
-  cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 2 L4 22 L9 17 L13 27 L17 25 L13 15 L20 15 Z' fill='white' stroke='%23111111' stroke-width='1.4' stroke-linejoin='round'/%3E%3Cline x1='14' y1='27' x2='28' y2='20' stroke='%230077CC' stroke-width='2.4' stroke-linecap='round'/%3E%3Ccircle cx='14' cy='27' r='2' fill='%23ffffff' stroke='%230077CC' stroke-width='1.4'/%3E%3Ccircle cx='28' cy='20' r='2' fill='%23ffffff' stroke='%230077CC' stroke-width='1.4'/%3E%3C/svg%3E") 4 2, crosshair;
-}
-
-.mn-panel-edit-action-dialog {
-  position: absolute;
-  left: 50%;
-  top: 58px;
-  z-index: 30;
-  width: 150px;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--mn-border-main);
-  border-radius: 7px;
-  background: var(--mn-bg-panel);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, .24);
-}
-
-.mn-panel-edit-action-btn {
-  height: 32px;
-  border: 0;
-  border-bottom: 1px solid var(--mn-border-main);
-  background: var(--mn-bg-panel);
-  color: var(--mn-text-main);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.mn-panel-edit-action-btn:last-child {
-  border-bottom: 0;
-}
-
-.mn-panel-edit-action-btn:hover {
-  background: var(--mn-bg-panel-soft);
-}
-
-.mn-panel-edit-action-btn.danger {
-  color: #d90000;
-}
-
-.mn-panel-edit-footer {
-  height: 30px;
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  border-top: 1px solid var(--mn-border-main);
-  background: var(--mn-bg-top);
-  color: var(--mn-text-main);
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.mn-panel-edit-canvas.mn-cursor-select {
-  cursor: url("data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 2 L4 23 L9 18 L13 29 L17 27 L13 16 L21 16 Z' fill='white' stroke='%23111111' stroke-width='1.4' stroke-linejoin='round'/%3E%3Ccircle cx='23' cy='24' r='4' fill='%23ffffff' stroke='%230077CC' stroke-width='1.5'/%3E%3C/svg%3E") 4 2, default;
-}
-
-</style>

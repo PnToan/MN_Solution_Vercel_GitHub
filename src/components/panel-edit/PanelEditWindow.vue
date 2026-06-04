@@ -74,7 +74,8 @@ const props = defineProps({
   canvasCursorClass: { type: String, default: '' },
   pendingAction: { type: Object, default: null },
   footerText: { type: String, default: '' },
-  setCanvasRef: { type: Function, required: true }
+  setCanvasRef: { type: Function, required: true },
+  requestCanvasResize: { type: Function, default: null }
 })
 
 const emit = defineEmits([
@@ -89,11 +90,35 @@ const emit = defineEmits([
 ])
 
 const canvasRef = ref(null)
+let panelEditCanvasResizeObserver = null
+
+//=================
+function requestPanelEditCanvasResize() {
+  props.requestCanvasResize?.()
+} // End requestPanelEditCanvasResize
 
 //=================
 function syncCanvasRef() {
   props.setCanvasRef(canvasRef.value)
+  requestPanelEditCanvasResize()
 } // End syncCanvasRef
+
+//=================
+function bindPanelEditCanvasResizeObserver() {
+  if (!canvasRef.value || typeof ResizeObserver === 'undefined') return
+
+  panelEditCanvasResizeObserver?.disconnect?.()
+  panelEditCanvasResizeObserver = new ResizeObserver(() => {
+    requestPanelEditCanvasResize()
+  })
+  panelEditCanvasResizeObserver.observe(canvasRef.value)
+} // End bindPanelEditCanvasResizeObserver
+
+//=================
+function unbindPanelEditCanvasResizeObserver() {
+  panelEditCanvasResizeObserver?.disconnect?.()
+  panelEditCanvasResizeObserver = null
+} // End unbindPanelEditCanvasResizeObserver
 
 //=================
 function emitSelectTool(toolId) {
@@ -136,12 +161,19 @@ function emitConfirmAction(action) {
 } // End emitConfirmAction
 
 onMounted(() => {
-  nextTick(syncCanvasRef)
+  nextTick(() => {
+    syncCanvasRef()
+    bindPanelEditCanvasResizeObserver()
+  })
 })
 
-watch(canvasRef, syncCanvasRef)
+watch(canvasRef, () => {
+  syncCanvasRef()
+  bindPanelEditCanvasResizeObserver()
+})
 
 onBeforeUnmount(() => {
+  unbindPanelEditCanvasResizeObserver()
   props.setCanvasRef(null)
 })
 </script>
@@ -265,7 +297,9 @@ onBeforeUnmount(() => {
 
 .mn-panel-edit-canvas {
   width: 100%;
-  height: calc(100% - 72px);
+  height: auto;
+  flex: 1 1 auto;
+  min-height: 0;
   display: block;
   background: var(--mn-bg-canvas);
   touch-action: none;
