@@ -396,6 +396,23 @@ function getCssVariable(variableName, fallback) {
 } // End getCssVariable
 
 //=================
+function resizePanelEditCanvas() {
+  const canvas = panelEditCanvasRef.value
+
+  if (!canvas) return
+
+  const rect = canvas.getBoundingClientRect()
+  const deviceRatio = window.devicePixelRatio || 1
+  canvas.width = Math.max(1, rect.width * deviceRatio)
+  canvas.height = Math.max(1, rect.height * deviceRatio)
+  canvas.style.width = `${rect.width}px`
+  canvas.style.height = `${rect.height}px`
+  const editContext = canvas.getContext('2d')
+  editContext.setTransform(deviceRatio, 0, 0, deviceRatio, 0, 0)
+  drawPanelEditCanvas(editContext, rect.width, rect.height)
+} // End resizePanelEditCanvas
+
+//=================
 function getClosestPointOnPanelEditLine(line, local) {
   if (!line || !local) return null
 
