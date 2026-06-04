@@ -92,6 +92,7 @@ import { createPanelEditRectangleRecord, getEditPanelToolCursorClass, isEditPane
 import { createEditPanelMoveController } from '../../core/tools/editPanelMoveTool'
 import { getPanelEditArcData, getPanelEditArcDefaultBulge, getPanelEditArcDraftWithRadiusInput, getPanelEditArcPoints } from '../../core/tools/editPanelArcTool'
 import { findShortcutAction, loadShortcutSettings, shortcutEventToText } from '../../core/settings/shortcut-settings'
+import { clampValue, getDistance } from '../../core/geometry/number-utils'
 
 const app = useAppStore()
 const cabinet = useCabinetStore()
@@ -3908,19 +3909,6 @@ const { applyPanelEdit } = usePanelEditApply({
   getPanelEditSavedCirclesForApply,
   getPanelEditSavedGuidesForApply
 })
-//=================
-function clampValue(value, min, max) {
-  return Math.min(Math.max(value, min), max)
-} // End clampValue
-
-//=================
-function getDistance(a, b) {
-  const dx = a.x - b.x
-  const dy = a.y - b.y
-
-  return Math.sqrt(dx * dx + dy * dy)
-} // End getDistance
-
 //=================
 function getVisiblePanels() {
   return drawing.state.panels.filter((panel) => panel.hidden !== true)

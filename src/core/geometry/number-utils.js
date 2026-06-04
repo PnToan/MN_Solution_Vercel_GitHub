@@ -15,3 +15,16 @@ export function normalizePositiveNumber(value, fallback = 1) {
 export function roundMm(value) {
   return roundOneDecimal(value, 0)
 }
+
+//=================
+export function clampValue(value, min, max) {
+  return Math.max(min, Math.min(max, value))
+} // End clampValue
+
+//=================
+export function getDistance(a, b) {
+  const dx = Number(a?.x || 0) - Number(b?.x || 0)
+  const dy = Number(a?.y || 0) - Number(b?.y || 0)
+
+  return Math.hypot(dx, dy)
+} // End getDistance
